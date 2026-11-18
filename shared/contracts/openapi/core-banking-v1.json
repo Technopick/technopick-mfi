@@ -245,6 +245,62 @@
         },
         "type": "object"
       },
+      "CreateRequest": {
+        "properties": {
+          "amount": {
+            "minLength": 1,
+            "pattern": "^\\d{1,9}(\\.0{1,2})?$",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          },
+          "phoneNumber": {
+            "maxLength": 16,
+            "minLength": 0,
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "targetReference": {
+            "maxLength": 12,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "idempotencyKey",
+          "phoneNumber",
+          "targetReference"
+        ],
+        "type": "object"
+      },
+      "Created": {
+        "properties": {
+          "replayed": {
+            "type": "boolean"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DISPATCHED",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Decision": {
         "properties": {
           "journalEntryId": {
@@ -256,6 +312,30 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Dispatch": {
+        "properties": {
+          "accountReference": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "msisdn": {
+            "type": "string"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "shortCode": {
             "type": "string"
           }
         },
@@ -329,6 +409,52 @@
         ],
         "type": "object"
       },
+      "ResultRequest": {
+        "properties": {
+          "amount": {
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "checkoutRequestId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "merchantRequestId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "receipt": {
+            "pattern": "^[A-Z0-9]{8,20}$",
+            "type": "string"
+          },
+          "resultCode": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultDesc": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "transactionTime": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkoutRequestId",
+          "resultCode",
+          "tenantId"
+        ],
+        "type": "object"
+      },
       "ReverseRequest": {
         "properties": {
           "correlationId": {
@@ -361,6 +487,64 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "SendFailure": {
+        "properties": {
+          "code": {
+            "maxLength": 14,
+            "minLength": 0,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "Submitted": {
+        "properties": {
+          "checkoutRequestId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "merchantRequestId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkoutRequestId",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "TenantOnly": {
+        "properties": {
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
         "type": "object"
       },
       "ValidateRequest": {
@@ -401,6 +585,60 @@
             "type": "string"
           },
           "resultDesc": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "View": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "checkoutRequestId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "msisdnMasked": {
+            "type": "string"
+          },
+          "paymentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultDesc": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DISPATCHED",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "targetReference": {
             "type": "string"
           }
         },
@@ -621,6 +859,231 @@
         },
         "tags": [
           "mpesa-c-2b-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests": {
+      "post": {
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/{requestId}": {
+      "get": {
+        "operationId": "get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/{requestId}/dispatch": {
+      "post": {
+        "operationId": "dispatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantOnly"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispatch"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/{requestId}/result": {
+      "post": {
+        "operationId": "result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/{requestId}/send-failure": {
+      "post": {
+        "operationId": "sendFailure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendFailure"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/{requestId}/submitted": {
+      "post": {
+        "operationId": "submitted",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submitted"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
         ]
       }
     },
