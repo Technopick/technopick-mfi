@@ -1,0 +1,84 @@
+{
+  "_comment": "TEST-ONLY realm for the end-to-end stack. Passwords and the client secret are test values; never import into a real identity provider.",
+  "realm": "technopick",
+  "enabled": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 600,
+  "roles": {
+    "realm": [
+      { "name": "LOAN_OFFICER" },
+      { "name": "BRANCH_MANAGER" },
+      { "name": "SUPERVISOR" },
+      { "name": "OPERATIONS" },
+      { "name": "TELLER" },
+      { "name": "INTEGRATION" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "staff-web",
+      "name": "Technopick staff web (TEST)",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": ["http://localhost:8088/*"],
+      "webOrigins": ["http://localhost:8088"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8088/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": { "claim.name": "roles", "multivalued": "true", "jsonType.label": "String",
+                      "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false" }
+        },
+        {
+          "name": "tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": { "claim.name": "tenant_id", "claim.value": "0e2e0000-0000-0000-0000-000000000001",
+                      "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "false",
+                      "userinfo.token.claim": "false" }
+        }
+      ]
+    },
+    {
+      "clientId": "mfi-integration",
+      "name": "Integration runtime (TEST)",
+      "publicClient": false,
+      "secret": "e2e-only-integration-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": { "claim.name": "roles", "multivalued": "true", "jsonType.label": "String",
+                      "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false" }
+        }
+      ]
+    }
+  ],
+  "users": [
+    { "username": "officer", "enabled": true, "emailVerified": true, "firstName": "Olive", "lastName": "Officer",
+      "email": "officer@e2e.invalid", "realmRoles": ["LOAN_OFFICER"],
+      "credentials": [{ "type": "password", "value": "e2e-only-officer", "temporary": false }] },
+    { "username": "manager", "enabled": true, "emailVerified": true, "firstName": "Mary", "lastName": "Manager",
+      "email": "manager@e2e.invalid", "realmRoles": ["BRANCH_MANAGER"],
+      "credentials": [{ "type": "password", "value": "e2e-only-manager", "temporary": false }] },
+    { "username": "supervisor", "enabled": true, "emailVerified": true, "firstName": "Sam", "lastName": "Supervisor",
+      "email": "supervisor@e2e.invalid", "realmRoles": ["SUPERVISOR"],
+      "credentials": [{ "type": "password", "value": "e2e-only-supervisor", "temporary": false }] },
+    { "username": "ops", "enabled": true, "emailVerified": true, "firstName": "Oscar", "lastName": "Ops",
+      "email": "ops@e2e.invalid", "realmRoles": ["OPERATIONS"],
+      "credentials": [{ "type": "password", "value": "e2e-only-ops", "temporary": false }] },
+    { "username": "service-account-mfi-integration", "enabled": true, "serviceAccountClientId": "mfi-integration",
+      "realmRoles": ["INTEGRATION"] }
+  ]
+}

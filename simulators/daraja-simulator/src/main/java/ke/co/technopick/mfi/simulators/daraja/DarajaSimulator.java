@@ -462,21 +462,39 @@ public final class DarajaSimulator implements AutoCloseable {
     }
 
     /**
-     * Standalone use for local development only. Refuses to start unless
-     * {@code DARAJA_SIMULATOR_ACK=TEST_ONLY_NOT_FOR_PRODUCTION}; listens on 127.0.0.1 only.
-     * Credentials come from the environment and are test values, never real Daraja keys.
+     * Standalone use for local development and the TEST-ONLY end-to-end stack. Refuses to start
+     * unless {@code DARAJA_SIMULATOR_ACK=TEST_ONLY_NOT_FOR_PRODUCTION}. Listens on 127.0.0.1 unless
+     * {@code DARAJA_SIM_BIND} says otherwise (a container sets 0.0.0.0 on its private network).
+     * Credentials come from the environment and are test values, never real Daraja keys. If
+     * {@code DARAJA_SIM_PUBLIC_KEY_FILE} is set, the public key for B2C SecurityCredential
+     * encryption is written there (the key pair is generated at start and never stored).
      */
     public static void main(String[] args) throws IOException {
-        if (!"TEST_ONLY_NOT_FOR_PRODUCTION".equals(System.getenv("DARAJA_SIMULATOR_ACK"))) {
+        Map<String, String> env = System.getenv();
+        if (!"TEST_ONLY_NOT_FOR_PRODUCTION".equals(env.get("DARAJA_SIMULATOR_ACK"))) {
             System.err.println(LABEL + ": refusing to start. Set DARAJA_SIMULATOR_ACK=TEST_ONLY_NOT_FOR_PRODUCTION.");
             System.exit(2);
         }
-        String shortCode = System.getenv().getOrDefault("DARAJA_SIM_SHORTCODE", "174379");
-        DarajaSimulator sim = start(System.getenv().getOrDefault("DARAJA_SIM_CONSUMER_KEY", "sim-key"),
-                System.getenv().getOrDefault("DARAJA_SIM_CONSUMER_SECRET", "sim-secret"),
-                Map.of(shortCode, System.getenv().getOrDefault("DARAJA_SIM_PASSKEY", "sim-passkey")),
-                Long.parseLong(System.getenv().getOrDefault("DARAJA_SIM_CALLBACK_DELAY_MS", "1000")),
-                Integer.parseInt(System.getenv().getOrDefault("DARAJA_SIM_PORT", "18090")));
-        System.out.println(LABEL + " listening on " + sim.baseUrl() + " - NOT FOR PRODUCTION");
+        String shortCode = env.getOrDefault("DARAJA_SIM_SHORTCODE", "174379");
+        String b2cShortCode = env.getOrDefault("DARAJA_SIM_B2C_SHORTCODE", "600000");
+        Map<String, Initiator> initiators = env.containsKey("DARAJA_SIM_B2C_INITIATOR_PASSWORD")
+                ? Map.of(b2cShortCode, new Initiator(env.getOrDefault("DARAJA_SIM_B2C_INITIATOR_NAME", "testapi"),
+                        env.get("DARAJA_SIM_B2C_INITIATOR_PASSWORD")))
+                : Map.of();
+        DarajaSimulator sim = new DarajaSimulator(env.getOrDefault("DARAJA_SIM_CONSUMER_KEY", "sim-key"),
+                env.getOrDefault("DARAJA_SIM_CONSUMER_SECRET", "sim-secret"),
+                Map.of(shortCode, env.getOrDefault("DARAJA_SIM_PASSKEY", "sim-passkey")), initiators,
+                Long.parseLong(env.getOrDefault("DARAJA_SIM_CALLBACK_DELAY_MS", "1000")),
+                env.getOrDefault("DARAJA_SIM_BIND", "127.0.0.1"),
+                Integer.parseInt(env.getOrDefault("DARAJA_SIM_PORT", "18090")));
+        String keyFile = env.get("DARAJA_SIM_PUBLIC_KEY_FILE");
+        if (keyFile != null && !keyFile.isBlank()) {
+            java.nio.file.Path path = java.nio.file.Path.of(keyFile);
+            if (path.getParent() != null) {
+                java.nio.file.Files.createDirectories(path.getParent());
+            }
+            java.nio.file.Files.writeString(path, sim.publicKeyPem(), StandardCharsets.US_ASCII);
+        }
+        System.out.println(LABEL + " listening on " + sim.server.getAddress() + " - NOT FOR PRODUCTION");
     }
 }

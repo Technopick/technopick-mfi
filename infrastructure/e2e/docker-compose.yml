@@ -1,0 +1,168 @@
+# TEST-ONLY end-to-end stack: core banking, integration, TEST-ONLY Daraja simulator, PostgreSQL,
+# RabbitMQ, Keycloak (test realm) and the staff web app. Every credential here is a test value.
+# Never point this at real customers, real money or live payment networks.
+#
+#   (build jars and the web app first - see README.md)
+#   docker compose -f infrastructure/e2e/docker-compose.yml up -d --build --wait
+#   docker compose -f infrastructure/e2e/docker-compose.yml --profile seed run --rm seed
+#   open http://localhost:8088  (users: officer, manager, supervisor, ops - see README.md)
+name: technopick-mfi-e2e
+
+
+networks:
+  mfi:
+    ipam:
+      config:
+        - subnet: 172.30.57.0/24
+
+volumes:
+  simshared: {}
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: mfi_owner
+      POSTGRES_PASSWORD: dev-only-change-me
+      POSTGRES_DB: mfi
+    volumes:
+      - ../docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfi_owner -d mfi"]
+      interval: 3s
+      retries: 40
+
+  rabbitmq:
+    image: rabbitmq:4.1
+    environment:
+      RABBITMQ_DEFAULT_USER: mfi
+      RABBITMQ_DEFAULT_PASS: dev-only-change-me
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      retries: 40
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: e2e-only-admin
+      # Tokens always carry the browser-facing issuer; containers reach Keycloak by service name.
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports: ["8180:8080"]
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/technopick HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q technopick <&3"]
+      interval: 5s
+      retries: 60
+
+  daraja-simulator:
+    build: ../../simulators/daraja-simulator
+    environment:
+      DARAJA_SIMULATOR_ACK: TEST_ONLY_NOT_FOR_PRODUCTION
+      DARAJA_SIM_BIND: 0.0.0.0
+      DARAJA_SIM_CONSUMER_KEY: e2e-only-key
+      DARAJA_SIM_CONSUMER_SECRET: e2e-only-secret
+      DARAJA_SIM_SHORTCODE: "600991"
+      DARAJA_SIM_PASSKEY: e2e-only-passkey
+      DARAJA_SIM_B2C_SHORTCODE: "600000"
+      DARAJA_SIM_B2C_INITIATOR_NAME: e2eapi
+      DARAJA_SIM_B2C_INITIATOR_PASSWORD: e2e-only-initiator
+      DARAJA_SIM_CALLBACK_DELAY_MS: "1500"
+      DARAJA_SIM_PUBLIC_KEY_FILE: /shared/mfi.daraja.certificate-pem
+    volumes:
+      - simshared:/shared
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /shared/mfi.daraja.certificate-pem && exec 3<>/dev/tcp/127.0.0.1/18090"]
+      interval: 3s
+      retries: 40
+
+  core:
+    build: ../../services/core-banking
+    depends_on:
+      postgres: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    environment:
+      MFI_DB_URL: jdbc:postgresql://postgres:5432/mfi
+      MFI_DB_APP_PASSWORD: dev-only-change-me
+      MFI_DB_OWNER_PASSWORD: dev-only-change-me
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/technopick
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/technopick/protocol/openid-connect/certs
+    ports: ["8080:8080"]
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      retries: 60
+
+  integration:
+    build: ../../services/integration
+    depends_on:
+      core: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      daraja-simulator: { condition: service_healthy }
+    environment:
+      MFI_DB_URL: jdbc:postgresql://postgres:5432/mfi
+      MFI_DB_RELAY_PASSWORD: dev-only-change-me
+      MFI_RABBITMQ_HOST: rabbitmq
+      MFI_RABBITMQ_PASSWORD: dev-only-change-me
+      MFI_CORE_BASE_URL: http://core:8080
+      MFI_CORE_TOKEN_URI: http://keycloak:8080/realms/technopick/protocol/openid-connect/token
+      MFI_CORE_CLIENT_SECRET: e2e-only-integration-secret
+      # The simulator's public key (for B2C SecurityCredential) is read from the shared volume.
+      SPRING_CONFIG_IMPORT: optional:configtree:/shared/
+      SPRING_APPLICATION_JSON: >-
+        {"mfi":{"daraja":{
+          "base-url":"http://daraja-simulator:18090",
+          "allow-insecure-test-endpoint":true,
+          "consumer-key":"e2e-only-key","consumer-secret":"e2e-only-secret",
+          "callback-base-url":"http://integration:8081",
+          "allowed-cidrs":["172.30.57.0/24"],
+          "process-interval-ms":1000,"retry-backoff":"PT2S","reconciler-enabled":false,
+          "paybills":[{"token":"e2e-only-paybill-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001",
+                       "short-code":"600991","passkey":"e2e-only-passkey"}],
+          "b2c-accounts":[{"token":"e2e-only-b2c-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001",
+                           "short-code":"600000","initiator-name":"e2eapi","initiator-password":"e2e-only-initiator"}]
+        }}}
+    volumes:
+      - simshared:/shared:ro
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      retries: 60
+
+  staff-web:
+    build: ../../apps/staff-web
+    depends_on:
+      core: { condition: service_healthy }
+    volumes:
+      - ./staff-web-config.json:/usr/share/nginx/html/config.json:ro
+    ports: ["8088:8080"]
+    networks: [mfi]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/config.json >/dev/null"]
+      interval: 3s
+      retries: 40
+
+  seed:
+    image: postgres:17
+    profiles: ["seed"]
+    depends_on:
+      core: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      PGUSER: mfi_owner
+      PGPASSWORD: dev-only-change-me
+      PGDATABASE: mfi
+    volumes:
+      - ./seed:/seed:ro
+    networks: [mfi]
+    command: ["psql", "-f", "/seed/seed-e2e-TEST-ONLY.sql"]

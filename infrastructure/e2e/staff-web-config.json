@@ -1,0 +1,7 @@
+{
+  "oidcAuthority": "http://localhost:8180/realms/technopick",
+  "oidcClientId": "staff-web",
+  "oidcScope": "openid profile",
+  "rolesClaim": "roles",
+  "apiBaseUrl": ""
+}

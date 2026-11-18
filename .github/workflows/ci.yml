@@ -68,6 +68,44 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  e2e:
+    name: end-to-end (TEST-ONLY stack, browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/staff-web/package-lock.json
+      - name: Build services and the TEST-ONLY simulator
+        run: |
+          mvn -B -ntp -DskipTests package -pl services/core-banking,services/integration,simulators/daraja-simulator -am
+          mvn -B -ntp -pl simulators/daraja-simulator dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=target/lib
+      - name: Build the staff web app
+        working-directory: apps/staff-web
+        run: npm ci && npm run build
+      - name: Start the stack
+        run: |
+          docker compose -f infrastructure/e2e/docker-compose.yml up -d --build --wait --wait-timeout 420
+          docker compose -f infrastructure/e2e/docker-compose.yml --profile seed run --rm seed
+      - name: Browser journey (Playwright, Chromium)
+        working-directory: apps/staff-web
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+      - name: Stack logs
+        if: failure()
+        run: docker compose -f infrastructure/e2e/docker-compose.yml logs --no-color --tail=300
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f infrastructure/e2e/docker-compose.yml down -v
+
   ledger-db-tests:
     name: ledger database invariants (PostgreSQL)
     runs-on: ubuntu-latest
