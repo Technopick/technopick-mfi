@@ -43,10 +43,20 @@
   127.0.0.1, and its receipts start with `SIM`. The integration runtime refuses a plain-http Daraja
   or callback URL unless `mfi.daraja.allow-insecure-test-endpoint=true` (tests only).
 
+## Reconciliation (increment 11, V11)
+- Core housekeeping (every minute): PENDING older than 10 minutes -> FAILED `EXPIRED` (never
+  dispatched, so no prompt was sent); DISPATCHED without a CheckoutRequestID older than 10 minutes
+  -> flagged `SEND_OUTCOME_UNKNOWN` (cannot be queried).
+- Integration reconciler (every minute): STK query for requests with no result after 3 minutes.
+  A non-zero ResultCode closes the request as FAILED; "still processing" is counted and after 12
+  checks the request is flagged `RECONCILE_EXHAUSTED`; ResultCode 0 flags `PAID_AWAITING_RECEIPT`
+  and **credits nothing**, because the query has no receipt number - a late callback or a C2B
+  confirmation of the receipt completes it exactly once.
+- Operations list: `GET /api/v1/payments/mpesa/stk-requests/attention` (OPERATIONS, SUPERVISOR).
+
 ## Not done yet (known gaps)
-- **Reconciliation of stuck requests**: requests left PENDING (event dropped after retries) or
-  DISPATCHED/SUBMITTED with no callback are not yet swept. Next step: a job that calls the STK
-  query API for SUBMITTED/DISPATCHED requests older than N minutes, and an operations list.
+- An operations action to complete a PAID_AWAITING_RECEIPT request with the receipt from the
+  M-Pesa org portal (maker-checker).
 - Daraja sandbox run and Safaricom go-live checklist; production callback source ranges.
 - B2C (disbursements, refunds) - next increment, with its own maker-checker and reconciliation.
 
