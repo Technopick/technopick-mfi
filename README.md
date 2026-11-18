@@ -43,7 +43,7 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 12)
+## What is verified (2026-11-18, increment 13)
 
 GitHub Actions on `main`: all four jobs green.
 
@@ -59,8 +59,9 @@ GitHub Actions on `main`: all four jobs green.
 | STK reconciliation: expiry of undispatched requests, unknown sends flagged, STK status queries (paid-per-query never credited without a receipt) | core: 1 end-to-end test; integration: 1 test with the simulator | ubuntu |
 | M-Pesa B2C loan disbursement: maker-checker, one live disbursement per loan, single send, post + activate only on a matching success, alarms for timeout / mismatch / success-after-failure | core: 1 end-to-end test; integration: 1 test through outbox, RabbitMQ and the simulator (encrypted initiator credential) | ubuntu |
 | Operations close-out of unsettled STK / B2C items: proposer and approver differ, applied through the normal exactly-once paths | core: 1 end-to-end test | ubuntu |
+| Loan origination: application with quote, maker-checker approval creating loan + schedule, loan numbering; full journey to B2C disbursement and paybill repayment | core: 1 end-to-end test | ubuntu |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
-| Ledger, savings, lending, EOD, STK, B2C and close-out database rules | 86/86 checks | PostgreSQL 17 service container |
+| Ledger, savings, lending, origination, EOD, STK, B2C and close-out database rules | 89/89 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
