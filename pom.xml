@@ -38,8 +38,10 @@
     <maven-compiler.version>3.14.1</maven-compiler.version>
     <maven-surefire.version>3.5.4</maven-surefire.version>
     <maven-enforcer.version>3.6.1</maven-enforcer.version>
-    <!-- Container-based tests are tagged "integration"; the Windows CI job excludes them. -->
-    <surefire.excludedGroups></surefire.excludedGroups>
+    <!-- Container-based tests are tagged "integration"; the Windows CI job excludes them.
+         Tests tagged "sandbox" call Safaricom's Daraja sandbox and only run in the manual
+         daraja-sandbox workflow; they are excluded everywhere else. -->
+    <surefire.excludedGroups>sandbox</surefire.excludedGroups>
   </properties>
 
   <dependencyManagement>

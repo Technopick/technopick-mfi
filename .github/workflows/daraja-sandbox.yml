@@ -1,0 +1,40 @@
+name: daraja-sandbox
+
+# Manual only: calls Safaricom's Daraja SANDBOX (no real money) with credentials from repository
+# secrets. Never runs on push or pull request. Production is not reachable from this workflow:
+# the test is hard-wired to https://sandbox.safaricom.co.ke.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Daraja sandbox smoke test
+    runs-on: ubuntu-latest
+    environment: daraja-sandbox
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Sandbox smoke test
+        shell: bash
+        env:
+          DARAJA_SANDBOX_CONSUMER_KEY: ${{ secrets.DARAJA_SANDBOX_CONSUMER_KEY }}
+          DARAJA_SANDBOX_CONSUMER_SECRET: ${{ secrets.DARAJA_SANDBOX_CONSUMER_SECRET }}
+          DARAJA_SANDBOX_PASSKEY: ${{ secrets.DARAJA_SANDBOX_PASSKEY }}
+          DARAJA_SANDBOX_SHORTCODE: ${{ secrets.DARAJA_SANDBOX_SHORTCODE }}
+          DARAJA_SANDBOX_TEST_MSISDN: ${{ secrets.DARAJA_SANDBOX_TEST_MSISDN }}
+          DARAJA_SANDBOX_CALLBACK_BASE_URL: ${{ secrets.DARAJA_SANDBOX_CALLBACK_BASE_URL }}
+          DARAJA_SANDBOX_B2C_SHORTCODE: ${{ secrets.DARAJA_SANDBOX_B2C_SHORTCODE }}
+          DARAJA_SANDBOX_B2C_INITIATOR_NAME: ${{ secrets.DARAJA_SANDBOX_B2C_INITIATOR_NAME }}
+          DARAJA_SANDBOX_B2C_INITIATOR_PASSWORD: ${{ secrets.DARAJA_SANDBOX_B2C_INITIATOR_PASSWORD }}
+          DARAJA_SANDBOX_CERTIFICATE_PEM: ${{ secrets.DARAJA_SANDBOX_CERTIFICATE_PEM }}
+        run: >
+          mvn -B -ntp -pl services/integration -am test
+          -Dsurefire.excludedGroups=integration -Dgroups=sandbox -Dsurefire.failIfNoSpecifiedTests=false
+          -Dtest=DarajaSandboxSmokeTest

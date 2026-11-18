@@ -26,7 +26,7 @@ jobs:
       - name: Build and tests
         shell: bash
         # Container-based integration tests need Linux containers: they run on ubuntu only.
-        run: mvn -B -ntp verify ${{ matrix.os == 'windows-latest' && '-Dsurefire.excludedGroups=integration' || '' }}
+        run: mvn -B -ntp verify ${{ matrix.os == 'windows-latest' && '-Dsurefire.excludedGroups=integration,sandbox' || '' }}
       - name: Print generated OpenAPI document (contract drift)
         if: failure() && matrix.os == 'ubuntu-latest'
         shell: bash
