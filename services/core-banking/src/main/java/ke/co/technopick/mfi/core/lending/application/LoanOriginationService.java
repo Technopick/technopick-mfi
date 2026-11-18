@@ -79,7 +79,7 @@ public class LoanOriginationService {
                 .filter(c -> "ACTIVE".equals(c.status()))
                 .orElseThrow(() -> new IllegalArgumentException("customer " + customerRef
                         + " not found or not verified; register and verify the customer first"));
-        customerRef = customer.customerNumber();
+        String customerNumber = customer.customerNumber();
         LoanProductVersion product = activeVersion(productCode.strip().toUpperCase(Locale.ROOT))
                 .orElseThrow(() -> new IllegalArgumentException("product " + productCode + " has no active version"));
         Money principal = money(principalAmount, product);
@@ -99,7 +99,7 @@ public class LoanOriginationService {
             .query(LoanOriginationService::app).optional();
         if (existing.isPresent()) {
             App a = existing.get();
-            boolean same = a.customerRef().equals(customerRef) && a.versionId().equals(product.versionId())
+            boolean same = a.customerRef().equals(customerNumber) && a.versionId().equals(product.versionId())
                     && a.branchCode().equals(branchCode) && a.principal().compareTo(principal.amount()) == 0
                     && a.term() == termMonths && a.firstDue().equals(firstDue);
             if (!same) {
@@ -114,7 +114,7 @@ public class LoanOriginationService {
                 VALUES (:tenant, :id, :key, :customer, :customerId, :version, :branch, :ccy, :principal, :term, :due, :purpose,
                     :actor)
                 """)
-            .param("tenant", tenantId).param("id", id).param("key", idempotencyKey).param("customer", customerRef)
+            .param("tenant", tenantId).param("id", id).param("key", idempotencyKey).param("customer", customerNumber)
             .param("customerId", customer.customerId()).param("version", product.versionId()).param("branch", branchCode)
             .param("ccy", product.currency().getCurrencyCode()).param("principal", principal.amount())
             .param("term", termMonths).param("due", firstDue).param("purpose", purpose.strip()).param("actor", actor)
