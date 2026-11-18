@@ -8,6 +8,7 @@ import ke.co.technopick.mfi.core.common.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -42,6 +43,14 @@ public class ProblemHandler {
     @ExceptionHandler(AccessDeniedException.class)
     ProblemDetail denied(AccessDeniedException e) {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "access denied");
+    }
+
+    /** A concurrent duplicate lost the race on a unique key; retrying returns the original result. */
+    @ExceptionHandler(DuplicateKeyException.class)
+    ProblemDetail duplicate(DuplicateKeyException e) {
+        ProblemDetail p = problem(HttpStatus.CONFLICT, "duplicate", "concurrent duplicate request; retry");
+        p.setProperty("code", "DUPLICATE_IN_FLIGHT");
+        return p;
     }
 
     @ExceptionHandler(DataAccessException.class)

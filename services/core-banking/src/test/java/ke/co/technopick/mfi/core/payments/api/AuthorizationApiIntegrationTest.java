@@ -111,7 +111,9 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '2110-SAVINGS-CONTROL', 'Savings control', 'LIABILITY', 'KES', true),
               ('%1$s', '1000-VAULT-CASH', 'Vault cash', 'ASSET', 'KES', false),
               ('%1$s', '2300-AGENT-FLOAT-PAYABLE', 'Agent float payable', 'LIABILITY', 'KES', false),
-              ('%1$s', '4200-FEE-WITHDRAWAL', 'Withdrawal fees', 'INCOME', 'KES', false);
+              ('%1$s', '4200-FEE-WITHDRAWAL', 'Withdrawal fees', 'INCOME', 'KES', false),
+              ('%1$s', '1120-MPESA-C2B-CLEARING', 'M-Pesa paybill clearing', 'ASSET', 'KES', false),
+              ('%1$s', '2900-SUSPENSE', 'Unmatched receipts suspense', 'LIABILITY', 'KES', false);
             INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date) VALUES ('%1$s', '2026-11', '2026-11-01', '2026-11-30');
             INSERT INTO tenancy.business_date (tenant_id, current_date_) VALUES ('%1$s', '2026-11-18');
             INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account)
@@ -120,7 +122,10 @@ class AuthorizationApiIntegrationTest {
                 branch_code, gl_control_account, opened_on) VALUES
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000001', '0100000001', 'C1', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000002', '0100000002', 'C2', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
-              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000003', '0100000003', 'C3', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000003', '0100000003', 'C3', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000004', '0100000004', 'C4', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+            INSERT INTO payments.mpesa_paybill (tenant_id, short_code, branch_code, gl_clearing, gl_suspense, max_amount)
+              VALUES ('%1$s', '600991', 'NBO01', '1120-MPESA-C2B-CLEARING', '2900-SUSPENSE', 150000);
             INSERT INTO payments.channel_config (tenant_id, channel_code, currency, per_txn_max, daily_max,
                 gl_settlement_account, gl_fee_income) VALUES
               ('%1$s', 'AGENT', 'KES', 70000, 150000, '2300-AGENT-FLOAT-PAYABLE', '4200-FEE-WITHDRAWAL');
@@ -304,5 +309,57 @@ class AuthorizationApiIntegrationTest {
         assertEquals(parser.parseMap(java.nio.file.Files.readString(contract, java.nio.charset.StandardCharsets.UTF_8)),
                 parser.parseMap(live),
                 "API changed: review target/openapi/core-banking-v1.json and update the committed contract");
+    }
+
+    static JwtRequestPostProcessor integrationToken() {
+        return jwt().jwt(j -> j.subject("svc-integration")).authorities(new SimpleGrantedAuthority("ROLE_INTEGRATION"));
+    }
+
+    String c2b(String path, String body, org.springframework.test.web.servlet.request.RequestPostProcessor auth,
+               org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mvc.perform(post("/api/v1/payments/mpesa/c2b" + path).with(auth).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    static String validation(String shortCode, String billRef, String amount) {
+        return """
+            {"tenantId":"%s","shortCode":"%s","billRef":"%s","amount":"%s","currency":"KES"}
+            """.formatted(TENANT_A, shortCode, billRef, amount);
+    }
+
+    static String confirmation(String transId, String billRef, String amount) {
+        return """
+            {"tenantId":"%s","transId":"%s","shortCode":"600991","amount":"%s","currency":"KES","billRef":"%s",
+             "msisdnMasked":"2547*****678","transTime":"2026-11-18T10:15:00+03:00"}
+            """.formatted(TENANT_A, transId, amount, billRef);
+    }
+
+    /** Daraja C2B in core: validation codes, exactly-once application, unmatched receipts to suspense. */
+    @Test
+    void mpesaC2bPayments() throws Exception {
+        var ok = status().isOk();
+        assertEquals("0", JsonPath.read(c2b("/validation", validation("600991", "0100000004", "1500.00"), integrationToken(), ok), "$.resultCode"));
+        assertEquals("C2B00012", JsonPath.read(c2b("/validation", validation("600991", "NO-SUCH-ACC", "1500.00"), integrationToken(), ok), "$.resultCode"));
+        assertEquals("C2B00015", JsonPath.read(c2b("/validation", validation("999999", "0100000004", "1500.00"), integrationToken(), ok), "$.resultCode"));
+        assertEquals("C2B00013", JsonPath.read(c2b("/validation", validation("600991", "0100000004", "150000.01"), integrationToken(), ok), "$.resultCode"));
+        c2b("/validation", validation("600991", "0100000004", "1"), switchToken(), status().isForbidden());
+
+        String applied = c2b("", confirmation("TA57ZBCAM3", "0100000004", "1500.00"), integrationToken(), ok);
+        assertEquals("APPLIED", JsonPath.read(applied, "$.outcome"));
+        assertEquals(Boolean.FALSE, JsonPath.read(applied, "$.replayed"));
+        String replay = c2b("", confirmation("TA57ZBCAM3", "0100000004", "1500.00"), integrationToken(), ok);
+        assertEquals(Boolean.TRUE, JsonPath.read(replay, "$.replayed"));
+        assertEquals((String) JsonPath.read(applied, "$.paymentId"), JsonPath.read(replay, "$.paymentId"));
+        expectBalance("0100000004", "1500.00", "0.00", "1500.00");
+
+        String unmatched = c2b("", confirmation("TA57ZBCAM4", "WRONG-REF", "200.00"), integrationToken(), ok);
+        assertEquals("UNMATCHED", JsonPath.read(unmatched, "$.outcome"));
+        BigDecimal suspense = owner().queryForObject("""
+                SELECT sum(CASE side WHEN 'C' THEN amount ELSE -amount END) FROM ledger.journal_line
+                 WHERE tenant_id = ?::uuid AND account_code = '2900-SUSPENSE'
+                """, BigDecimal.class, TENANT_A);
+        assertEquals(0, new BigDecimal("200").compareTo(suspense));
+        assertEquals(2, owner().queryForObject(
+                "SELECT count(*) FROM messaging.outbox_event WHERE event_type = 'MpesaPaymentReceived'", Integer.class));
     }
 }

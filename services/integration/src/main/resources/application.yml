@@ -18,10 +18,29 @@ spring:
 camel:
   main:
     name: mfi-integration
-    # No embedded web server yet: keep the JVM running for the routes.
-    run-controller: true
+
+server:
+  port: ${MFI_INTEGRATION_PORT:8081}
+  shutdown: graceful
 
 mfi:
+  core:
+    base-url: ${MFI_CORE_BASE_URL:http://localhost:8080}
+    # OAuth2 client-credentials client with role INTEGRATION in the platform IdP.
+    token-uri: ${MFI_CORE_TOKEN_URI:}
+    client-id: ${MFI_CORE_CLIENT_ID:mfi-integration}
+    client-secret: ${MFI_CORE_CLIENT_SECRET:}
+  daraja:
+    # Per tenant paybill: an unguessable path token (from the secret store) plus the short code.
+    # Daraja callback URLs are https://<host>/daraja/c2b/<token>/{validation|confirmation}.
+    paybills: []
+    # Safaricom callback source ranges, from Safaricom's current documentation (never hard-coded).
+    allowed-cidrs: []
+    validation-on-error: REJECT
+    processor-enabled: ${MFI_DARAJA_PROCESSOR_ENABLED:true}
+    process-interval-ms: 2000
+    max-attempts: 10
+    retry-backoff: PT30S
   outbox:
     enabled: ${MFI_OUTBOX_RELAY_ENABLED:true}
     poll-interval-ms: ${MFI_OUTBOX_POLL_MS:1000}
