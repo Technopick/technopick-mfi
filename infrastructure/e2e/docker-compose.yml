@@ -58,7 +58,7 @@ services:
     ports: ["8180:8080"]
     networks: [mfi]
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/technopick HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q technopick <&3"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/technopick HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q technopick <&3"]
       interval: 5s
       retries: 60
 
@@ -80,7 +80,7 @@ services:
       - simshared:/shared
     networks: [mfi]
     healthcheck:
-      test: ["CMD-SHELL", "test -s /shared/mfi.daraja.certificate-pem && exec 3<>/dev/tcp/127.0.0.1/18090"]
+      test: ["CMD", "bash", "-c", "test -s /shared/mfi.daraja.certificate-pem && exec 3<>/dev/tcp/127.0.0.1/18090"]
       interval: 3s
       retries: 40
 
