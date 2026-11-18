@@ -108,6 +108,11 @@
         <executions>
           <execution>
             <goals><goal>repackage</goal></goals>
+            <configuration>
+              <!-- Runnable jar is core-banking-<v>-exec.jar; the plain jar stays usable as a
+                   dependency (e.g. its Flyway migrations in other modules' tests). -->
+              <classifier>exec</classifier>
+            </configuration>
           </execution>
         </executions>
       </plugin>

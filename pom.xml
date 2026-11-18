@@ -18,6 +18,7 @@
   <modules>
     <module>shared/canonical-model</module>
     <module>services/core-banking</module>
+    <module>services/integration</module>
   </modules>
 
   <properties>
@@ -84,6 +85,11 @@
       <dependency>
         <groupId>ke.co.technopick.mfi</groupId>
         <artifactId>canonical-model</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ke.co.technopick.mfi</groupId>
+        <artifactId>core-banking</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>

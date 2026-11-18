@@ -233,6 +233,10 @@ class AuthorizationApiIntegrationTest {
                  WHERE entry_id IN (SELECT entry_id FROM ledger.journal_entry WHERE idempotency_key LIKE ?)
                 """, BigDecimal.class, "%" + holdId);
         assertEquals(0, net.signum());
+        // Exactly one event per business change, written in the same transaction (replays added none).
+        assertEquals(java.util.List.of("AuthorizationCompleted", "AuthorizationReversed"), owner().queryForList(
+                "SELECT event_type FROM messaging.outbox_event WHERE aggregate_id = ? ORDER BY occurred_at",
+                String.class, holdId));
         // Tenant B's teller cannot see the account at all.
         mvc.perform(get("/api/v1/accounts/0100000001/balance").with(teller(TENANT_B))).andExpect(status().isNotFound());
     }

@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: integration
+  # The relay connects as mfi_relay: reads every tenant's outbox, may only mark publication.
+  datasource:
+    url: ${MFI_DB_URL:jdbc:postgresql://localhost:5432/mfi}
+    username: ${MFI_DB_RELAY_USER:mfi_relay}
+    password: ${MFI_DB_RELAY_PASSWORD:}
+    hikari:
+      maximum-pool-size: 4
+  rabbitmq:
+    host: ${MFI_RABBITMQ_HOST:localhost}
+    port: ${MFI_RABBITMQ_PORT:5672}
+    username: ${MFI_RABBITMQ_USER:mfi}
+    password: ${MFI_RABBITMQ_PASSWORD:}
+    publisher-confirm-type: correlated
+
+camel:
+  main:
+    name: mfi-integration
+    # No embedded web server yet: keep the JVM running for the routes.
+    run-controller: true
+
+mfi:
+  outbox:
+    enabled: ${MFI_OUTBOX_RELAY_ENABLED:true}
+    poll-interval-ms: ${MFI_OUTBOX_POLL_MS:1000}
+    batch-size: ${MFI_OUTBOX_BATCH:100}
+    exchange: mfi.events
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

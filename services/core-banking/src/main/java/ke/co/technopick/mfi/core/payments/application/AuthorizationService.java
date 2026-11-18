@@ -18,6 +18,7 @@ import ke.co.technopick.mfi.core.accounting.domain.Side;
 import ke.co.technopick.mfi.core.accounting.persistence.JdbcJournal;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.common.NotFoundException;
+import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.payments.domain.AuthorizationDecider;
 import ke.co.technopick.mfi.core.payments.domain.AuthorizationDecision;
 import ke.co.technopick.mfi.core.payments.persistence.JdbcChannelConfig;
@@ -56,15 +57,17 @@ public class AuthorizationService {
     private final JdbcHolds holds;
     private final JdbcChannelConfig channels;
     private final JdbcJournal journal;
+    private final Outbox outbox;
 
     public AuthorizationService(TenantSession session, BusinessDates businessDates, JdbcDepositAccounts accounts,
-                                JdbcHolds holds, JdbcChannelConfig channels, JdbcJournal journal) {
+                                JdbcHolds holds, JdbcChannelConfig channels, JdbcJournal journal, Outbox outbox) {
         this.session = session;
         this.businessDates = businessDates;
         this.accounts = accounts;
         this.holds = holds;
         this.channels = channels;
         this.journal = journal;
+        this.outbox = outbox;
     }
 
     @Transactional
@@ -132,6 +135,11 @@ public class AuthorizationService {
                 "SWITCH", correlationId, hold.reference(), null, lines);
         journal.post(entry, actor);
         holds.capture(holdId, entry.entryId());
+        outbox.record(tenantId, "AuthorizationCompleted", "hold", holdId.toString(),
+                "{\"holdId\":\"%s\",\"entryId\":\"%s\",\"accountId\":\"%s\",\"amount\":\"%s\",\"fee\":\"%s\",\"currency\":\"%s\"}"
+                        .formatted(holdId, entry.entryId(), account.accountId(), amount.amount().toPlainString(),
+                                fee.amount().toPlainString(), amount.currency().getCurrencyCode()),
+                correlationId);
         return new CompletionResult(holdId, entry.entryId(), false);
     }
 
@@ -157,6 +165,10 @@ public class AuthorizationService {
                         .orElseThrow(() -> new IllegalStateException("captured entry missing"));
                 JournalEntry reversal = original.reversal(reversalId, key, businessDates.current(), correlationId);
                 journal.post(reversal, actor);
+                outbox.record(tenantId, "AuthorizationReversed", "hold", holdId.toString(),
+                        "{\"holdId\":\"%s\",\"reversalEntryId\":\"%s\",\"originalEntryId\":\"%s\"}"
+                                .formatted(holdId, reversalId, original.entryId()),
+                        correlationId);
                 return new ReversalResult(holdId, ReversalOutcome.REVERSED, reversalId, false);
             }
             default -> throw new IllegalStateException("unknown hold status " + hold.status());
