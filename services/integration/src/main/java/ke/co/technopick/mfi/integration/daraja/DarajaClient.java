@@ -70,10 +70,18 @@ public class DarajaClient {
         body.put("CallBackURL", callbackUrl);
         body.put("AccountReference", accountReference);
         body.put("TransactionDesc", description);
+        String bearer;
+        try {
+            bearer = accessToken();
+        } catch (RuntimeException e) {
+            // Nothing was sent to the STK endpoint, so no prompt can have been shown.
+            LOG.warn("Daraja OAuth failed: {}", e.toString());
+            return new StkOutcome(Kind.REJECTED, null, null, "OAUTH", "Daraja access token unavailable");
+        }
         try {
             Map<String, Object> r = Objects.requireNonNull(http.post()
                 .uri(props.baseUrl() + "/mpesa/stkpush/v1/processrequest")
-                .header("Authorization", "Bearer " + accessToken())
+                .header("Authorization", "Bearer " + bearer)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()

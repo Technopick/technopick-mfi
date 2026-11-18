@@ -13,7 +13,7 @@ services/core-banking/    Modular monolith: accounting + lending domain, Flyway 
 services/switch/          jPOS switch (Phase 1 increment 3: sign-on/echo vs simulator)
 services/integration/     Camel runtime: outbox relay to RabbitMQ (provider routes next)
 services/worker/          Batch / EOD / outbox relay
-simulators/               TEST-ONLY ISO 8583/20022 and provider simulators
+simulators/               TEST-ONLY simulators (daraja-simulator: OAuth, STK Push, callbacks)
 infrastructure/           docker (local dev), CI, Linux + Windows Server deployment
 docs/                     ADRs, architecture, switching, operations, compliance
 ```
@@ -43,27 +43,28 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 9)
+## What is verified (2026-11-18, increment 10)
 
 GitHub Actions on `main`: all four jobs green.
 
 | Item | Result | Where |
 | --- | --- | --- |
 | `mvn verify` on JDK 25, `-Xlint:all -Werror` | BUILD SUCCESS | ubuntu-latest and windows-latest |
-| Unit tests (JUnit 5) incl. seeded property tests | 88/88 on each OS | both runners |
+| Unit tests (JUnit 5) incl. seeded property tests, ArchUnit, Daraja simulator | 90/90 on each OS | both runners |
 | ArchUnit rules (framework-free domain, no float/double money, no module cycles) | 4/4 | both runners |
 | Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 6 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend, hold expiry, OpenAPI contract drift | ubuntu (Testcontainers) |
 | M-Pesa C2B: Daraja callbacks (token + source range auth, store-then-ack, retries, dead letters) and core application (exactly once, suspense when unmatched) | core: 1 end-to-end test; integration: 3 tests | ubuntu (Testcontainers + stub core) |
 | Loan repayment by loan number via paybill (allocation, accrued vs unaccrued interest, overpayment, exactly once) and suspense clearance with maker-checker (to savings or loan) | core: 2 end-to-end tests | ubuntu (Testcontainers PostgreSQL 17) |
+| M-Pesa STK Push: staff request, single dispatch, result applied once across STK and C2B, phone number erased when final | core: 1 end-to-end test; integration: 3 tests through outbox, RabbitMQ and the TEST-ONLY Daraja simulator over HTTP | ubuntu (Testcontainers PostgreSQL 17 + RabbitMQ 4) |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
-| Ledger, savings, lending and EOD database rules | 70/70 checks | PostgreSQL 17 service container |
+| Ledger, savings, lending, EOD and STK database rules | 76/76 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
 API contract: `shared/contracts/openapi/core-banking-v1.json` (OpenAPI 3.1); CI fails if the
 code and the committed contract diverge.
 
-Not yet verified: suspense refunds and splitting, jPOS switch, Daraja STK Push / B2C and sandbox certification, bank/CRB/SMS routes, Docker images, running the Windows service
+Not yet verified: STK reconciliation of stuck requests, Daraja sandbox run, B2C, suspense refunds and splitting, jPOS switch, bank/CRB/SMS routes, Docker images, running the Windows service
 scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.
 
 ## Non-negotiables
