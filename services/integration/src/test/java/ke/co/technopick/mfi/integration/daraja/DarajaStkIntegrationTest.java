@@ -58,6 +58,8 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
     "mfi.daraja.consumer-key=test-only-key",
     "mfi.daraja.consumer-secret=test-only-secret",
     "mfi.daraja.allow-insecure-test-endpoint=true",
+    "mfi.daraja.reconciler-enabled=false",
+    "mfi.daraja.reconcile-after=PT0S",
     "mfi.core.client-id=mfi-integration",
     "mfi.core.client-secret=test-only"
 })
@@ -78,6 +80,9 @@ class DarajaStkIntegrationTest {
     static final Map<String, String> PHONES = new ConcurrentHashMap<>();
     static final Map<String, Integer> DISPATCHES = new ConcurrentHashMap<>();
     static final List<String> CALLS = new CopyOnWriteArrayList<>();
+    /** request id -> CheckoutRequestID reported as submitted; only ids in RECONCILE are offered as stale. */
+    static final Map<String, String> SUBMITTED = new ConcurrentHashMap<>();
+    static final java.util.Set<String> RECONCILE = ConcurrentHashMap.newKeySet();
 
     static {
         try {
@@ -115,6 +120,24 @@ class DarajaStkIntegrationTest {
             reply(ex, 200, """
                 {"requestId":"%s","shortCode":"174379","msisdn":"%s","amount":"500","accountReference":"%s",
                  "description":"Deposit"}""".formatted(id, PHONES.get(id), reference));
+            return;
+        }
+        if ("submitted".equals(action)) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"checkoutRequestId\":\"([^\"]+)\"").matcher(body);
+            if (m.find()) {
+                SUBMITTED.put(id, m.group(1));
+            }
+        }
+        if ("stale".equals(action)) {
+            StringBuilder items = new StringBuilder();
+            for (String rid : RECONCILE) {
+                if (SUBMITTED.containsKey(rid)) {
+                    items.append(items.isEmpty() ? "" : ",").append("""
+                        {"requestId":"%s","shortCode":"174379","checkoutRequestId":"%s","status":"SUBMITTED","checkCount":0}
+                        """.formatted(rid, SUBMITTED.get(rid)));
+                }
+            }
+            reply(ex, 200, "{\"items\":[" + items + "]}");
             return;
         }
         reply(ex, 200, "{\"status\":\"OK\"}");
@@ -266,5 +289,29 @@ class DarajaStkIntegrationTest {
     void plainHttpDarajaIsRefusedOutsideTests() {
         assertThrows(IllegalStateException.class, () -> new DarajaProperties(null, null, null, true, 1000, 10, null,
                 "http://daraja.example", "k", "s", "https://cb.example", false, true));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    StkReconciler reconciler;
+
+    /** No callback ever arrives: the reconciler asks Daraja (STK query) and reports what it learns. */
+    @Test
+    void overdueResultsAreQueried() throws Exception {
+        String paidSilently = request("254712340999");
+        String cancelledSilently = request("254712340997");
+        String stillProcessing = request("254712340998");
+        RECONCILE.addAll(List.of(paidSilently, cancelledSilently, stillProcessing));
+        await("submissions", () -> SUBMITTED.keySet().containsAll(RECONCILE));
+
+        assertEquals(3, reconciler.reconcile());
+        assertTrue(SIM.queries().containsAll(List.of(SUBMITTED.get(paidSilently), SUBMITTED.get(cancelledSilently),
+                SUBMITTED.get(stillProcessing))), SIM.queries().toString());
+        String paid = calls("query-result", paidSilently).get(0);
+        assertTrue(paid.contains("\"resultCode\":\"0\""), paid);
+        String cancelled = calls("query-result", cancelledSilently).get(0);
+        assertTrue(cancelled.contains("\"resultCode\":\"1032\""), cancelled);
+        String processing = calls("query-result", stillProcessing).get(0);
+        assertTrue(!processing.contains("resultCode"), processing);
+        assertEquals(List.of(), calls("result", paidSilently));
     }
 }

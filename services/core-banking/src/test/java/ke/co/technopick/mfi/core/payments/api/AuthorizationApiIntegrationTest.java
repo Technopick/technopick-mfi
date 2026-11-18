@@ -600,4 +600,82 @@ class AuthorizationApiIntegrationTest {
         // Another tenant's staff cannot see it.
         mvc.perform(get("/api/v1/payments/mpesa/stk-requests/" + id2).with(teller(TENANT_B))).andExpect(status().isNotFound());
     }
+
+    @Autowired
+    ke.co.technopick.mfi.core.payments.application.MpesaStkService stkService;
+
+    String stkSubmitted(String key, String checkout) throws Exception {
+        String id = JsonPath.read(stk("", stkCreate(key, "0712345678", "50", "0100000001"), teller(TENANT_A), status().isOk()),
+                "$.requestId");
+        stk("/" + id + "/dispatch", "{\"tenantId\":\"" + TENANT_A + "\"}", integrationToken(), status().isOk());
+        if (checkout != null) {
+            stk("/" + id + "/submitted", "{\"tenantId\":\"" + TENANT_A + "\",\"checkoutRequestId\":\"" + checkout + "\"}",
+                    integrationToken(), status().isOk());
+        }
+        return id;
+    }
+
+    String queryResult(String id, String checkout, String code) throws Exception {
+        return stk("/" + id + "/query-result", "{\"tenantId\":\"" + TENANT_A + "\",\"checkoutRequestId\":\"" + checkout + "\""
+                + (code == null ? "" : ",\"resultCode\":\"" + code + "\",\"resultDesc\":\"query\"") + "}",
+                integrationToken(), status().isOk());
+    }
+
+    /** Reconciliation: expiry of undispatched requests, unknown sends flagged, status queries applied safely. */
+    @Test
+    void mpesaStkReconciliation() throws Exception {
+        var ok = status().isOk();
+        String neverSent = JsonPath.read(stk("", stkCreate("rec-1", "0712345678", "50", "0100000001"), teller(TENANT_A), ok),
+                "$.requestId");
+        String unknownSend = stkSubmitted("rec-2", null);
+        String paidNoReceipt = stkSubmitted("rec-3", "ws_CO_R3");
+        String stuck = stkSubmitted("rec-4", "ws_CO_R4");
+        String cancelled = stkSubmitted("rec-5", "ws_CO_R5");
+
+        stkService.housekeep(java.util.UUID.fromString(TENANT_A), java.time.Duration.ZERO, java.time.Duration.ZERO);
+        String expired = mvc.perform(get("/api/v1/payments/mpesa/stk-requests/" + neverSent).with(teller(TENANT_A)))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("FAILED", JsonPath.read(expired, "$.status"));
+        assertEquals("EXPIRED", JsonPath.read(expired, "$.resultCode"));
+        stk("/" + neverSent + "/dispatch", "{\"tenantId\":\"" + TENANT_A + "\"}", integrationToken(), status().isConflict());
+
+        String stale = stk("/reconciliation/stale", "{\"tenantId\":\"" + TENANT_A + "\",\"olderThanSeconds\":0,\"limit\":100}",
+                integrationToken(), ok);
+        java.util.List<String> staleIds = JsonPath.read(stale, "$.items[*].requestId");
+        assertEquals(Boolean.TRUE, staleIds.containsAll(java.util.List.of(paidNoReceipt, stuck, cancelled)), stale);
+        assertEquals(Boolean.FALSE, staleIds.contains(unknownSend), "no CheckoutRequestID: cannot be queried");
+        stk("/reconciliation/stale", "{\"tenantId\":\"" + TENANT_A + "\",\"olderThanSeconds\":0,\"limit\":100}",
+                teller(TENANT_A), status().isForbidden());
+
+        // Paid per status query: flagged, not credited (no receipt number); a late callback completes it once.
+        String paid = queryResult(paidNoReceipt, "ws_CO_R3", "0");
+        assertEquals("SUBMITTED", JsonPath.read(paid, "$.status"));
+        assertEquals(0, owner().queryForObject("SELECT count(*) FROM payments.provider_payment WHERE provider_ref = 'SIMREC0003'",
+                Integer.class));
+        // Final failure per status query.
+        assertEquals("FAILED", JsonPath.read(queryResult(cancelled, "ws_CO_R5", "1032"), "$.status"));
+        // Still processing: counted; after the limit it goes to operations.
+        for (int i = 0; i < ke.co.technopick.mfi.core.payments.application.MpesaStkService.MAX_CHECKS; i++) {
+            queryResult(stuck, "ws_CO_R4", null);
+        }
+
+        String attention = mvc.perform(get("/api/v1/payments/mpesa/stk-requests/attention").with(staff("ops-1", "OPERATIONS")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("SEND_OUTCOME_UNKNOWN", ((java.util.List<?>) JsonPath.read(attention,
+                "$[?(@.requestId == '" + unknownSend + "')].attention")).get(0));
+        assertEquals("PAID_AWAITING_RECEIPT", ((java.util.List<?>) JsonPath.read(attention,
+                "$[?(@.requestId == '" + paidNoReceipt + "')].attention")).get(0));
+        assertEquals("RECONCILE_EXHAUSTED", ((java.util.List<?>) JsonPath.read(attention,
+                "$[?(@.requestId == '" + stuck + "')].attention")).get(0));
+        mvc.perform(get("/api/v1/payments/mpesa/stk-requests/attention").with(teller(TENANT_A))).andExpect(status().isForbidden());
+        java.util.List<String> staleAfter = JsonPath.read(stk("/reconciliation/stale",
+                "{\"tenantId\":\"" + TENANT_A + "\",\"olderThanSeconds\":0,\"limit\":100}", integrationToken(), ok), "$.items[*].requestId");
+        assertEquals(Boolean.FALSE, staleAfter.contains(paidNoReceipt) || staleAfter.contains(stuck) || staleAfter.contains(cancelled));
+
+        String late = stk("/" + paidNoReceipt + "/result", stkResult("ws_CO_R3", "0", "SIMREC0003", "50.00"), integrationToken(), ok);
+        assertEquals("COMPLETED", JsonPath.read(late, "$.status"));
+        String after = mvc.perform(get("/api/v1/payments/mpesa/stk-requests/attention").with(staff("ops-1", "OPERATIONS")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.FALSE, after.contains(paidNoReceipt));
+    }
 }

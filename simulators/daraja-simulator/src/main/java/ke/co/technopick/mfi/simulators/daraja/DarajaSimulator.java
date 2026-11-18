@@ -40,7 +40,9 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>{@code 032} customer cancels (ResultCode 1032)</li>
  *   <li>{@code 001} insufficient balance (ResultCode 1)</li>
  *   <li>{@code 037} customer unreachable (ResultCode 1037)</li>
- *   <li>{@code 999} prompt accepted but no callback is ever sent</li>
+ *   <li>{@code 999} customer pays but no callback is ever sent (STK query reports success)</li>
+ *   <li>{@code 997} customer cancels but no callback is ever sent (STK query reports 1032)</li>
+ *   <li>{@code 998} no callback, and STK query keeps answering "being processed"</li>
  *   <li>{@code 222} success, callback delivered twice (duplicate delivery)</li>
  *   <li>{@code 400} request rejected with HTTP 400 (no prompt shown)</li>
  *   <li>{@code 500} HTTP 500 (outcome unknown to the caller; no prompt shown)</li>
@@ -78,6 +80,7 @@ public final class DarajaSimulator implements AutoCloseable {
     private final Map<String, Map<String, Object>> results = new ConcurrentHashMap<>();
     private final List<StkCall> stkCalls = new CopyOnWriteArrayList<>();
     private final List<Delivery> deliveries = new CopyOnWriteArrayList<>();
+    private final List<String> queries = new CopyOnWriteArrayList<>();
 
     private DarajaSimulator(String consumerKey, String consumerSecret, Map<String, String> passkeys, long callbackDelayMs,
                             String host, int port) throws IOException {
@@ -105,6 +108,11 @@ public final class DarajaSimulator implements AutoCloseable {
 
     public List<StkCall> stkCalls() {
         return List.copyOf(stkCalls);
+    }
+
+    /** CheckoutRequestIDs queried via the STK query API (password-checked), in order. */
+    public List<String> queries() {
+        return List.copyOf(queries);
     }
 
     public List<Delivery> deliveries() {
@@ -193,8 +201,10 @@ public final class DarajaSimulator implements AutoCloseable {
                 + random.nextInt(100_000_000, 999_999_999);
         stkCalls.add(new StkCall(shortCode, phone, amount, accountRef, callback, checkout, 200));
         Map<String, Object> callbackBody = outcome(merchant, checkout, phone, amount);
-        results.put(checkout, callbackBody);
-        if (!phone.endsWith("999")) {
+        if (!phone.endsWith("998")) {
+            results.put(checkout, callbackBody);
+        }
+        if (!phone.endsWith("999") && !phone.endsWith("998") && !phone.endsWith("997")) {
             int times = phone.endsWith("222") ? 2 : 1;
             for (int i = 0; i < times; i++) {
                 scheduler.schedule(() -> deliver(callback, checkout, callbackBody), callbackDelayMs * (i + 1),
@@ -210,7 +220,7 @@ public final class DarajaSimulator implements AutoCloseable {
         Map<String, Object> cb = new LinkedHashMap<>();
         cb.put("MerchantRequestID", merchant);
         cb.put("CheckoutRequestID", checkout);
-        if (phone.endsWith("032")) {
+        if (phone.endsWith("032") || phone.endsWith("997")) {
             cb.put("ResultCode", 1032);
             cb.put("ResultDesc", "Request cancelled by user");
         } else if (phone.endsWith("001")) {
@@ -259,6 +269,13 @@ public final class DarajaSimulator implements AutoCloseable {
         }
         @SuppressWarnings("unchecked")
         Map<String, Object> r = json.readValue(ex.getRequestBody().readAllBytes(), Map.class);
+        String shortCode = str(r.get("BusinessShortCode"));
+        String passkey = passkeys.get(shortCode);
+        if (passkey == null || !password(shortCode, passkey, str(r.get("Timestamp"))).equals(str(r.get("Password")))) {
+            reply(ex, 400, Map.of("errorCode", "400.002.02", "errorMessage", "Bad Request - Invalid Password"));
+            return;
+        }
+        queries.add(str(r.get("CheckoutRequestID")));
         Map<String, Object> result = results.get(str(r.get("CheckoutRequestID")));
         if (result == null) {
             reply(ex, 500, Map.of("errorCode", "500.001.1001", "errorMessage", "The transaction is being processed"));

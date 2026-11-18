@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
  *   <li>{@code daraja-stk-dispatch}: consumes {@code MpesaStkPushRequested} events and sends the prompt.</li>
  *   <li>{@code daraja-stk-result}: persist then acknowledge STK results (idempotent on CheckoutRequestID).</li>
  *   <li>{@code daraja-stk-processor}: timer that applies stored STK results in core, with retries.</li>
+ *   <li>{@code daraja-stk-reconciler}: timer that queries Daraja for overdue STK results.</li>
  * </ul>
  */
 @Component
@@ -74,6 +75,11 @@ public class DarajaRoutes extends RouteBuilder {
             .routeId("daraja-stk-processor")
             .autoStartup("{{mfi.daraja.processor-enabled}}")
             .bean(StkResultProcessor.class, "processPending");
+
+        from("timer:daraja-stk-reconciler?period={{mfi.daraja.reconcile-interval-ms}}&delay=10000")
+            .routeId("daraja-stk-reconciler")
+            .autoStartup("{{mfi.daraja.reconciler-enabled}}")
+            .bean(StkReconciler.class, "reconcile");
     }
 
     private Map<String, Object> validateInCore(C2bCallback c) {

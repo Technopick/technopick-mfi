@@ -177,3 +177,43 @@ BEGIN
 END $$;
 COMMIT;
 \echo PASS K6 tenant B cannot see tenant A STK requests
+
+-- ---------- R1-R3: reconciliation (V11) ----------
+BEGIN;
+SET LOCAL app.tenant_id = :tA;
+INSERT INTO payments.stk_request (tenant_id, request_id, idempotency_key, short_code, target_reference, amount, currency,
+                                  msisdn, msisdn_masked, description, requested_by)
+VALUES (:tA::uuid, 'dddddddd-0000-0000-0000-000000000003', 'k-5', '174379', '0100000001', 50, 'KES',
+        '254712345678', '2547*****678', 'Deposit', 'user:teller-1'),
+       (:tA::uuid, 'dddddddd-0000-0000-0000-000000000004', 'k-6', '174379', '0100000001', 50, 'KES',
+        '254712345678', '2547*****678', 'Deposit', 'user:teller-1');
+DO $$
+BEGIN
+  UPDATE payments.stk_request SET status = 'FAILED', result_code = '1032', msisdn = NULL
+   WHERE request_id = 'dddddddd-0000-0000-0000-000000000003';
+  RAISE EXCEPTION 'TEST FAILED R1a';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE 'STK_REQUEST_STATUS%' THEN RAISE; END IF;
+END $$;
+UPDATE payments.stk_request SET status = 'FAILED', result_code = 'EXPIRED', msisdn = NULL
+ WHERE request_id = 'dddddddd-0000-0000-0000-000000000003';
+UPDATE payments.stk_request SET status = 'DISPATCHED', attention = 'SEND_OUTCOME_UNKNOWN', check_count = 1
+ WHERE request_id = 'dddddddd-0000-0000-0000-000000000004';
+DO $$
+BEGIN
+  UPDATE payments.stk_request SET check_count = 0 WHERE request_id = 'dddddddd-0000-0000-0000-000000000004';
+  RAISE EXCEPTION 'TEST FAILED R3';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE 'STK_REQUEST_IMMUTABLE%' THEN RAISE; END IF;
+END $$;
+DO $$
+BEGIN
+  UPDATE payments.stk_request SET status = 'FAILED', result_code = '1037', msisdn = NULL
+   WHERE request_id = 'dddddddd-0000-0000-0000-000000000004';
+  RAISE EXCEPTION 'TEST FAILED R2: final request kept its attention flag';
+EXCEPTION WHEN check_violation THEN NULL;
+END $$;
+UPDATE payments.stk_request SET status = 'FAILED', result_code = '1037', msisdn = NULL, attention = NULL
+ WHERE request_id = 'dddddddd-0000-0000-0000-000000000004';
+COMMIT;
+\echo PASS R1 R2 R3 only undispatched requests expire, final requests carry no attention flag, check count only grows

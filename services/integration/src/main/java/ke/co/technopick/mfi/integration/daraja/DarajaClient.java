@@ -40,6 +40,11 @@ public class DarajaClient {
     public record StkOutcome(Kind kind, String merchantRequestId, String checkoutRequestId, String code,
                              String description) { }
 
+    /** STK query outcome: FINAL (with ResultCode), PROCESSING, or ERROR (could not ask; try later). */
+    public enum QueryKind { FINAL, PROCESSING, ERROR }
+
+    public record QueryOutcome(QueryKind kind, String resultCode, String resultDesc) { }
+
     private final DarajaProperties props;
     private final RestClient http;
     private final JsonMapper json = JsonMapper.builder().build();
@@ -100,6 +105,39 @@ public class DarajaClient {
         } catch (RestClientException | IllegalStateException e) {
             LOG.warn("STK Push outcome unknown: {}", e.toString());
             return new StkOutcome(Kind.UNKNOWN, null, null, "UNKNOWN", e.getClass().getSimpleName());
+        }
+    }
+
+    /** Lipa na M-Pesa Online status query for one CheckoutRequestID. */
+    public QueryOutcome stkQuery(DarajaProperties.Paybill paybill, String checkoutRequestId) {
+        String timestamp = ZonedDateTime.now(EAT).format(STAMP);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("BusinessShortCode", paybill.shortCode());
+        body.put("Password", Base64.getEncoder().encodeToString(
+                (paybill.shortCode() + paybill.passkey() + timestamp).getBytes(StandardCharsets.UTF_8)));
+        body.put("Timestamp", timestamp);
+        body.put("CheckoutRequestID", checkoutRequestId);
+        try {
+            Map<String, Object> r = Objects.requireNonNull(http.post()
+                .uri(props.baseUrl() + "/mpesa/stkpushquery/v1/query")
+                .header("Authorization", "Bearer " + accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP));
+            Object code = r.get("ResultCode");
+            if (code == null || !"0".equals(String.valueOf(r.get("ResponseCode")))) {
+                return new QueryOutcome(QueryKind.ERROR, null, str(r.get("ResponseDescription")));
+            }
+            return new QueryOutcome(QueryKind.FINAL, String.valueOf(code), str(r.get("ResultDesc")));
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            Map<String, Object> err = parse(e.getResponseBodyAsString());
+            if ("500.001.1001".equals(err.get("errorCode"))) {
+                return new QueryOutcome(QueryKind.PROCESSING, null, str(err.get("errorMessage")));
+            }
+            return new QueryOutcome(QueryKind.ERROR, null, str(err.getOrDefault("errorMessage", e.getStatusText())));
+        } catch (RuntimeException e) {
+            return new QueryOutcome(QueryKind.ERROR, null, e.getClass().getSimpleName());
         }
     }
 

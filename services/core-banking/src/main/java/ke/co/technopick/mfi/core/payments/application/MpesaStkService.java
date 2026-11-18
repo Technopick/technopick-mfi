@@ -2,6 +2,7 @@ package ke.co.technopick.mfi.core.payments.application;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Currency;
 import java.util.List;
@@ -49,6 +50,17 @@ public class MpesaStkService {
     /** What the integration runtime needs to send the prompt; only returned once, on dispatch. */
     public record Dispatch(UUID requestId, String shortCode, String msisdn, String amount, String accountReference,
                            String description) { }
+
+    /** A request whose provider outcome is overdue: candidate for an STK status query. */
+    public record StaleItem(UUID requestId, String shortCode, String checkoutRequestId, Status status, int checkCount) { }
+
+    /** A request a person has to look at, with the reason. */
+    public record AttentionItem(UUID requestId, String targetReference, String amount, String msisdnMasked,
+                                Status status, String attention, String checkoutRequestId, int checkCount,
+                                OffsetDateTime requestedAt) { }
+
+    /** Status checks after which an unresolved request is handed to operations. */
+    public static final int MAX_CHECKS = 12;
 
     public record Result(String checkoutRequestId, String merchantRequestId, String resultCode, String resultDesc,
                          String receipt, Money amount, OffsetDateTime transTime) { }
@@ -193,7 +205,7 @@ public class MpesaStkService {
         Row r = lock(requestId);
         if (r.status() == Status.DISPATCHED) {
             jdbc.sql("""
-                    UPDATE payments.stk_request SET status = 'FAILED', result_code = :code, result_desc = :desc, msisdn = NULL
+                    UPDATE payments.stk_request SET status = 'FAILED', result_code = :code, result_desc = :desc, msisdn = NULL, attention = NULL
                      WHERE request_id = :id
                     """)
                 .param("code", truncate("SEND:" + code, 20)).param("desc", truncate(description, 200))
@@ -227,7 +239,7 @@ public class MpesaStkService {
                     Objects.requireNonNullElse(result.transTime(), OffsetDateTime.now()), correlationId), "MPESA_STK");
             jdbc.sql("""
                     UPDATE payments.stk_request SET status = 'COMPLETED', payment_id = :payment, result_code = '0',
-                           result_desc = :desc, msisdn = NULL,
+                           result_desc = :desc, msisdn = NULL, attention = NULL,
                            checkout_request_id = COALESCE(checkout_request_id, :c),
                            merchant_request_id = COALESCE(merchant_request_id, :m)
                      WHERE request_id = :id
@@ -237,7 +249,7 @@ public class MpesaStkService {
                 .update();
         } else if (r.status() != Status.FAILED) {
             jdbc.sql("""
-                    UPDATE payments.stk_request SET status = 'FAILED', result_code = :code, result_desc = :desc, msisdn = NULL,
+                    UPDATE payments.stk_request SET status = 'FAILED', result_code = :code, result_desc = :desc, msisdn = NULL, attention = NULL,
                            checkout_request_id = COALESCE(checkout_request_id, :c),
                            merchant_request_id = COALESCE(merchant_request_id, :m)
                      WHERE request_id = :id
@@ -249,6 +261,108 @@ public class MpesaStkService {
                     "{\"requestId\":\"%s\",\"resultCode\":\"%s\"}".formatted(requestId, result.resultCode()), correlationId);
         }
         return view(tenantId, requestId);
+    }
+
+    // ------------------------------------------------------------------ reconciliation (ADR-0011)
+
+    /**
+     * Housekeeping for one tenant: PENDING requests older than {@code pendingTimeout} were never
+     * dispatched, so no prompt reached the customer, and they are expired; DISPATCHED requests with
+     * no CheckoutRequestID older than {@code unknownAfter} had an unknown send outcome and cannot be
+     * queried, so they are flagged for operations. Returns {expired, flagged}.
+     */
+    @Transactional
+    public int[] housekeep(UUID tenantId, Duration pendingTimeout, Duration unknownAfter) {
+        session.bind(tenantId);
+        int expired = jdbc.sql("""
+                UPDATE payments.stk_request SET status = 'FAILED', result_code = 'EXPIRED',
+                       result_desc = 'Not dispatched in time; no prompt was sent', msisdn = NULL, attention = NULL
+                 WHERE request_id IN (SELECT request_id FROM payments.stk_request
+                                       WHERE status = 'PENDING'
+                                         AND requested_at <= clock_timestamp() - make_interval(secs => :secs)
+                                       LIMIT 500 FOR UPDATE SKIP LOCKED)
+                """)
+            .param("secs", (double) pendingTimeout.toMillis() / 1000.0).update();
+        int flagged = jdbc.sql("""
+                UPDATE payments.stk_request SET attention = 'SEND_OUTCOME_UNKNOWN'
+                 WHERE request_id IN (SELECT request_id FROM payments.stk_request
+                                       WHERE status = 'DISPATCHED' AND checkout_request_id IS NULL AND attention IS NULL
+                                         AND updated_at <= clock_timestamp() - make_interval(secs => :secs)
+                                       LIMIT 500 FOR UPDATE SKIP LOCKED)
+                """)
+            .param("secs", (double) unknownAfter.toMillis() / 1000.0).update();
+        return new int[] {expired, flagged};
+    }
+
+    /** Requests with a CheckoutRequestID and no outcome for {@code olderThan}, not yet handed to a person. */
+    @Transactional(readOnly = true)
+    public List<StaleItem> stale(UUID tenantId, Duration olderThan, int limit) {
+        session.bind(tenantId);
+        return jdbc.sql("""
+                SELECT request_id, short_code, checkout_request_id, status, check_count FROM payments.stk_request
+                 WHERE status IN ('DISPATCHED', 'SUBMITTED') AND checkout_request_id IS NOT NULL AND attention IS NULL
+                   AND updated_at <= clock_timestamp() - make_interval(secs => :secs)
+                 ORDER BY updated_at LIMIT :limit
+                """)
+            .param("secs", (double) olderThan.toMillis() / 1000.0).param("limit", Math.min(Math.max(limit, 1), 200))
+            .query((rs, i) -> new StaleItem(rs.getObject("request_id", UUID.class), rs.getString("short_code"),
+                    rs.getString("checkout_request_id"), Status.valueOf(rs.getString("status")), rs.getInt("check_count")))
+            .list();
+    }
+
+    /**
+     * Records an STK status query. {@code resultCode} null = still processing. Non-zero = final
+     * failure (applied like a failure callback). "0" = the customer paid, but the query carries no
+     * receipt number, so nothing is credited here: the request is flagged PAID_AWAITING_RECEIPT and
+     * a late callback (or a C2B confirmation of the receipt) still completes it exactly once.
+     */
+    @Transactional
+    public View queryResult(UUID tenantId, UUID requestId, String checkoutRequestId, String resultCode,
+                            String resultDesc, String correlationId) {
+        session.bind(tenantId);
+        Row r = lock(requestId);
+        checkCheckout(r, checkoutRequestId);
+        if (r.status() == Status.COMPLETED || r.status() == Status.FAILED || r.status() == Status.PENDING) {
+            return view(tenantId, requestId);
+        }
+        if (resultCode != null && !"0".equals(resultCode)) {
+            return result(tenantId, requestId, new Result(checkoutRequestId, null, resultCode, resultDesc, null, null, null),
+                    correlationId);
+        }
+        jdbc.sql("""
+                UPDATE payments.stk_request SET check_count = check_count + 1, last_checked_at = clock_timestamp(),
+                       checkout_request_id = COALESCE(checkout_request_id, :c),
+                       attention = CASE WHEN :paid THEN 'PAID_AWAITING_RECEIPT'
+                                        WHEN check_count + 1 >= :max THEN 'RECONCILE_EXHAUSTED'
+                                        ELSE attention END
+                 WHERE request_id = :id
+                """)
+            .param("c", checkoutRequestId).param("paid", "0".equals(resultCode)).param("max", MAX_CHECKS)
+            .param("id", requestId).update();
+        if ("0".equals(resultCode)) {
+            LOG.warn("STK request {} paid according to status query, receipt not yet received", requestId);
+        }
+        return view(tenantId, requestId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttentionItem> attention(UUID tenantId) {
+        session.bind(tenantId);
+        return jdbc.sql("""
+                SELECT request_id, target_reference, amount, msisdn_masked, status, attention, checkout_request_id,
+                       check_count, requested_at
+                  FROM payments.stk_request WHERE attention IS NOT NULL ORDER BY requested_at
+                """)
+            .query((rs, i) -> new AttentionItem(rs.getObject("request_id", UUID.class), rs.getString("target_reference"),
+                    rs.getBigDecimal("amount").setScale(2, RoundingMode.UNNECESSARY).toPlainString(),
+                    rs.getString("msisdn_masked"), Status.valueOf(rs.getString("status")), rs.getString("attention"),
+                    rs.getString("checkout_request_id"), rs.getInt("check_count"),
+                    rs.getObject("requested_at", OffsetDateTime.class)))
+            .list();
+    }
+
+    public List<UUID> activeTenants() {
+        return jdbc.sql("SELECT tenancy.active_tenant_ids()").query(UUID.class).list();
     }
 
     private void checkCheckout(Row r, String checkoutRequestId) {

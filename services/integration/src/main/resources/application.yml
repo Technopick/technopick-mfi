@@ -50,6 +50,10 @@ mfi:
     allow-insecure-test-endpoint: false
     stk-consumer-enabled: ${MFI_DARAJA_STK_CONSUMER_ENABLED:true}
     stk-queue: mfi.integration.mpesa-stk-requests
+    # Reconciliation (ADR-0011): query Daraja for STK results overdue by reconcile-after.
+    reconciler-enabled: ${MFI_DARAJA_RECONCILER_ENABLED:true}
+    reconcile-interval-ms: 60000
+    reconcile-after: PT3M
     process-interval-ms: 2000
     max-attempts: 10
     retry-backoff: PT30S

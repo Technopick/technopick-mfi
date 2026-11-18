@@ -5,7 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Currency;
 import java.util.UUID;
 import ke.co.technopick.mfi.core.identity.api.CurrentCaller;
@@ -51,6 +53,14 @@ public class MpesaStkController {
                                 @Pattern(regexp = "^[A-Z0-9]{8,20}$") String receipt,
                                 @Pattern(regexp = "^\\d{1,15}(\\.\\d{1,2})?$") String amount,
                                 OffsetDateTime transactionTime) { }
+
+    public record StaleRequest(@NotNull UUID tenantId, @jakarta.validation.constraints.PositiveOrZero long olderThanSeconds,
+                               @jakarta.validation.constraints.Positive int limit) { }
+
+    public record StaleItems(List<MpesaStkService.StaleItem> items) { }
+
+    public record QueryResult(@NotNull UUID tenantId, @NotBlank @Size(max = 60) String checkoutRequestId,
+                              @Size(max = 20) String resultCode, @Size(max = 200) String resultDesc) { }
 
     private final MpesaStkService service;
     private final CurrentCaller caller;
@@ -98,5 +108,24 @@ public class MpesaStkController {
                 r.merchantRequestId(), r.resultCode(), r.resultDesc(), r.receipt(),
                 r.amount() == null ? null : MpesaStkService.amount(r.amount(), Currency.getInstance("KES")),
                 r.transactionTime()), "stk:" + requestId);
+    }
+
+    @GetMapping("/attention")
+    @PreAuthorize("hasAnyRole('OPERATIONS', 'SUPERVISOR')")
+    public List<MpesaStkService.AttentionItem> attention() {
+        return service.attention(caller.tenantId());
+    }
+
+    @PostMapping("/reconciliation/stale")
+    @PreAuthorize("hasRole('INTEGRATION')")
+    public StaleItems stale(@Valid @RequestBody StaleRequest r) {
+        return new StaleItems(service.stale(r.tenantId(), Duration.ofSeconds(r.olderThanSeconds()), r.limit()));
+    }
+
+    @PostMapping("/{requestId}/query-result")
+    @PreAuthorize("hasRole('INTEGRATION')")
+    public View queryResult(@PathVariable UUID requestId, @Valid @RequestBody QueryResult r) {
+        return service.queryResult(r.tenantId(), requestId, r.checkoutRequestId(), r.resultCode(), r.resultDesc(),
+                "stk:" + requestId);
     }
 }
