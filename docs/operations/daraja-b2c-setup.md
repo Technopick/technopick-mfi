@@ -22,8 +22,10 @@ require the business's explicit go-ahead (build rules). Start in the Daraja sand
 ## Daily operations
 - `GET /api/v1/payments/mpesa/b2c/disbursements/attention` (OPERATIONS, SUPERVISOR):
   - `TIMEOUT_UNKNOWN`, `SEND_OUTCOME_UNKNOWN`: check the M-Pesa org portal by ConversationID /
-    OriginatorConversationID (= disbursement id). **Do not request a new disbursement for the loan
-    until you know whether money left** - the system blocks it while the item is live.
+    OriginatorConversationID (= disbursement id), then propose PAID (transaction id + amount) or
+    NOT_PAID with the evidence via `POST /api/v1/payments/mpesa/resolutions`; a different supervisor
+    approves (ADR-0013). **Do not request a new disbursement for the loan until it is resolved** -
+    the system blocks it while the item is live.
   - `AMOUNT_MISMATCH`, `SUCCESS_AFTER_FAILURE`: money left but was not posted. Escalate to finance
     the same day; the ledger and the B2C float will differ until resolved.
 - Reconcile the B2C utility float against the ledger's B2C clearing account daily (manual until

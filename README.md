@@ -43,7 +43,7 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 11)
+## What is verified (2026-11-18, increment 12)
 
 GitHub Actions on `main`: all four jobs green.
 
@@ -58,13 +58,14 @@ GitHub Actions on `main`: all four jobs green.
 | M-Pesa STK Push: staff request, single dispatch, result applied once across STK and C2B, phone number erased when final | core: 1 end-to-end test; integration: 3 tests through outbox, RabbitMQ and the TEST-ONLY Daraja simulator over HTTP | ubuntu (Testcontainers PostgreSQL 17 + RabbitMQ 4) |
 | STK reconciliation: expiry of undispatched requests, unknown sends flagged, STK status queries (paid-per-query never credited without a receipt) | core: 1 end-to-end test; integration: 1 test with the simulator | ubuntu |
 | M-Pesa B2C loan disbursement: maker-checker, one live disbursement per loan, single send, post + activate only on a matching success, alarms for timeout / mismatch / success-after-failure | core: 1 end-to-end test; integration: 1 test through outbox, RabbitMQ and the simulator (encrypted initiator credential) | ubuntu |
+| Operations close-out of unsettled STK / B2C items: proposer and approver differ, applied through the normal exactly-once paths | core: 1 end-to-end test | ubuntu |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
-| Ledger, savings, lending, EOD, STK and B2C database rules | 83/83 checks | PostgreSQL 17 service container |
+| Ledger, savings, lending, EOD, STK, B2C and close-out database rules | 86/86 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
 API contract: `shared/contracts/openapi/core-banking-v1.json` (OpenAPI 3.1); CI fails if the
-code and the committed contract diverge.
+code and the committed contract diverge, or if an operation id is generator-numbered.
 
 Not yet verified: any Daraja sandbox or production run, B2C status query and float reconciliation, suspense refunds and splitting, jPOS switch, bank/CRB/SMS routes, Docker images, running the Windows service
 scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.

@@ -26,3 +26,10 @@ Prerequisite: the paybill is already set up for C2B (see `daraja-c2b-setup.md`).
 - Requests in DISPATCHED or SUBMITTED for more than 10 minutes: outcome unknown. Check the
   Daraja portal or STK query for the CheckoutRequestID before telling the customer anything; if
   the customer paid, the C2B confirmation (if configured) or a late callback will credit once.
+
+## Closing flagged requests (ADR-0011, ADR-0013)
+`GET /api/v1/payments/mpesa/stk-requests/attention` lists requests needing a person. For
+`PAID_AWAITING_RECEIPT`, `RECONCILE_EXHAUSTED` or `SEND_OUTCOME_UNKNOWN`, look the payment up in the
+M-Pesa org portal and propose PAID (receipt + amount) or NOT_PAID with the evidence via
+`POST /api/v1/payments/mpesa/resolutions`; a different supervisor approves. A PAID approval credits
+the customer exactly once, even if the receipt also arrives later by callback or C2B.
