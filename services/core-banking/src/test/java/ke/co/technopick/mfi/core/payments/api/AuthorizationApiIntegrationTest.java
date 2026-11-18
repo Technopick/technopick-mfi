@@ -874,4 +874,87 @@ class AuthorizationApiIntegrationTest {
             .andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals(Boolean.FALSE, pending.contains(r1) || pending.contains(r3) || pending.contains(r4), pending);
     }
+
+    static String application(String key, String principal, int term, String firstDue) {
+        return """
+            {"idempotencyKey":"%s","customerRef":"CUST-500","productCode":"biashara","branchCode":"NBO01",
+             "principal":"%s","termMonths":%d,%s"purpose":"Restock the shop"}
+            """.formatted(key, principal, term, firstDue == null ? "" : "\"firstDueDate\":\"" + firstDue + "\",");
+    }
+
+    String apply(String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,
+                 org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mvc.perform(post("/api/v1/lending/applications").with(who).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    String decideApplication(String id, String action, String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,
+                             org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        var builder = post("/api/v1/lending/applications/" + id + "/" + action).with(who);
+        if (body != null) {
+            builder = builder.contentType(MediaType.APPLICATION_JSON).content(body);
+        }
+        return mvc.perform(builder).andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    /** Origination to repayment with no seeded loan: apply, approve, disburse by B2C, repay by paybill. */
+    @Test
+    void loanOriginationJourney() throws Exception {
+        var ok = status().isOk();
+        var bad = status().isBadRequest();
+        var officer = staff("officer-1", "LOAN_OFFICER");
+        var manager = staff("manager-1", "BRANCH_MANAGER");
+        apply(application("app-0", "100000", 12, null), teller(TENANT_A), status().isForbidden());
+        apply(application("app-x1", "1000", 12, null), officer, bad);                // below the product minimum
+        apply(application("app-x2", "100000", 30, null), officer, bad);              // above the maximum term
+        apply(application("app-x3", "100000", 12, "2026-11-18"), officer, bad);      // first due date not after today
+        apply(application("app-x4", "100000.005", 12, null), officer, bad);          // sub-cent amount
+
+        String submitted = apply(application("app-1", "100000", 12, "2026-12-18"), officer, ok);
+        String id = JsonPath.read(submitted, "$.applicationId");
+        assertEquals("SUBMITTED", JsonPath.read(submitted, "$.status"));
+        assertEquals("9455.96", JsonPath.read(submitted, "$.quote.installments[0].total"));
+        assertEquals("2000.00", JsonPath.read(submitted, "$.quote.upfrontFee"));
+        assertEquals("98000.00", JsonPath.read(submitted, "$.quote.netDisbursement"));
+        assertEquals(12, ((List<?>) JsonPath.read(submitted, "$.quote.installments")).size());
+        assertEquals("0.00", JsonPath.read(submitted, "$.quote.installments[11].closingBalance"));
+        assertEquals(id, JsonPath.read(apply(application("app-1", "100000", 12, "2026-12-18"), officer, ok), "$.applicationId"));
+        apply(application("app-1", "90000", 12, "2026-12-18"), officer, status().isConflict());
+
+        decideApplication(id, "approve", null, jwt().jwt(j -> j.subject("officer-1").claim("tenant_id", TENANT_A))
+                .authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")), status().isForbidden()); // submitter
+        decideApplication(id, "approve", null, staff("officer-2", "LOAN_OFFICER"), status().isForbidden());
+        decideApplication(id, "decline", "{\"reason\":\"\"}", manager, bad);
+        String approved = decideApplication(id, "approve", null, manager, ok);
+        assertEquals("APPROVED", JsonPath.read(approved, "$.status"));
+        String loanNumber = JsonPath.read(approved, "$.loanNumber");
+        assertEquals(Boolean.TRUE, loanNumber.matches("^LN26-\\d{7}$"), loanNumber);
+        decideApplication(id, "approve", null, manager, status().isConflict());
+
+        String schedule = mvc.perform(get("/api/v1/lending/loans/" + loanNumber + "/schedule").with(teller(TENANT_A)))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(1, (int) JsonPath.read(schedule, "$.scheduleVersion"));
+        assertEquals("2026-12-18", JsonPath.read(schedule, "$.installments[0].dueDate"));
+        assertEquals("2027-11-18", JsonPath.read(schedule, "$.installments[11].dueDate"));
+        assertEquals("0.00", JsonPath.read(schedule, "$.installments[11].closingBalance"));
+        assertEquals("APPROVED", JsonPath.read(schedule, "$.status"));
+        assertEquals(List.of("user:officer-1|user:manager-1"), owner().queryForList(
+                "SELECT created_by || '|' || approved_by FROM lending.loan WHERE loan_number = ?", String.class, loanNumber));
+
+        // Declined application: reason kept, no loan.
+        String other = JsonPath.read(apply(application("app-2", "50000", 6, null), officer, ok), "$.applicationId");
+        String declined = decideApplication(other, "decline", "{\"reason\":\"Existing arrears with another lender\"}", manager, ok);
+        assertEquals("DECLINED", JsonPath.read(declined, "$.status"));
+        assertEquals(null, JsonPath.read(declined, "$.loanNumber"));
+
+        // Disburse the new loan by B2C, then the customer pays through the paybill with the loan number.
+        String disbursement = approvedAndDispatched("orig-b2c", loanNumber);
+        assertEquals("COMPLETED", JsonPath.read(b2c("/" + disbursement + "/result",
+                b2cResult("AG_ORIG", "0", "SIMORIG001", "98000.00"), integrationToken(), ok), "$.status"));
+        String paid = c2b("", confirmation("SIMORIGP01", loanNumber, "9455.96"), integrationToken(), ok);
+        assertEquals("LOAN_REPAYMENT", JsonPath.read(paid, "$.outcome"));
+        // Nothing is due before 18 Dec, so today's payment is held as an overpayment (policy pending, ADR-0010).
+        assertEquals(0, new BigDecimal("9455.96").compareTo(owner().queryForObject(
+                "SELECT unallocated FROM lending.repayment WHERE provider_ref = 'SIMORIGP01'", BigDecimal.class)));
+    }
 }

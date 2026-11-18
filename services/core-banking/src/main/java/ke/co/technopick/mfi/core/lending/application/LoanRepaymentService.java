@@ -144,29 +144,34 @@ public class LoanRepaymentService {
                 """)
             .param("loan", loanId)
             .query((rs, i) -> {
-                Currency c = Currency.getInstance(rs.getString("currency"));
-                java.sql.Array order = rs.getArray("allocation_order");
-                List<DueComponent> components = new ArrayList<>();
-                for (Object o : (Object[]) order.getArray()) {
-                    components.add(DueComponent.valueOf(String.valueOf(o)));
-                }
-                LoanProductVersion v = new LoanProductVersion(rs.getObject("version_id", UUID.class),
-                        rs.getString("product_code"), rs.getInt("version"), c,
-                        LoanProductVersion.InterestMethod.valueOf(rs.getString("interest_method")),
-                        rs.getBigDecimal("annual_rate"), RoundingMode.valueOf(rs.getString("rounding_mode")),
-                        money(rs.getBigDecimal("min_principal"), c), money(rs.getBigDecimal("max_principal"), c),
-                        rs.getInt("min_term_months"), rs.getInt("max_term_months"), rs.getBigDecimal("upfront_fee_rate"),
-                        RepaymentAllocator.Strategy.valueOf(rs.getString("allocation_strategy")), components,
-                        new LoanGlMapping(rs.getString("gl_principal"), rs.getString("gl_interest_receivable"),
-                                rs.getString("gl_interest_income"), rs.getString("gl_fee_receivable"),
-                                rs.getString("gl_fee_income"), rs.getString("gl_penalty_receivable"),
-                                rs.getString("gl_penalty_income"), rs.getString("gl_overpayment"),
-                                rs.getString("gl_write_off")));
+                LoanProductVersion v = product(rs);
                 return new Loaded(rs.getString("loan_number"), rs.getString("status"), rs.getString("branch_code"),
                         rs.getBigDecimal("principal"), v);
             })
             .optional()
             .orElseThrow(() -> new IllegalArgumentException("loan not found"));
+    }
+
+    /** Maps a row holding {@code currency} and the {@code loan_product_version} columns. */
+    static LoanProductVersion product(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Currency c = Currency.getInstance(rs.getString("currency"));
+        java.sql.Array order = rs.getArray("allocation_order");
+        List<DueComponent> components = new ArrayList<>();
+        for (Object o : (Object[]) order.getArray()) {
+            components.add(DueComponent.valueOf(String.valueOf(o)));
+        }
+        return new LoanProductVersion(rs.getObject("version_id", UUID.class),
+                rs.getString("product_code"), rs.getInt("version"), c,
+                LoanProductVersion.InterestMethod.valueOf(rs.getString("interest_method")),
+                rs.getBigDecimal("annual_rate"), RoundingMode.valueOf(rs.getString("rounding_mode")),
+                money(rs.getBigDecimal("min_principal"), c), money(rs.getBigDecimal("max_principal"), c),
+                rs.getInt("min_term_months"), rs.getInt("max_term_months"), rs.getBigDecimal("upfront_fee_rate"),
+                RepaymentAllocator.Strategy.valueOf(rs.getString("allocation_strategy")), components,
+                new LoanGlMapping(rs.getString("gl_principal"), rs.getString("gl_interest_receivable"),
+                        rs.getString("gl_interest_income"), rs.getString("gl_fee_receivable"),
+                        rs.getString("gl_fee_income"), rs.getString("gl_penalty_receivable"),
+                        rs.getString("gl_penalty_income"), rs.getString("gl_overpayment"),
+                        rs.getString("gl_write_off")));
     }
 
     /** Unpaid principal, interest and penalties of installments due on or before the business date. */
