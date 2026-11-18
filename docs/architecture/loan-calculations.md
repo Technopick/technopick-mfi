@@ -38,3 +38,22 @@ KES 100,000, 24% p.a., monthly, 12 periods, r = 0.02.
 Grace periods (principal and/or interest), moratoria, holidays and business-day shifts,
 irregular first period, daily accrual (actual/365), fees and insurance in installments,
 rescheduling and early settlement quotations.
+
+## Repayment allocation - allocation/v1
+Implementation: `RepaymentAllocator`; tests: `RepaymentAllocatorTest` (worked examples +
+3,000-case seeded property test per strategy).
+
+- Installments are paid oldest due date first (ties by installment number).
+- Component order is configured per product version; default PENALTY, FEE, INTEREST, PRINCIPAL.
+- `COMPONENT_FIRST`: clear each component across all installments before the next component.
+- `INSTALLMENT_FIRST`: clear each installment completely before the next installment.
+- Any remainder is returned as `unallocated`; the product's overpayment rule (prepay future
+  principal or hold as overpayment liability) is applied explicitly by the caller.
+
+Worked example (installments 1 and 2 of the section above overdue, KES 200 penalty on 1):
+payment 9,655.96 under COMPONENT_FIRST pays penalty 200.00, interest 2,000.00 (inst 1),
+interest 1,850.88 (inst 2), principal 5,605.08 (inst 1). INSTALLMENT_FIRST clears
+installment 1 entirely (200.00 + 2,000.00 + 7,455.96). Paying 20,000.00 leaves 888.08 unallocated.
+
+Invariants (tested): allocations + unallocated = payment exactly; no component receives
+more than is outstanding; every allocation is positive.

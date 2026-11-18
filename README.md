@@ -43,13 +43,13 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18)
+## What is verified (2026-11-18, increment 2)
 
 | Item | Result | How |
 | --- | --- | --- |
 | Domain code compiles with `-Xlint:all -Werror` | Yes | `javac --release 21` (JDK 21.0.13) |
-| 30 unit tests (Money, canonical model, journals, schedules incl. 2,000-case property test) | 30/30 pass | JUnit 5 test sources run through a local JUnit-API shim, because Maven Central was unreachable from the build workspace |
-| Ledger DB rules (balance, immutability, closed period, idempotency, reversals, RLS) | 20/20 checks pass; mutation run detects a disabled balance trigger | PostgreSQL 16.15, app role `mfi_app` without BYPASSRLS |
+| 50 unit tests (Money, canonical model, journals, schedules, repayment allocation, holds, authorization; incl. seeded property tests) | 50/50 pass | JUnit 5 test sources run through a local JUnit-API shim, because Maven Central was unreachable from the build workspace |
+| Ledger + savings DB rules (balance, immutability, closed period, idempotency, reversals, subledger/control, holds, available balance, RLS) | 38/38 checks pass incl. two-session race tests; mutation runs detect a disabled balance trigger and a missing row lock | PostgreSQL 16.15, app role `mfi_app` without BYPASSRLS |
 | `mvn verify`, ArchUnit rules, Docker images, CI workflow, PowerShell scripts | **Not yet run** | Need a networked build (GitHub Actions or a developer PC) |
 
 ## Non-negotiables

@@ -21,3 +21,17 @@ makes T2 fail, proving the tests detect the defect they target.
 ## Consequences
 - Superusers bypass RLS: production must never connect the app as a superuser.
 - `btree_gist` must be installed by the DBA if the migration role cannot create extensions.
+
+## Addendum (V2, 2026-11-18): deposit accounts and holds
+- GL control accounts flagged `requires_subledger` only accept lines naming a deposit
+  account, and subledger lines must post to that account's control GL - so the savings
+  subledger reconciles to the control account by construction (test H15).
+- Holds: ACTIVE -> CAPTURED | RELEASED | EXPIRED, terminal states final, CAPTURED only with
+  an entry that debits the held account, no delete/truncate.
+- Available balance (ledger + overdraft - active holds) can never go negative: authorization
+  holds are checked on insert and debits at commit, both under a `FOR NO KEY UPDATE` lock on
+  the account row. Earmark and legal holds may exceed available but still block debits.
+- Verified: 15 functional checks + 2 two-session race tests; a mutation run without the row
+  lock lets both racing holds through (1,400 held on 1,000) and the race test fails.
+- Known gap: lowering an overdraft limit is not yet re-checked against existing holds
+  (to be enforced with the maker-checker limit-change flow).
