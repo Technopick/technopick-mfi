@@ -10,7 +10,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import ke.co.technopick.mfi.canonical.Money;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.common.NotFoundException;
@@ -37,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class MpesaStkService {
 
     private static final Logger LOG = LoggerFactory.getLogger(MpesaStkService.class);
-    private static final Pattern MSISDN = Pattern.compile("^254[17][0-9]{8}$");
 
     public enum Status { PENDING, DISPATCHED, SUBMITTED, COMPLETED, FAILED }
 
@@ -86,21 +84,11 @@ public class MpesaStkService {
 
     /** Kenyan numbers as 2547XXXXXXXX / 2541XXXXXXXX, accepting the common local and +254 forms. */
     public static String normaliseMsisdn(String phone) {
-        String digits = phone == null ? "" : phone.replaceAll("[\\s-]", "");
-        if (digits.startsWith("+")) {
-            digits = digits.substring(1);
-        }
-        if (digits.matches("^0[17][0-9]{8}$")) {
-            digits = "254" + digits.substring(1);
-        }
-        if (!MSISDN.matcher(digits).matches()) {
-            throw new IllegalArgumentException("phone number must be a Kenyan mobile number (2547XXXXXXXX or 2541XXXXXXXX)");
-        }
-        return digits;
+        return ke.co.technopick.mfi.canonical.Msisdn.normalise(phone);
     }
 
     public static String mask(String msisdn) {
-        return msisdn.substring(0, 4) + "*****" + msisdn.substring(msisdn.length() - 3);
+        return ke.co.technopick.mfi.canonical.Msisdn.mask(msisdn);
     }
 
     @Transactional

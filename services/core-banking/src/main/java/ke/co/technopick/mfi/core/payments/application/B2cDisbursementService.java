@@ -12,6 +12,7 @@ import java.util.UUID;
 import ke.co.technopick.mfi.canonical.Money;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.common.NotFoundException;
+import ke.co.technopick.mfi.core.customer.application.CustomerService;
 import ke.co.technopick.mfi.core.lending.application.LoanDisbursementService;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.tenancy.persistence.BusinessDates;
@@ -64,9 +65,11 @@ public class B2cDisbursementService {
     private final BusinessDates businessDates;
     private final LoanDisbursementService loans;
     private final Outbox outbox;
+    private final CustomerService customers;
 
     public B2cDisbursementService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates,
-                                  LoanDisbursementService loans, Outbox outbox) {
+                                  LoanDisbursementService loans, Outbox outbox, CustomerService customers) {
+        this.customers = customers;
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
@@ -78,10 +81,10 @@ public class B2cDisbursementService {
     public DisbursementCreated request(UUID tenantId, String idempotencyKey, String loanNumber, String phone, String shortCode,
                            String actor) {
         session.bind(tenantId);
-        String msisdn = MpesaStkService.normaliseMsisdn(phone);
         String number = loanNumber.strip().toUpperCase(Locale.ROOT);
         LoanDisbursementService.Disbursable loan = loans.disbursable(number)
                 .orElseThrow(() -> new IllegalArgumentException("loan " + number + " not found"));
+        String msisdn = payoutNumber(loan, phone);
         Optional<Row> existing = jdbc.sql(SELECT + " WHERE d.idempotency_key = :key").param("key", idempotencyKey)
             .query(B2cDisbursementService::row).optional();
         if (existing.isPresent()) {
@@ -119,6 +122,31 @@ public class B2cDisbursementService {
             .param("msisdn", msisdn).param("masked", MpesaStkService.mask(msisdn)).param("actor", actor)
             .update();
         return new DisbursementCreated(id, DisbursementStatus.REQUESTED, plain(net), loan.fee().amount().toPlainString(), false);
+    }
+
+    /**
+     * Loan payouts go only to the borrower's registered M-Pesa number (ADR-0016). A number may be
+     * omitted (the registered one is used); a different number is refused. Loans created before
+     * customer records existed (no customer link) still need an explicit number.
+     */
+    private String payoutNumber(LoanDisbursementService.Disbursable loan, String phone) {
+        if (loan.customerId() == null) {
+            if (phone == null || phone.isBlank()) {
+                throw new IllegalArgumentException("this loan has no customer record; give the M-Pesa number");
+            }
+            return MpesaStkService.normaliseMsisdn(phone);
+        }
+        CustomerService.CustomerRef customer = customers.byId(loan.customerId())
+                .orElseThrow(() -> new IllegalStateException("loan customer missing"));
+        if (!"ACTIVE".equals(customer.status())) {
+            throw new IllegalArgumentException("customer " + customer.customerNumber() + " is " + customer.status()
+                    + "; disbursement is not allowed");
+        }
+        if (phone != null && !phone.isBlank() && !MpesaStkService.normaliseMsisdn(phone).equals(customer.msisdn())) {
+            throw new IllegalArgumentException("loan payouts go only to the customer's registered M-Pesa number ("
+                    + MpesaStkService.mask(customer.msisdn()) + ")");
+        }
+        return customer.msisdn();
     }
 
     /** Checker decision. The requester can never decide their own request (also enforced by the database). */

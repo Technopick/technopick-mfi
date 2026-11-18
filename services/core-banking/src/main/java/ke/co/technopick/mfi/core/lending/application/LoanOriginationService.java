@@ -12,6 +12,7 @@ import java.util.UUID;
 import ke.co.technopick.mfi.canonical.Money;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.common.NotFoundException;
+import ke.co.technopick.mfi.core.customer.application.CustomerService;
 import ke.co.technopick.mfi.core.lending.domain.Installment;
 import ke.co.technopick.mfi.core.lending.domain.LoanProductVersion;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
@@ -51,19 +52,22 @@ public class LoanOriginationService {
 
     public record LoanScheduleView(String loanNumber, String status, int scheduleVersion, List<QuoteInstallment> installments) { }
 
-    private record App(UUID id, String key, String customerRef, UUID versionId, String branchCode, BigDecimal principal,
+    private record App(UUID id, String key, String customerRef, UUID customerId, UUID versionId, String branchCode, BigDecimal principal,
                        int term, LocalDate firstDue, String purpose, String status, String submittedBy) { }
 
     private final JdbcClient jdbc;
     private final TenantSession session;
     private final BusinessDates businessDates;
     private final Outbox outbox;
+    private final CustomerService customers;
 
-    public LoanOriginationService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, Outbox outbox) {
+    public LoanOriginationService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, Outbox outbox,
+                                  CustomerService customers) {
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
         this.outbox = outbox;
+        this.customers = customers;
     }
 
     @Transactional
@@ -71,6 +75,11 @@ public class LoanOriginationService {
                                            String branchCode, BigDecimal principalAmount, int termMonths,
                                            LocalDate firstDueDate, String purpose, String actor) {
         session.bind(tenantId);
+        CustomerService.CustomerRef customer = customers.byNumber(customerRef)
+                .filter(c -> "ACTIVE".equals(c.status()))
+                .orElseThrow(() -> new IllegalArgumentException("customer " + customerRef
+                        + " not found or not verified; register and verify the customer first"));
+        customerRef = customer.customerNumber();
         LoanProductVersion product = activeVersion(productCode.strip().toUpperCase(Locale.ROOT))
                 .orElseThrow(() -> new IllegalArgumentException("product " + productCode + " has no active version"));
         Money principal = money(principalAmount, product);
@@ -100,12 +109,13 @@ public class LoanOriginationService {
         }
         UUID id = UUID.randomUUID();
         jdbc.sql("""
-                INSERT INTO lending.loan_application (tenant_id, application_id, idempotency_key, customer_ref,
+                INSERT INTO lending.loan_application (tenant_id, application_id, idempotency_key, customer_ref, customer_id,
                     product_version_id, branch_code, currency, principal, term_months, first_due_date, purpose, submitted_by)
-                VALUES (:tenant, :id, :key, :customer, :version, :branch, :ccy, :principal, :term, :due, :purpose, :actor)
+                VALUES (:tenant, :id, :key, :customer, :customerId, :version, :branch, :ccy, :principal, :term, :due, :purpose,
+                    :actor)
                 """)
             .param("tenant", tenantId).param("id", id).param("key", idempotencyKey).param("customer", customerRef)
-            .param("version", product.versionId()).param("branch", branchCode)
+            .param("customerId", customer.customerId()).param("version", product.versionId()).param("branch", branchCode)
             .param("ccy", product.currency().getCurrencyCode()).param("principal", principal.amount())
             .param("term", termMonths).param("due", firstDue).param("purpose", purpose.strip()).param("actor", actor)
             .update();
@@ -150,12 +160,13 @@ public class LoanOriginationService {
             .query(String.class).single();
         UUID loanId = UUID.randomUUID();
         jdbc.sql("""
-                INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code,
-                    currency, principal, term_months, created_by, approved_by)
-                VALUES (:tenant, :loan, :number, :customer, :version, :branch, :ccy, :principal, :term, :maker, :checker)
+                INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, customer_id, product_version_id,
+                    branch_code, currency, principal, term_months, created_by, approved_by)
+                VALUES (:tenant, :loan, :number, :customer, :customerId, :version, :branch, :ccy, :principal, :term, :maker,
+                    :checker)
                 """)
             .param("tenant", tenantId).param("loan", loanId).param("number", loanNumber).param("customer", a.customerRef())
-            .param("version", a.versionId()).param("branch", a.branchCode())
+            .param("customerId", a.customerId()).param("version", a.versionId()).param("branch", a.branchCode())
             .param("ccy", product.currency().getCurrencyCode()).param("principal", principal.amount())
             .param("term", a.term()).param("maker", a.submittedBy()).param("checker", actor)
             .update();
@@ -302,13 +313,15 @@ public class LoanOriginationService {
     }
 
     private static final String SELECT = """
-            SELECT application_id, idempotency_key, customer_ref, product_version_id, branch_code, principal, term_months,
+            SELECT application_id, idempotency_key, customer_ref, customer_id, product_version_id, branch_code, principal,
+                   term_months,
                    first_due_date, purpose, status, submitted_by
               FROM lending.loan_application""";
 
     private static App app(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         return new App(rs.getObject("application_id", UUID.class), rs.getString("idempotency_key"),
-                rs.getString("customer_ref"), rs.getObject("product_version_id", UUID.class), rs.getString("branch_code"),
+                rs.getString("customer_ref"), rs.getObject("customer_id", UUID.class),
+                rs.getObject("product_version_id", UUID.class), rs.getString("branch_code"),
                 rs.getBigDecimal("principal"), rs.getInt("term_months"), rs.getObject("first_due_date", LocalDate.class),
                 rs.getString("purpose"), rs.getString("status"), rs.getString("submitted_by"));
     }

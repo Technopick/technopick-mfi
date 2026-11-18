@@ -878,11 +878,85 @@ class AuthorizationApiIntegrationTest {
         assertEquals(Boolean.FALSE, pending.contains(r1) || pending.contains(r3) || pending.contains(r4), pending);
     }
 
+    static String journeyCustomer = "none";
+
     static String application(String key, String principal, int term, String firstDue) {
         return """
-            {"idempotencyKey":"%s","customerRef":"CUST-500","productCode":"biashara","branchCode":"NBO01",
+            {"idempotencyKey":"%s","customerRef":"%s","productCode":"biashara","branchCode":"NBO01",
              "principal":"%s","termMonths":%d,%s"purpose":"Restock the shop"}
-            """.formatted(key, principal, term, firstDue == null ? "" : "\"firstDueDate\":\"" + firstDue + "\",");
+            """.formatted(key, journeyCustomer, principal, term,
+                firstDue == null ? "" : "\"firstDueDate\":\"" + firstDue + "\",");
+    }
+
+    static String customerJson(String key, String idNumber, String dob, boolean consent) {
+        return """
+            {"idempotencyKey":"%s","firstName":"Achieng","lastName":"Otieno","dateOfBirth":"%s","idType":"NATIONAL_ID",
+             "idNumber":"%s","phoneNumber":"0712345678","branchCode":"NBO01","consentGiven":%s}
+            """.formatted(key, dob, idNumber, consent);
+    }
+
+    String registerAndVerify(String key, String idNumber) throws Exception {
+        String number = JsonPath.read(mvc.perform(post("/api/v1/customers").with(staff("officer-1", "LOAN_OFFICER"))
+                .contentType(MediaType.APPLICATION_JSON).content(customerJson(key, idNumber, "1990-05-01", true)))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.customerNumber");
+        mvc.perform(post("/api/v1/customers/" + number + "/verify").with(staff("manager-1", "BRANCH_MANAGER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"National ID sighted, IPRS ref T-1\"}"))
+            .andExpect(status().isOk());
+        return number;
+    }
+
+    /** Customers and KYC: consent, adults only, one per document, four-eyes verification, masked search. */
+    @Test
+    void customerRegistrationAndKyc() throws Exception {
+        var ok = status().isOk();
+        var officer = staff("officer-1", "LOAN_OFFICER");
+        java.util.function.BiFunction<String, org.springframework.test.web.servlet.ResultMatcher, String> register = (body, expected) -> {
+            try {
+                return mvc.perform(post("/api/v1/customers").with(officer).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(expected).andReturn().getResponse().getContentAsString();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        };
+        register.apply(customerJson("cu-0", "22334455", "1990-05-01", false), status().isBadRequest()); // no consent
+        register.apply(customerJson("cu-1", "22334456", "2015-01-01", true), status().isBadRequest());  // minor
+        register.apply(customerJson("cu-2", "12AB", "1990-05-01", true), status().isBadRequest()); // malformed ID
+        mvc.perform(post("/api/v1/customers").with(teller(TENANT_A)).contentType(MediaType.APPLICATION_JSON)
+                .content(customerJson("cu-t", "22334499", "1990-05-01", true))).andExpect(ok); // tellers may register
+        String created = register.apply(customerJson("cu-3", "22334457", "1990-05-01", true), ok);
+        String number = JsonPath.read(created, "$.customerNumber");
+        assertEquals(Boolean.TRUE, number.matches("^CU26-\\d{7}$"), number);
+        assertEquals("PENDING_VERIFICATION", JsonPath.read(created, "$.status"));
+        assertEquals(number, JsonPath.read(register.apply(customerJson("cu-3", "22334457", "1990-05-01", true), ok), "$.customerNumber"));
+        register.apply(customerJson("cu-4", "22334457", "1990-05-01", true), status().isConflict()); // same ID again
+
+        String verifyBody = "{\"note\":\"National ID sighted at branch\"}";
+        mvc.perform(post("/api/v1/customers/" + number + "/verify")
+                .with(jwt().jwt(j -> j.subject("officer-1").claim("tenant_id", TENANT_A))
+                    .authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))
+                .contentType(MediaType.APPLICATION_JSON).content(verifyBody))
+            .andExpect(status().isForbidden()); // the registrar cannot verify, whatever roles they hold
+        mvc.perform(post("/api/v1/customers/" + number + "/verify").with(officer)
+                .contentType(MediaType.APPLICATION_JSON).content(verifyBody)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/customers/" + number + "/verify").with(staff("manager-1", "BRANCH_MANAGER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"ok\"}")).andExpect(status().isBadRequest());
+        String verified = mvc.perform(post("/api/v1/customers/" + number + "/verify").with(staff("manager-1", "BRANCH_MANAGER"))
+                .contentType(MediaType.APPLICATION_JSON).content(verifyBody))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("ACTIVE", JsonPath.read(verified, "$.status"));
+        assertEquals("user:manager-1", JsonPath.read(verified, "$.verifiedBy"));
+        assertEquals("DPA-2026-01", JsonPath.read(verified, "$.consentVersion"));
+
+        String found = mvc.perform(get("/api/v1/customers").param("q", "22334457").with(officer))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("*****457", JsonPath.read(found, "$[0].idNumberMasked"));
+        assertEquals("2547*****678", JsonPath.read(found, "$[0].phoneMasked"));
+        assertEquals(Boolean.FALSE, found.contains("22334457") || found.contains("254712345678"), found);
+        assertEquals(1, ((List<?>) JsonPath.read(mvc.perform(get("/api/v1/customers").param("q", "otieno achieng").with(officer))
+            .andReturn().getResponse().getContentAsString(), "$[?(@.customerNumber == '" + number + "')]")).size());
+        mvc.perform(get("/api/v1/customers").param("q", "ab").with(officer)).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/customers/" + number).with(jwt().jwt(j -> j.subject("x").claim("tenant_id", TENANT_B))
+                .authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))).andExpect(status().isNotFound());
     }
 
     String apply(String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,
@@ -907,6 +981,13 @@ class AuthorizationApiIntegrationTest {
         var bad = status().isBadRequest();
         var officer = staff("officer-1", "LOAN_OFFICER");
         var manager = staff("manager-1", "BRANCH_MANAGER");
+        // The applicant must be a verified customer.
+        String unverified = JsonPath.read(mvc.perform(post("/api/v1/customers").with(officer).contentType(MediaType.APPLICATION_JSON)
+                .content(customerJson("journey-u", "33445566", "1988-02-02", true)))
+            .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.customerNumber");
+        journeyCustomer = unverified;
+        apply(application("app-u", "100000", 12, null), officer, bad);
+        journeyCustomer = registerAndVerify("journey-c", "33445567");
         apply(application("app-0", "100000", 12, null), teller(TENANT_A), status().isForbidden());
         apply(application("app-x1", "1000", 12, null), officer, bad);                // below the product minimum
         apply(application("app-x2", "100000", 30, null), officer, bad);              // above the maximum term
@@ -943,6 +1024,9 @@ class AuthorizationApiIntegrationTest {
         assertEquals("APPROVED", JsonPath.read(schedule, "$.status"));
         assertEquals(List.of("user:officer-1|user:manager-1"), owner().queryForList(
                 "SELECT created_by || '|' || approved_by FROM lending.loan WHERE loan_number = ?", String.class, loanNumber));
+        assertEquals(journeyCustomer, owner().queryForObject(
+                "SELECT c.customer_number FROM lending.loan l JOIN customer.customer c USING (tenant_id, customer_id) WHERE l.loan_number = ?",
+                String.class, loanNumber));
 
         // Declined application: reason kept, no loan.
         String other = JsonPath.read(apply(application("app-2", "50000", 6, null), officer, ok), "$.applicationId");
@@ -951,6 +1035,10 @@ class AuthorizationApiIntegrationTest {
         org.junit.jupiter.api.Assertions.assertNull(JsonPath.read(declined, "$.loanNumber"));
 
         // Disburse the new loan by B2C, then the customer pays through the paybill with the loan number.
+        // Payouts go only to the customer's registered number (0712345678).
+        mvc.perform(post("/api/v1/payments/mpesa/b2c/disbursements").with(officer).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"orig-wrong\",\"loanNumber\":\"" + loanNumber + "\",\"phoneNumber\":\"0799999999\"}"))
+            .andExpect(bad);
         String disbursement = approvedAndDispatched("orig-b2c", loanNumber);
         assertEquals("COMPLETED", JsonPath.read(b2c("/" + disbursement + "/result",
                 b2cResult("AG_ORIG", "0", "SIMORIG001", "98000.00"), integrationToken(), ok), "$.status"));

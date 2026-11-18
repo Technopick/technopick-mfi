@@ -32,7 +32,7 @@ public class B2cDisbursementController {
 
     public record DisbursementRequest(@NotBlank @Size(max = 80) String idempotencyKey,
                                 @NotBlank @Size(max = 34) String loanNumber,
-                                @NotBlank @Size(max = 16) String phoneNumber, String shortCode) { }
+                                @Size(max = 16) String phoneNumber, String shortCode) { }
 
     public record DisbursementTenant(@NotNull UUID tenantId) { }
 

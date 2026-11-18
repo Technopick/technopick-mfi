@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LoanDisbursementService {
 
     public record Disbursable(UUID loanId, String loanNumber, String status, Money principal, Money netAmount,
-                              Money fee) { }
+                              Money fee, UUID customerId) { }
 
     private final JdbcClient jdbc;
     private final LoanRepaymentService loans;
@@ -45,7 +45,9 @@ public class LoanDisbursementService {
             Money principal = Money.of(l.principal().setScale(l.product().currency().getDefaultFractionDigits(),
                     RoundingMode.UNNECESSARY), l.product().currency());
             Money fee = l.product().upfrontFee(principal);
-            return new Disbursable(ref.loanId(), l.loanNumber(), l.status(), principal, principal.minus(fee), fee);
+            UUID customerId = jdbc.sql("SELECT customer_id FROM lending.loan WHERE loan_id = :l").param("l", ref.loanId())
+                .query(UUID.class).optional().orElse(null);
+            return new Disbursable(ref.loanId(), l.loanNumber(), l.status(), principal, principal.minus(fee), fee, customerId);
         });
     }
 
