@@ -138,7 +138,8 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000004', '0100000004', 'C4', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000005', '0100000005', 'C5', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000006', '0100000006', 'C6', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
-              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000007', '0100000007', 'C7', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000007', '0100000007', 'C7', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000008', '0100000008', 'C8', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
             INSERT INTO payments.mpesa_paybill (tenant_id, short_code, branch_code, gl_clearing, gl_suspense, max_amount)
               VALUES ('%1$s', '600991', 'NBO01', '1120-MPESA-C2B-CLEARING', '2900-SUSPENSE', 150000);
             INSERT INTO payments.channel_config (tenant_id, channel_code, currency, per_txn_max, daily_max,
@@ -216,11 +217,13 @@ class AuthorizationApiIntegrationTest {
                 principal, term_months, created_by, approved_by) VALUES
               ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000003', 'LN-000003', 'C3', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
               ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000004', 'LN-000004', 'C4', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
-              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000005', 'LN-000005', 'C5', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager');
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000005', 'LN-000005', 'C5', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000006', 'LN-000006', 'C6', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager');
             INSERT INTO lending.schedule_installment (tenant_id, loan_id, schedule_version, installment_no, due_date, principal, interest) VALUES
               ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000003', 1, 1, '2026-12-18', 100000, 2000),
               ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000004', 1, 1, '2026-12-18', 100000, 2000),
-              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000005', 1, 1, '2026-12-18', 100000, 2000);
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000005', 1, 1, '2026-12-18', 100000, 2000),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000006', 1, 1, '2026-12-18', 100000, 2000);
             COMMIT;
             """.formatted(TENANT_A, TENANT_B));
     }
@@ -798,5 +801,73 @@ class AuthorizationApiIntegrationTest {
         mvc.perform(get("/api/v1/payments/mpesa/b2c/disbursements/" + id).with(jwt().jwt(j -> j.subject("x").claim("tenant_id", TENANT_B))
                 .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))
             .andExpect(status().isNotFound());
+    }
+
+    String propose(String type, String item, String outcome, String ref, String amount, String evidence,
+                   org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mvc.perform(post("/api/v1/payments/mpesa/resolutions").with(staff("ops-1", "OPERATIONS"))
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"itemType":"%s","itemId":"%s","outcome":"%s","providerRef":%s,"amount":%s,"evidence":"%s"}
+                    """.formatted(type, item, outcome, ref == null ? "null" : "\"" + ref + "\"",
+                        amount == null ? "null" : "\"" + amount + "\"", evidence)))
+            .andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    String decideResolution(String id, String action, org.springframework.test.web.servlet.request.RequestPostProcessor who,
+                            org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mvc.perform(post("/api/v1/payments/mpesa/resolutions/" + id + "/" + action).with(who))
+            .andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    /** Operations close-out: proposed by one person, approved by another, applied through the normal paths. */
+    @Test
+    void mpesaManualResolution() throws Exception {
+        var ok = status().isOk();
+        String tenantBody = "{\"tenantId\":\"" + TENANT_A + "\"}";
+        // STK request paid according to the status query, receipt never delivered.
+        String paid = JsonPath.read(stk("", stkCreate("res-1", "0712345678", "50", "0100000008"), teller(TENANT_A), ok), "$.requestId");
+        stk("/" + paid + "/dispatch", tenantBody, integrationToken(), ok);
+        stk("/" + paid + "/submitted", "{\"tenantId\":\"" + TENANT_A + "\",\"checkoutRequestId\":\"ws_CO_RES1\"}", integrationToken(), ok);
+        queryResult(paid, "ws_CO_RES1", "0");
+
+        propose("STK_REQUEST", paid, "PAID", null, null, "Portal statement 18/11 14:02", status().isBadRequest()); // no receipt
+        propose("STK_REQUEST", paid, "PAID", "SIMRES0001", "50.00", "short", status().isBadRequest());           // weak evidence
+        mvc.perform(get("/api/v1/payments/mpesa/resolutions").with(teller(TENANT_A))).andExpect(status().isForbidden());
+        String r1 = JsonPath.read(propose("STK_REQUEST", paid, "PAID", "SIMRES0001", "50.00",
+                "M-Pesa org portal statement 18/11 14:02", ok), "$.resolutionId");
+        propose("STK_REQUEST", paid, "NOT_PAID", null, null, "Customer says it failed", status().isConflict()); // one live
+        decideResolution(r1, "approve", jwt().jwt(j -> j.subject("ops-1").claim("tenant_id", TENANT_A))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR")), status().isForbidden());
+        decideResolution(r1, "approve", staff("ops-2", "OPERATIONS"), status().isForbidden());
+        String approved = decideResolution(r1, "approve", staff("sup-1", "SUPERVISOR"), ok);
+        assertEquals("APPROVED", JsonPath.read(approved, "$.status"));
+        assertEquals("COMPLETED", JsonPath.read(approved, "$.resultStatus"));
+        expectBalance("0100000008", "50.00", "0.00", "50.00");
+        decideResolution(r1, "reject", staff("sup-1", "SUPERVISOR"), status().isConflict());
+        propose("STK_REQUEST", paid, "PAID", "SIMRES0001", "50.00", "Second attempt at the same item", status().isConflict());
+
+        // Not paid: first proposal rejected, second approved; the request is closed without money.
+        String unpaid = JsonPath.read(stk("", stkCreate("res-2", "0712345678", "50", "0100000008"), teller(TENANT_A), ok), "$.requestId");
+        stk("/" + unpaid + "/dispatch", tenantBody, integrationToken(), ok);
+        String r2 = JsonPath.read(propose("STK_REQUEST", unpaid, "NOT_PAID", null, null, "Customer confirms no prompt", ok), "$.resolutionId");
+        assertEquals("REJECTED", JsonPath.read(decideResolution(r2, "reject", staff("sup-1", "SUPERVISOR"), ok), "$.status"));
+        String r3 = JsonPath.read(propose("STK_REQUEST", unpaid, "NOT_PAID", null, null, "Portal shows no transaction", ok), "$.resolutionId");
+        assertEquals("FAILED", JsonPath.read(decideResolution(r3, "approve", staff("sup-1", "SUPERVISOR"), ok), "$.resultStatus"));
+        expectBalance("0100000008", "50.00", "0.00", "50.00");
+
+        // B2C disbursement with a queue timeout: confirmed paid from the portal, so posted and activated.
+        String timedOut = approvedAndDispatched("res-b1", "LN-000006");
+        b2c("/" + timedOut + "/submitted", "{\"tenantId\":\"" + TENANT_A + "\",\"conversationId\":\"AG_RES1\"}", integrationToken(), ok);
+        propose("B2C_DISBURSEMENT", timedOut, "PAID", "SIMRESB001", "98000.00", "Portal shows payment", status().isConflict()); // not flagged
+        b2c("/" + timedOut + "/timeout", tenantBody, integrationToken(), ok);
+        String r4 = JsonPath.read(propose("B2C_DISBURSEMENT", timedOut, "PAID", "SIMRESB001", "98000.00",
+                "Portal: B2C payment completed 14:05", ok), "$.resolutionId");
+        assertEquals("COMPLETED", JsonPath.read(decideResolution(r4, "approve", staff("sup-1", "SUPERVISOR"), ok), "$.resultStatus"));
+        assertEquals("ACTIVE", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-000006'", String.class));
+        propose("B2C_DISBURSEMENT", timedOut, "NOT_PAID", null, null, "Too late, already completed", status().isConflict());
+
+        String pending = mvc.perform(get("/api/v1/payments/mpesa/resolutions").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.FALSE, pending.contains(r1) || pending.contains(r3) || pending.contains(r4), pending);
     }
 }
