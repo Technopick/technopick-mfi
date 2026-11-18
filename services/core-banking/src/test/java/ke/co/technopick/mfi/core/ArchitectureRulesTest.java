@@ -52,4 +52,56 @@ class ArchitectureRulesTest {
     void modulesAreFreeOfCycles() {
         slices().matching("ke.co.technopick.mfi.core.(*)..").should().beFreeOfCycles().check(CORE);
     }
+
+    /**
+     * The OpenAPI generator names schemas by simple class name, so two different API types with
+     * the same simple name silently collapse into one schema and the contract describes the wrong
+     * shape. Every type reachable from a REST controller must therefore have a unique simple name.
+     */
+    @Test
+    void apiTypesHaveUniqueSimpleNames() {
+        java.util.Map<String, java.util.Set<String>> byName = new java.util.TreeMap<>();
+        java.util.Set<Class<?>> seen = new java.util.HashSet<>();
+        CORE.stream()
+            .filter(c -> c.isAnnotatedWith("org.springframework.web.bind.annotation.RestController"))
+            .map(com.tngtech.archunit.core.domain.JavaClass::reflect)
+            .forEach(controller -> {
+                for (java.lang.reflect.Method m : controller.getDeclaredMethods()) {
+                    if (java.lang.reflect.Modifier.isPublic(m.getModifiers())) {
+                        collect(m.getGenericReturnType(), byName, seen);
+                        for (java.lang.reflect.Type t : m.getGenericParameterTypes()) {
+                            collect(t, byName, seen);
+                        }
+                    }
+                }
+            });
+        java.util.Map<String, java.util.Set<String>> clashes = new java.util.TreeMap<>();
+        byName.forEach((name, classes) -> {
+            if (classes.size() > 1) {
+                clashes.put(name, classes);
+            }
+        });
+        org.junit.jupiter.api.Assertions.assertTrue(clashes.isEmpty(), "API schema name clashes: " + clashes);
+        org.junit.jupiter.api.Assertions.assertTrue(byName.size() > 10, "expected to find the API types");
+    }
+
+    private static void collect(java.lang.reflect.Type type, java.util.Map<String, java.util.Set<String>> byName,
+                                java.util.Set<Class<?>> seen) {
+        if (type instanceof java.lang.reflect.ParameterizedType p) {
+            for (java.lang.reflect.Type a : p.getActualTypeArguments()) {
+                collect(a, byName, seen);
+            }
+            collect(p.getRawType(), byName, seen);
+            return;
+        }
+        if (!(type instanceof Class<?> c) || !c.getName().startsWith("ke.co.technopick.mfi") || !seen.add(c)) {
+            return;
+        }
+        byName.computeIfAbsent(c.getSimpleName(), k -> new java.util.TreeSet<>()).add(c.getName());
+        if (c.isRecord()) {
+            for (java.lang.reflect.RecordComponent rc : c.getRecordComponents()) {
+                collect(rc.getGenericType(), byName, seen);
+            }
+        }
+    }
 }

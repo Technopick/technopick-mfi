@@ -359,6 +359,242 @@
         },
         "type": "object"
       },
+      "DisbursementCreated": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fee": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "REQUESTED",
+              "APPROVED",
+              "REJECTED",
+              "DISPATCHED",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DisbursementDispatch": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "msisdn": {
+            "type": "string"
+          },
+          "occasion": {
+            "type": "string"
+          },
+          "remarks": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DisbursementRequest": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          },
+          "loanNumber": {
+            "maxLength": 34,
+            "minLength": 0,
+            "type": "string"
+          },
+          "phoneNumber": {
+            "maxLength": 16,
+            "minLength": 0,
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "loanNumber",
+          "phoneNumber"
+        ],
+        "type": "object"
+      },
+      "DisbursementResultRequest": {
+        "properties": {
+          "amount": {
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "conversationId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultCode": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultDesc": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "transactionId": {
+            "pattern": "^[A-Z0-9]{8,20}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resultCode",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "DisbursementSendFailure": {
+        "properties": {
+          "code": {
+            "maxLength": 14,
+            "minLength": 0,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "DisbursementSubmitted": {
+        "properties": {
+          "conversationId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "DisbursementTenant": {
+        "properties": {
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "DisbursementView": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "attention": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journalEntryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "msisdnMasked": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultDesc": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "REQUESTED",
+              "APPROVED",
+              "REJECTED",
+              "DISPATCHED",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "transactionId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Dispatch": {
         "properties": {
           "accountReference": {
@@ -941,7 +1177,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateRequest"
+                "$ref": "#/components/schemas/DisbursementRequest"
               }
             }
           },
@@ -952,7 +1188,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Created"
+                  "$ref": "#/components/schemas/DisbursementCreated"
                 }
               }
             },
@@ -973,7 +1209,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/View"
+                    "$ref": "#/components/schemas/DisbursementView"
                   },
                   "type": "array"
                 }
@@ -1006,7 +1242,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
@@ -1037,7 +1273,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
@@ -1067,7 +1303,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TenantOnly"
+                "$ref": "#/components/schemas/DisbursementTenant"
               }
             }
           },
@@ -1078,7 +1314,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Dispatch"
+                  "$ref": "#/components/schemas/DisbursementDispatch"
                 }
               }
             },
@@ -1109,7 +1345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
@@ -1139,7 +1375,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResultRequest"
+                "$ref": "#/components/schemas/DisbursementResultRequest"
               }
             }
           },
@@ -1150,7 +1386,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
@@ -1180,7 +1416,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendFailure"
+                "$ref": "#/components/schemas/DisbursementSendFailure"
               }
             }
           },
@@ -1191,7 +1427,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
@@ -1221,7 +1457,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Submitted"
+                "$ref": "#/components/schemas/DisbursementSubmitted"
               }
             }
           },
@@ -1232,7 +1468,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
@@ -1262,7 +1498,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TenantOnly"
+                "$ref": "#/components/schemas/DisbursementTenant"
               }
             }
           },
@@ -1273,7 +1509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/View"
+                  "$ref": "#/components/schemas/DisbursementView"
                 }
               }
             },
