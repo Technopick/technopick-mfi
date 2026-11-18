@@ -40,12 +40,12 @@ public class B2cDisbursementService {
 
     private static final Logger LOG = LoggerFactory.getLogger(B2cDisbursementService.class);
 
-    public enum Status { REQUESTED, APPROVED, REJECTED, DISPATCHED, SUBMITTED, COMPLETED, FAILED }
+    public enum DisbursementStatus { REQUESTED, APPROVED, REJECTED, DISPATCHED, SUBMITTED, COMPLETED, FAILED }
 
-    public record DisbursementCreated(UUID disbursementId, Status status, String amount, String fee, boolean replayed) { }
+    public record DisbursementCreated(UUID disbursementId, DisbursementStatus status, String amount, String fee, boolean replayed) { }
 
     public record DisbursementView(UUID disbursementId, String loanNumber, String shortCode, String amount, String currency,
-                       String msisdnMasked, Status status, String requestedBy, String decidedBy, String conversationId,
+                       String msisdnMasked, DisbursementStatus status, String requestedBy, String decidedBy, String conversationId,
                        String transactionId, String resultCode, String resultDesc, UUID journalEntryId,
                        String attention, OffsetDateTime requestedAt) { }
 
@@ -56,7 +56,7 @@ public class B2cDisbursementService {
                          Money amount) { }
 
     private record Row(UUID id, String key, UUID loanId, String loanNumber, String shortCode, BigDecimal amount,
-                       String currency, String msisdn, String msisdnMasked, Status status, String requestedBy,
+                       String currency, String msisdn, String msisdnMasked, DisbursementStatus status, String requestedBy,
                        String conversationId, String transactionId, String glClearing) { }
 
     private final JdbcClient jdbc;
@@ -118,7 +118,7 @@ public class B2cDisbursementService {
             .param("code", code).param("amount", net).param("ccy", loan.netAmount().currency().getCurrencyCode())
             .param("msisdn", msisdn).param("masked", MpesaStkService.mask(msisdn)).param("actor", actor)
             .update();
-        return new DisbursementCreated(id, Status.REQUESTED, plain(net), loan.fee().amount().toPlainString(), false);
+        return new DisbursementCreated(id, DisbursementStatus.REQUESTED, plain(net), loan.fee().amount().toPlainString(), false);
     }
 
     /** Checker decision. The requester can never decide their own request (also enforced by the database). */
@@ -126,7 +126,7 @@ public class B2cDisbursementService {
     public DisbursementView decide(UUID tenantId, UUID id, boolean approve, String actor) {
         session.bind(tenantId);
         Row r = lock(id);
-        if (r.status() != Status.REQUESTED) {
+        if (r.status() != DisbursementStatus.REQUESTED) {
             throw new ConflictException("disbursement is already " + r.status());
         }
         if (r.requestedBy().equals(actor)) {
@@ -162,7 +162,7 @@ public class B2cDisbursementService {
             .param("id", id)
             .query((rs, i) -> new DisbursementView(rs.getObject("disbursement_id", UUID.class), rs.getString("loan_number"),
                     rs.getString("short_code"), plain(rs.getBigDecimal("amount")), rs.getString("currency"),
-                    rs.getString("msisdn_masked"), Status.valueOf(rs.getString("status")), rs.getString("requested_by"),
+                    rs.getString("msisdn_masked"), DisbursementStatus.valueOf(rs.getString("status")), rs.getString("requested_by"),
                     rs.getString("decided_by"), rs.getString("conversation_id"), rs.getString("transaction_id"),
                     rs.getString("result_code"), rs.getString("result_desc"), rs.getObject("journal_entry_id", UUID.class),
                     rs.getString("attention"), rs.getObject("requested_at", OffsetDateTime.class)))
@@ -182,7 +182,7 @@ public class B2cDisbursementService {
     public DisbursementDispatch dispatch(UUID tenantId, UUID id) {
         session.bind(tenantId);
         Row r = lock(id);
-        if (r.status() != Status.APPROVED) {
+        if (r.status() != DisbursementStatus.APPROVED) {
             throw new ConflictException("disbursement is " + r.status() + ", not APPROVED");
         }
         jdbc.sql("UPDATE payments.b2c_disbursement SET status = 'DISPATCHED' WHERE disbursement_id = :id")
@@ -196,10 +196,10 @@ public class B2cDisbursementService {
         session.bind(tenantId);
         Row r = lock(id);
         checkConversation(r, conversationId);
-        if (r.status() == Status.DISPATCHED) {
+        if (r.status() == DisbursementStatus.DISPATCHED) {
             jdbc.sql("UPDATE payments.b2c_disbursement SET status = 'SUBMITTED', conversation_id = :c WHERE disbursement_id = :id")
                 .param("c", conversationId).param("id", id).update();
-        } else if (r.status() == Status.REQUESTED || r.status() == Status.APPROVED || r.status() == Status.REJECTED) {
+        } else if (r.status() == DisbursementStatus.REQUESTED || r.status() == DisbursementStatus.APPROVED || r.status() == DisbursementStatus.REJECTED) {
             throw new ConflictException("disbursement was never dispatched");
         }
         return view(tenantId, id);
@@ -210,7 +210,7 @@ public class B2cDisbursementService {
     public DisbursementView sendFailed(UUID tenantId, UUID id, String code, String description) {
         session.bind(tenantId);
         Row r = lock(id);
-        if (r.status() == Status.DISPATCHED) {
+        if (r.status() == DisbursementStatus.DISPATCHED) {
             jdbc.sql("""
                     UPDATE payments.b2c_disbursement SET status = 'FAILED', result_code = :code, result_desc = :desc,
                            msisdn = NULL, attention = NULL
@@ -219,7 +219,7 @@ public class B2cDisbursementService {
                 .param("code", truncate("SEND:" + code, 20)).param("desc", truncate(description, 200)).param("id", id).update();
             outbox.record(tenantId, "MpesaDisbursementFailed", "b2c_disbursement", id.toString(),
                     "{\"disbursementId\":\"%s\",\"resultCode\":\"%s\"}".formatted(id, truncate("SEND:" + code, 20)), "b2c:" + id);
-        } else if (r.status() != Status.FAILED) {
+        } else if (r.status() != DisbursementStatus.FAILED) {
             throw new ConflictException("disbursement is " + r.status());
         }
         return view(tenantId, id);
@@ -231,17 +231,17 @@ public class B2cDisbursementService {
         session.bind(tenantId);
         Row r = lock(id);
         checkConversation(r, result.conversationId());
-        if (r.status() == Status.REQUESTED || r.status() == Status.APPROVED || r.status() == Status.REJECTED) {
+        if (r.status() == DisbursementStatus.REQUESTED || r.status() == DisbursementStatus.APPROVED || r.status() == DisbursementStatus.REJECTED) {
             throw new ConflictException("disbursement was never dispatched");
         }
-        if (r.status() == Status.COMPLETED) {
+        if (r.status() == DisbursementStatus.COMPLETED) {
             if (result.transactionId() != null && !result.transactionId().equals(r.transactionId())) {
                 throw new ConflictException("a different transaction already completed this disbursement");
             }
             return view(tenantId, id);
         }
         if (!"0".equals(result.resultCode())) {
-            if (r.status() != Status.FAILED) {
+            if (r.status() != DisbursementStatus.FAILED) {
                 jdbc.sql("""
                         UPDATE payments.b2c_disbursement SET status = 'FAILED', result_code = :code, result_desc = :desc,
                                msisdn = NULL, attention = NULL, conversation_id = COALESCE(conversation_id, :c)
@@ -257,7 +257,7 @@ public class B2cDisbursementService {
         if (result.transactionId() == null || result.amount() == null) {
             throw new IllegalArgumentException("a successful result needs the transaction id and amount");
         }
-        if (r.status() == Status.FAILED) {
+        if (r.status() == DisbursementStatus.FAILED) {
             LOG.error("ALARM: B2C disbursement {} reported successful (transaction {}) after it was recorded as failed",
                     id, result.transactionId());
             jdbc.sql("""
@@ -297,7 +297,7 @@ public class B2cDisbursementService {
     public DisbursementView timeout(UUID tenantId, UUID id) {
         session.bind(tenantId);
         Row r = lock(id);
-        if (r.status() == Status.DISPATCHED || r.status() == Status.SUBMITTED) {
+        if (r.status() == DisbursementStatus.DISPATCHED || r.status() == DisbursementStatus.SUBMITTED) {
             jdbc.sql("UPDATE payments.b2c_disbursement SET attention = 'TIMEOUT_UNKNOWN' WHERE disbursement_id = :id")
                 .param("id", id).update();
         }
@@ -351,7 +351,7 @@ public class B2cDisbursementService {
         return new Row(rs.getObject("disbursement_id", UUID.class), rs.getString("idempotency_key"),
                 rs.getObject("loan_id", UUID.class), rs.getString("loan_number"), rs.getString("short_code"),
                 rs.getBigDecimal("amount"), rs.getString("currency"), rs.getString("msisdn"), rs.getString("msisdn_masked"),
-                Status.valueOf(rs.getString("status")), rs.getString("requested_by"), rs.getString("conversation_id"),
+                DisbursementStatus.valueOf(rs.getString("status")), rs.getString("requested_by"), rs.getString("conversation_id"),
                 rs.getString("transaction_id"), rs.getString("gl_clearing"));
     }
 
