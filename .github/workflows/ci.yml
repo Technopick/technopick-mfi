@@ -24,6 +24,7 @@ jobs:
           java-version: '25'
           cache: maven
       - name: Build and tests
+        shell: bash
         # Container-based integration tests need Linux containers: they run on ubuntu only.
         run: mvn -B -ntp verify ${{ matrix.os == 'windows-latest' && '-Dsurefire.excludedGroups=integration' || '' }}
 

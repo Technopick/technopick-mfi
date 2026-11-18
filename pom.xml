@@ -92,6 +92,8 @@
           <version>${maven-compiler.version}</version>
           <configuration>
             <release>${java.release}</release>
+            <!-- Spring binds @PathVariable/@RequestParam by parameter name. -->
+            <parameters>true</parameters>
             <compilerArgs>
               <arg>-Xlint:all</arg>
               <arg>-Werror</arg>
