@@ -2,6 +2,7 @@ package ke.co.technopick.mfi.core;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -45,5 +46,10 @@ class ArchitectureRulesTest {
         noClasses().that().resideInAPackage("..lending..")
                 .should().dependOnClassesThat().resideInAPackage("..accounting.persistence..")
                 .check(CORE);
+    }
+
+    @Test
+    void modulesAreFreeOfCycles() {
+        slices().matching("ke.co.technopick.mfi.core.(*)..").should().beFreeOfCycles().check(CORE);
     }
 }

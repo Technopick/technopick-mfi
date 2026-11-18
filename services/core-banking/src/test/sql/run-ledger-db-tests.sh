@@ -52,6 +52,9 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== lending tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/lending_test.sql"
 
+echo "== business date and EOD tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/eod_test.sql"
+
 echo "== concurrency: two sessions racing for the same funds"
 bash "$HERE/concurrency_hold_race_test.sh" "$DB" "$APP_PW" "${MFI_APP_HOST:-${PGHOST:-localhost}}"
 

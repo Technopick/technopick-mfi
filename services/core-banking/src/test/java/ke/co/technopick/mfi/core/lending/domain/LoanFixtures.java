@@ -8,12 +8,12 @@ import java.util.UUID;
 import ke.co.technopick.mfi.canonical.Money;
 
 /** Shared test fixtures matching the Phase 0 design examples (section 5). */
-final class LoanFixtures {
+public final class LoanFixtures {
 
-    static final UUID TENANT = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
-    static final UUID LOAN = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001");
+    public static final UUID TENANT = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    public static final UUID LOAN = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001");
 
-    static final LoanGlMapping GL = new LoanGlMapping(
+    public static final LoanGlMapping GL = new LoanGlMapping(
             "1200-LOANS-PRINCIPAL", "1210-INTEREST-RECEIVABLE", "4000-INTEREST-INCOME",
             "1220-FEE-RECEIVABLE", "4100-FEE-PROCESSING", "1230-PENALTY-RECEIVABLE", "4300-PENALTY-INCOME",
             "2400-LOAN-OVERPAYMENTS", "5100-LOAN-WRITE-OFFS");
@@ -21,12 +21,12 @@ final class LoanFixtures {
     private LoanFixtures() {
     }
 
-    static Money kes(String v) {
+    public static Money kes(String v) {
         return Money.of(v, "KES");
     }
 
     /** Biashara loan v1: 24% p.a. reducing balance, 2% upfront fee, KES 5,000 - 500,000, 3-24 months. */
-    static LoanProductVersion biasharaV1() {
+    public static LoanProductVersion biasharaV1() {
         return new LoanProductVersion(UUID.fromString("cccccccc-0000-0000-0000-000000000001"), "BIASHARA", 1,
                 Currency.getInstance("KES"), LoanProductVersion.InterestMethod.REDUCING_BALANCE,
                 new BigDecimal("0.24"), RoundingMode.HALF_EVEN, kes("5000"), kes("500000"), 3, 24,
@@ -34,7 +34,7 @@ final class LoanFixtures {
                 List.of(DueComponent.values()), GL);
     }
 
-    static LoanPostingRules.LoanContext context() {
+    public static LoanPostingRules.LoanContext context() {
         return new LoanPostingRules.LoanContext(TENANT, LOAN, "NBO01", biasharaV1());
     }
 }

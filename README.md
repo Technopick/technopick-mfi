@@ -43,13 +43,13 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 3)
+## What is verified (2026-11-18, increment 4)
 
 | Item | Result | How |
 | --- | --- | --- |
 | Domain code compiles with `-Xlint:all -Werror` | Yes | `javac --release 21` (JDK 21.0.13) |
-| 67 unit tests (Money, canonical model, journals, schedules, repayment allocation, holds, authorization, product versions, loan posting rules, interest accrual; incl. seeded property tests) | 67/67 pass | JUnit 5 test sources run through a local JUnit-API shim, because Maven Central was unreachable from the build workspace |
-| Ledger, savings and lending DB rules (balance, immutability, closed period, idempotency, reversals, subledger/control, holds, available balance, product versioning, maker-checker, loans, schedules, repayments, RLS) | 57/57 checks pass incl. two-session race tests; mutation runs detect a disabled balance trigger, a missing row lock and a disabled allocation check | PostgreSQL 16.15, app role `mfi_app` without BYPASSRLS |
+| 83 unit tests (Money, canonical model, journals, schedules, repayment allocation, holds, authorization, product versions, posting rules, accrual, arrears/PAR, penalties, EOD planner; incl. seeded property tests) | 83/83 pass | JUnit 5 test sources run through a local JUnit-API shim, because Maven Central was unreachable from the build workspace |
+| Ledger, savings and lending DB rules (balance, immutability, closed period, idempotency, reversals, subledger/control, holds, available balance, product versioning, maker-checker, loans, schedules, repayments, business date/EOD, accrual/penalty records, arrears snapshots, PAR, RLS) | 70/70 checks pass incl. two-session race tests; mutation runs detect a disabled balance trigger, a missing row lock, a disabled allocation check and a disabled EOD-completion check | PostgreSQL 16.15, app role `mfi_app` without BYPASSRLS |
 | `mvn verify`, ArchUnit rules, Docker images, CI workflow, PowerShell scripts | **Not yet run** | Need a networked build (GitHub Actions or a developer PC) |
 
 ## Non-negotiables

@@ -46,3 +46,11 @@ makes T2 fail, proving the tests detect the defect they target.
   repayment must equal its journal entry.
 - Verified: 19 checks (L1-L19), incl. loan principal reconciling to GL principal receivable;
   mutation with the allocation check disabled makes L15 fail.
+
+## Addendum (V4, 2026-11-18): business date and end of day
+- Business date advances one day at a time and only after a COMPLETED EOD run; completed runs
+  are final; accrual/penalty records only for the current date while its run is RUNNING.
+- Accrual and penalty records are tied to this loan's own entry for that event, agree with
+  the posted amounts, and accrual never exceeds the installment's scheduled interest.
+- Arrears snapshots are insert-only with bucket consistent with DPD; PAR view per branch.
+- Verified: 13 checks (E1-E13); mutation with the EOD-completion check disabled makes E1 fail.
