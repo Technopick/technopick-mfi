@@ -35,3 +35,14 @@ makes T2 fail, proving the tests detect the defect they target.
   lock lets both racing holds through (1,400 held on 1,000) and the race test fails.
 - Known gap: lowering an overdraft limit is not yet re-checked against existing holds
   (to be enforced with the maker-checker limit-change flow).
+
+## Addendum (V3, 2026-11-18): loan products, loans and repayments
+- Product versions: created DRAFT, activated only by a checker different from the maker,
+  then frozen (ACTIVE -> RETIRED only). Loans pin a version and must be inside its limits.
+- Loans: approved by someone other than the creator; terms never change; APPROVED -> ACTIVE
+  only with this loan's own disbursement entry debiting principal in full.
+- Schedules, repayments and allocations are insert-only; every schedule version sums to the
+  principal; allocations + unallocated = payment; a provider receipt is applied once; a
+  repayment must equal its journal entry.
+- Verified: 19 checks (L1-L19), incl. loan principal reconciling to GL principal receivable;
+  mutation with the allocation check disabled makes L15 fail.

@@ -57,3 +57,30 @@ installment 1 entirely (200.00 + 2,000.00 + 7,455.96). Paying 20,000.00 leaves 8
 
 Invariants (tested): allocations + unallocated = payment exactly; no component receives
 more than is outstanding; every allocation is positive.
+
+## Interest accrual - accrual/v1
+Implementation: `InterestAccrual`; tests: `InterestAccrualTest` (worked example + 2,000-case
+property test with skipped EOD days).
+
+- Each installment's scheduled interest accrues daily across its period (previous due date
+  exclusive, due date inclusive).
+- Accrued-to-date = round(period interest x elapsed days / period days); the day's posting is
+  accrued-to-date minus what is already posted. One accrual entry per loan per business date
+  (idempotency key `loan:<id>:ACCRUE:<date>`).
+- Properties (tested): daily amounts sum exactly to the scheduled interest, are never
+  negative, a re-run on the same day posts zero, missed EOD days are caught up.
+- Worked example: KES 2,000.00 over 30 days -> 66.67 after day 1, 133.33 after day 2,
+  266.67 after day 4, 2,000.00 on the due date.
+
+## Posting rules (LoanPostingRules)
+| Event | Debit | Credit |
+| --- | --- | --- |
+| Disbursement (fee deducted) | Principal receivable (gross) | Channel clearing (net) + Fee income (fee) |
+| Daily accrual | Interest receivable | Interest income |
+| Penalty / fee charged | Penalty / fee receivable | Penalty / fee income |
+| Repayment | Channel clearing (payment) | Receivable per allocated component + Overpayment liability |
+| Write-off | Write-off expense | Principal receivable + Interest receivable |
+
+POLICY ITEM FOR FINANCE SIGN-OFF: upfront fees are recognised at disbursement. IFRS 9 would
+normally defer fees integral to the effective interest rate; if required, a new product
+version maps the fee to a deferred-fee liability and adds an amortisation event.
