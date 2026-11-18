@@ -13,3 +13,8 @@ node_modules/
 *.key
 application-local.yml
 /infrastructure/docker/.data/
+
+# staff web build output
+apps/staff-web/dist/
+*.tsbuildinfo
+apps/staff-web/public/config.json

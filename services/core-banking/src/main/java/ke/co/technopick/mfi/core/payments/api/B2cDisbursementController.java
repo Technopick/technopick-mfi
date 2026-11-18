@@ -61,6 +61,12 @@ public class B2cDisbursementController {
                 caller.actor());
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'OPERATIONS', 'BRANCH_MANAGER', 'SUPERVISOR')")
+    public List<DisbursementView> pending() {
+        return service.pending(caller.tenantId());
+    }
+
     @GetMapping("/attention")
     @PreAuthorize("hasAnyRole('OPERATIONS', 'SUPERVISOR')")
     public List<DisbursementView> attention() {

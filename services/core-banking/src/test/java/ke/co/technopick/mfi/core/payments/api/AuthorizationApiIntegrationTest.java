@@ -750,6 +750,9 @@ class AuthorizationApiIntegrationTest {
                     .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))
             .andExpect(status().isForbidden()); // requester cannot approve, whatever roles they hold
         b2c("/" + id + "/approve", null, staff("officer-2", "LOAN_OFFICER"), status().isForbidden());
+        String waiting = mvc.perform(get("/api/v1/payments/mpesa/b2c/disbursements").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, waiting.contains(id), waiting);
         assertEquals("APPROVED", JsonPath.read(b2c("/" + id + "/approve", null, staff("sup-1", "SUPERVISOR"), ok), "$.status"));
         String event = owner().queryForObject("""
                 SELECT payload::text FROM messaging.outbox_event WHERE event_type = 'MpesaDisbursementApproved' AND aggregate_id = ?

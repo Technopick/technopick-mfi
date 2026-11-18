@@ -41,6 +41,33 @@ jobs:
           path: services/core-banking/target/openapi/
           if-no-files-found: ignore
 
+  staff-web:
+    name: staff web app (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/staff-web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/staff-web/package-lock.json
+      - run: npm ci
+      - name: API types match the OpenAPI contract
+        run: npm run api:check
+      - name: Runtime dependencies have no known high or critical vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
   ledger-db-tests:
     name: ledger database invariants (PostgreSQL)
     runs-on: ubuntu-latest

@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to config.json on the web server. Public values only - no secrets (the app is a public OIDC client using PKCE).",
+  "oidcAuthority": "https://idp.example.co.ke/realms/technopick",
+  "oidcClientId": "staff-web",
+  "oidcScope": "openid profile",
+  "rolesClaim": "roles",
+  "apiBaseUrl": ""
+}

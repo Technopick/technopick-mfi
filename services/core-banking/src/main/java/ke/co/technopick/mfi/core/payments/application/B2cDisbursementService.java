@@ -170,6 +170,14 @@ public class B2cDisbursementService {
             .orElseThrow(() -> new NotFoundException("disbursement not found"));
     }
 
+    /** Disbursements waiting for a checker's decision. */
+    @Transactional(readOnly = true)
+    public List<DisbursementView> pending(UUID tenantId) {
+        session.bind(tenantId);
+        return jdbc.sql("SELECT disbursement_id FROM payments.b2c_disbursement WHERE status = 'REQUESTED' ORDER BY requested_at")
+            .query(UUID.class).list().stream().map(id -> view(tenantId, id)).toList();
+    }
+
     @Transactional(readOnly = true)
     public List<DisbursementView> attention(UUID tenantId) {
         session.bind(tenantId);
