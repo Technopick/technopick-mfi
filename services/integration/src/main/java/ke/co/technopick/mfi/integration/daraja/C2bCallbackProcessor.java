@@ -1,6 +1,7 @@
 package ke.co.technopick.mfi.integration.daraja;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -43,9 +44,11 @@ public class C2bCallbackProcessor {
 
     /** Processes up to 100 due callbacks; returns how many were applied. */
     public int processPending() {
+        // Each callback is tried at most once per pass, whatever the back-off.
+        OffsetDateTime passStart = jdbc.sql("SELECT clock_timestamp()").query(OffsetDateTime.class).single();
         int applied = 0;
         for (int i = 0; i < 100; i++) {
-            Boolean result = tx.execute(s -> processOne());
+            Boolean result = tx.execute(s -> processOne(passStart));
             if (result == null) {
                 break;
             }
@@ -57,18 +60,20 @@ public class C2bCallbackProcessor {
     }
 
     /** null = nothing due; true = applied; false = failed (will retry). */
-    private Boolean processOne() {
+    private Boolean processOne(OffsetDateTime passStart) {
         Duration backoff = props.retryBackoff();
         Optional<Pending> next = jdbc.sql("""
                 SELECT callback_id, tenant_id, payload::text AS payload FROM integration.provider_callback
                  WHERE provider = 'MPESA' AND callback_type = 'C2B_CONFIRMATION' AND status <> 'APPLIED'
                    AND attempts < :max
-                   AND (last_attempt_at IS NULL OR last_attempt_at <= clock_timestamp() - make_interval(secs => :backoff))
+                   AND (last_attempt_at IS NULL OR (last_attempt_at < :passStart
+                        AND last_attempt_at <= clock_timestamp() - make_interval(secs => :backoff)))
                  ORDER BY received_at
                  LIMIT 1
                    FOR UPDATE SKIP LOCKED
                 """)
             .param("max", props.maxAttempts())
+            .param("passStart", passStart)
             .param("backoff", (double) backoff.toMillis() / 1000.0)
             .query((rs, n) -> new Pending(rs.getObject("callback_id", UUID.class), rs.getObject("tenant_id", UUID.class),
                     rs.getString("payload")))
