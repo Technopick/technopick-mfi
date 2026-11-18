@@ -18,7 +18,7 @@ import org.springframework.stereotype.Repository;
  * database re-checks balance, periods, subledger rules and available balance at commit.
  */
 @Repository
-public class JdbcJournal {
+public class JdbcJournal implements ke.co.technopick.mfi.core.accounting.application.JournalPosting {
 
     private final JdbcClient jdbc;
 

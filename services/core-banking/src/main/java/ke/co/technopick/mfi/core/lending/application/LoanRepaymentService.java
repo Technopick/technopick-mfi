@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import ke.co.technopick.mfi.canonical.Money;
 import ke.co.technopick.mfi.core.accounting.domain.JournalEntry;
-import ke.co.technopick.mfi.core.accounting.persistence.JdbcJournal;
+import ke.co.technopick.mfi.core.accounting.application.JournalPosting;
 import ke.co.technopick.mfi.core.lending.domain.DueComponent;
 import ke.co.technopick.mfi.core.lending.domain.InstallmentDue;
 import ke.co.technopick.mfi.core.lending.domain.LoanGlMapping;
@@ -46,10 +46,10 @@ public class LoanRepaymentService {
                          Money overpayment) { }
 
     private final JdbcClient jdbc;
-    private final JdbcJournal journal;
+    private final JournalPosting journal;
     private final Outbox outbox;
 
-    public LoanRepaymentService(JdbcClient jdbc, JdbcJournal journal, Outbox outbox) {
+    public LoanRepaymentService(JdbcClient jdbc, JournalPosting journal, Outbox outbox) {
         this.jdbc = jdbc;
         this.journal = journal;
         this.outbox = outbox;
