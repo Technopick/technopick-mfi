@@ -933,7 +933,7 @@ class AuthorizationApiIntegrationTest {
 
         String schedule = mvc.perform(get("/api/v1/lending/loans/" + loanNumber + "/schedule").with(teller(TENANT_A)))
             .andExpect(ok).andReturn().getResponse().getContentAsString();
-        assertEquals(1, (int) JsonPath.read(schedule, "$.scheduleVersion"));
+        assertEquals(Integer.valueOf(1), JsonPath.<Integer>read(schedule, "$.scheduleVersion"));
         assertEquals("2026-12-18", JsonPath.read(schedule, "$.installments[0].dueDate"));
         assertEquals("2027-11-18", JsonPath.read(schedule, "$.installments[11].dueDate"));
         assertEquals("0.00", JsonPath.read(schedule, "$.installments[11].closingBalance"));
@@ -945,7 +945,7 @@ class AuthorizationApiIntegrationTest {
         String other = JsonPath.read(apply(application("app-2", "50000", 6, null), officer, ok), "$.applicationId");
         String declined = decideApplication(other, "decline", "{\"reason\":\"Existing arrears with another lender\"}", manager, ok);
         assertEquals("DECLINED", JsonPath.read(declined, "$.status"));
-        assertEquals(null, JsonPath.read(declined, "$.loanNumber"));
+        assertEquals(null, (Object) JsonPath.read(declined, "$.loanNumber"));
 
         // Disburse the new loan by B2C, then the customer pays through the paybill with the loan number.
         String disbursement = approvedAndDispatched("orig-b2c", loanNumber);
