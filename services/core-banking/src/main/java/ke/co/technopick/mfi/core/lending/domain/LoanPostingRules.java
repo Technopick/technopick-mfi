@@ -97,6 +97,18 @@ public final class LoanPostingRules {
     public static JournalEntry repayment(LoanContext ctx, Money payment, RepaymentAllocator.Result allocation,
                                          String channelClearingAccount, LocalDate businessDate, String paymentRef,
                                          String correlationId) {
+        return repayment(ctx, payment, allocation, channelClearingAccount, businessDate, paymentRef, correlationId,
+                Money.zero(payment.currency()));
+    }
+
+    /**
+     * Repayment where part of the interest paid has not been accrued yet (paid before the EOD
+     * accrual caught up). That part is credited straight to interest income, so interest
+     * receivable never goes negative.
+     */
+    public static JournalEntry repayment(LoanContext ctx, Money payment, RepaymentAllocator.Result allocation,
+                                         String channelClearingAccount, LocalDate businessDate, String paymentRef,
+                                         String correlationId, Money interestNotYetAccrued) {
         Currency ccy = payment.currency();
         if (!allocation.totalAllocated(ccy).plus(allocation.unallocated()).equals(payment)) {
             throw new IllegalArgumentException("allocation does not add up to the payment");
@@ -108,8 +120,21 @@ public final class LoanPostingRules {
         List<JournalLine> lines = new ArrayList<>();
         lines.add(JournalLine.debit(channelClearingAccount, payment, ctx.branchCode()));
         LoanGlMapping gl = ctx.product().gl();
-        byComponent.forEach((component, amount) ->
-                lines.add(JournalLine.credit(gl.receivableFor(component), amount, ctx.branchCode())));
+        Money interestPaid = byComponent.getOrDefault(DueComponent.INTEREST, Money.zero(ccy));
+        if (interestNotYetAccrued.isNegative() || interestNotYetAccrued.compareTo(interestPaid) > 0) {
+            throw new IllegalArgumentException("unaccrued interest must be between 0 and the interest paid");
+        }
+        byComponent.forEach((component, amount) -> {
+            if (component == DueComponent.INTEREST && interestNotYetAccrued.isPositive()) {
+                Money accrued = amount.minus(interestNotYetAccrued);
+                if (accrued.isPositive()) {
+                    lines.add(JournalLine.credit(gl.interestReceivable(), accrued, ctx.branchCode()));
+                }
+                lines.add(JournalLine.credit(gl.interestIncome(), interestNotYetAccrued, ctx.branchCode()));
+            } else {
+                lines.add(JournalLine.credit(gl.receivableFor(component), amount, ctx.branchCode()));
+            }
+        });
         if (allocation.unallocated().isPositive()) {
             lines.add(JournalLine.credit(gl.overpaymentLiability(), allocation.unallocated(), ctx.branchCode()));
         }

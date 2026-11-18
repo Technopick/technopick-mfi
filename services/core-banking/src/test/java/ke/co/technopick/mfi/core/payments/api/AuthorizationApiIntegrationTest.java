@@ -113,8 +113,20 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '2300-AGENT-FLOAT-PAYABLE', 'Agent float payable', 'LIABILITY', 'KES', false),
               ('%1$s', '4200-FEE-WITHDRAWAL', 'Withdrawal fees', 'INCOME', 'KES', false),
               ('%1$s', '1120-MPESA-C2B-CLEARING', 'M-Pesa paybill clearing', 'ASSET', 'KES', false),
-              ('%1$s', '2900-SUSPENSE', 'Unmatched receipts suspense', 'LIABILITY', 'KES', false);
-            INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date) VALUES ('%1$s', '2026-11', '2026-11-01', '2026-11-30');
+              ('%1$s', '2900-SUSPENSE', 'Unmatched receipts suspense', 'LIABILITY', 'KES', false),
+              ('%1$s', '1200-LOANS-PRINCIPAL', 'Loans receivable - principal', 'ASSET', 'KES', false),
+              ('%1$s', '1210-INTEREST-RECEIVABLE', 'Interest receivable', 'ASSET', 'KES', false),
+              ('%1$s', '4000-INTEREST-INCOME', 'Interest income', 'INCOME', 'KES', false),
+              ('%1$s', '1220-FEE-RECEIVABLE', 'Fee receivable', 'ASSET', 'KES', false),
+              ('%1$s', '4100-FEE-PROCESSING', 'Processing fees', 'INCOME', 'KES', false),
+              ('%1$s', '1230-PENALTY-RECEIVABLE', 'Penalty receivable', 'ASSET', 'KES', false),
+              ('%1$s', '4300-PENALTY-INCOME', 'Penalty income', 'INCOME', 'KES', false),
+              ('%1$s', '2400-LOAN-OVERPAYMENTS', 'Loan overpayments', 'LIABILITY', 'KES', false),
+              ('%1$s', '5100-LOAN-WRITE-OFFS', 'Loan write-offs', 'EXPENSE', 'KES', false),
+              ('%1$s', '1110-MPESA-B2C-CLEARING', 'M-Pesa B2C clearing', 'ASSET', 'KES', false);
+            INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date) VALUES
+              ('%1$s', '2026-10', '2026-10-01', '2026-10-31'),
+              ('%1$s', '2026-11', '2026-11-01', '2026-11-30');
             INSERT INTO tenancy.business_date (tenant_id, current_date_) VALUES ('%1$s', '2026-11-18');
             INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account)
               VALUES ('%1$s', 'SAV01', 'Savings', 'KES', '2110-SAVINGS-CONTROL');
@@ -123,7 +135,8 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000001', '0100000001', 'C1', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000002', '0100000002', 'C2', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000003', '0100000003', 'C3', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
-              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000004', '0100000004', 'C4', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000004', '0100000004', 'C4', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000005', '0100000005', 'C5', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
             INSERT INTO payments.mpesa_paybill (tenant_id, short_code, branch_code, gl_clearing, gl_suspense, max_amount)
               VALUES ('%1$s', '600991', 'NBO01', '1120-MPESA-C2B-CLEARING', '2900-SUSPENSE', 150000);
             INSERT INTO payments.channel_config (tenant_id, channel_code, currency, per_txn_max, daily_max,
@@ -137,6 +150,62 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '44444444-0000-0000-0000-000000000001', 2, '2110-SAVINGS-CONTROL', 'C', 10000, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000001'),
               ('%1$s', '44444444-0000-0000-0000-000000000001', 3, '2110-SAVINGS-CONTROL', 'C', 1000, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000002'),
               ('%1$s', '44444444-0000-0000-0000-000000000001', 4, '2110-SAVINGS-CONTROL', 'C', 500, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000003');
+            COMMIT;
+            INSERT INTO lending.loan_product (tenant_id, product_code, name, currency) VALUES ('%1$s', 'BIASHARA', 'Biashara', 'KES');
+            INSERT INTO lending.loan_product_version (tenant_id, version_id, product_code, version, interest_method, annual_rate,
+                min_principal, max_principal, min_term_months, max_term_months, upfront_fee_rate, allocation_strategy,
+                allocation_order, gl_principal, gl_interest_receivable, gl_interest_income, gl_fee_receivable, gl_fee_income,
+                gl_penalty_receivable, gl_penalty_income, gl_overpayment, gl_write_off, created_by)
+              VALUES ('%1$s', 'cccccccc-0000-0000-0000-000000000001', 'BIASHARA', 1, 'REDUCING_BALANCE', 0.24, 5000, 500000, 3, 24,
+                0.02, 'COMPONENT_FIRST', ARRAY['PENALTY','FEE','INTEREST','PRINCIPAL'], '1200-LOANS-PRINCIPAL',
+                '1210-INTEREST-RECEIVABLE', '4000-INTEREST-INCOME', '1220-FEE-RECEIVABLE', '4100-FEE-PROCESSING',
+                '1230-PENALTY-RECEIVABLE', '4300-PENALTY-INCOME', '2400-LOAN-OVERPAYMENTS', '5100-LOAN-WRITE-OFFS', 'test:maker');
+            UPDATE lending.loan_product_version SET status = 'ACTIVE', approved_by = 'test:checker'
+             WHERE version_id = 'cccccccc-0000-0000-0000-000000000001';
+            BEGIN;
+            INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency,
+                principal, term_months, created_by, approved_by) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 'LN-000001', 'C1', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 'LN-000002', 'C2', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager');
+            INSERT INTO lending.schedule_installment (tenant_id, loan_id, schedule_version, installment_no, due_date, principal, interest) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 1, '2026-11-18', 7455.96, 2000.00),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 2, '2026-12-18', 7605.08, 1850.88),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 3, '2027-01-18', 7757.18, 1698.78),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 4, '2027-02-18', 7912.32, 1543.64),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 5, '2027-03-18', 8070.57, 1385.39),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 6, '2027-04-18', 8231.98, 1223.98),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 7, '2027-05-18', 8396.62, 1059.34),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 8, '2027-06-18', 8564.55, 891.41),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 9, '2027-07-18', 8735.85, 720.11),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 10, '2027-08-18', 8910.56, 545.40),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 11, '2027-09-18', 9088.77, 367.19),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000001', 1, 12, '2027-10-18', 9270.56, 185.41),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 1, '2026-11-18', 7455.96, 2000.00),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 2, '2026-12-18', 7605.08, 1850.88),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 3, '2027-01-18', 7757.18, 1698.78),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 4, '2027-02-18', 7912.32, 1543.64),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 5, '2027-03-18', 8070.57, 1385.39),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 6, '2027-04-18', 8231.98, 1223.98),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 7, '2027-05-18', 8396.62, 1059.34),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 8, '2027-06-18', 8564.55, 891.41),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 9, '2027-07-18', 8735.85, 720.11),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 10, '2027-08-18', 8910.56, 545.40),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 11, '2027-09-18', 9088.77, 367.19),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000002', 1, 12, '2027-10-18', 9270.56, 185.41);
+            INSERT INTO ledger.journal_entry (tenant_id, entry_id, idempotency_key, business_date, source, correlation_id, actor) VALUES
+              ('%1$s', '77777777-0000-0000-0000-000000000001', 'loan:bbbbbbbb-0000-0000-0000-000000000001:DISBURSE:SEED', '2026-10-18', 'LOAN', 'seed', 'test'),
+              ('%1$s', '77777777-0000-0000-0000-000000000002', 'loan:bbbbbbbb-0000-0000-0000-000000000002:DISBURSE:SEED', '2026-10-18', 'LOAN', 'seed', 'test');
+            INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, side, amount, currency, branch_code) VALUES
+              ('%1$s', '77777777-0000-0000-0000-000000000001', 1, '1200-LOANS-PRINCIPAL', 'D', 100000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-000000000001', 2, '1110-MPESA-B2C-CLEARING', 'C', 98000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-000000000001', 3, '4100-FEE-PROCESSING', 'C', 2000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-000000000002', 1, '1200-LOANS-PRINCIPAL', 'D', 100000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-000000000002', 2, '1110-MPESA-B2C-CLEARING', 'C', 98000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-000000000002', 3, '4100-FEE-PROCESSING', 'C', 2000, 'KES', 'NBO01');
+            UPDATE lending.loan SET status = 'ACTIVE', disbursement_entry_id = '77777777-0000-0000-0000-000000000001'
+             WHERE loan_id = 'bbbbbbbb-0000-0000-0000-000000000001';
+            UPDATE lending.loan SET status = 'ACTIVE', disbursement_entry_id = '77777777-0000-0000-0000-000000000002'
+             WHERE loan_id = 'bbbbbbbb-0000-0000-0000-000000000002';
             COMMIT;
             """.formatted(TENANT_A, TENANT_B));
     }
@@ -359,7 +428,89 @@ class AuthorizationApiIntegrationTest {
                  WHERE tenant_id = ?::uuid AND account_code = '2900-SUSPENSE'
                 """, BigDecimal.class, TENANT_A);
         assertEquals(0, new BigDecimal("200").compareTo(suspense));
-        assertEquals(2, owner().queryForObject(
-                "SELECT count(*) FROM messaging.outbox_event WHERE event_type = 'MpesaPaymentReceived'", Integer.class));
+        assertEquals(2, owner().queryForObject("""
+                SELECT count(*) FROM messaging.outbox_event
+                 WHERE event_type = 'MpesaPaymentReceived' AND payload->>'transId' IN ('TA57ZBCAM3', 'TA57ZBCAM4')
+                """, Integer.class));
+    }
+
+    static JwtRequestPostProcessor staff(String subject, String role) {
+        return jwt().jwt(j -> j.subject(subject).claim("tenant_id", TENANT_A)).authorities(new SimpleGrantedAuthority("ROLE_" + role));
+    }
+
+    /** Paybill receipt quoting a loan number repays the loan with proper allocation and postings. */
+    @Test
+    void mpesaReceiptRepaysLoanByLoanNumber() throws Exception {
+        var ok = status().isOk();
+        assertEquals("0", JsonPath.read(c2b("/validation", validation("600991", "LN-000001", "10000.00"), integrationToken(), ok), "$.resultCode"));
+        String applied = c2b("", confirmation("TA57ZBCAL1", "ln-000001", "10000.00"), integrationToken(), ok);
+        assertEquals("LOAN_REPAYMENT", JsonPath.read(applied, "$.outcome"));
+        assertEquals("LN-000001", JsonPath.read(applied, "$.accountNumber"));
+        String entryId = JsonPath.read(applied, "$.journalEntryId");
+
+        // Installment 1 (due 18 Nov): interest 2,000.00 + principal 7,455.96; remainder 544.04 is an overpayment.
+        assertEquals(0, new BigDecimal("544.04").compareTo(owner().queryForObject(
+                "SELECT unallocated FROM lending.repayment WHERE provider_ref = 'TA57ZBCAL1'", BigDecimal.class)));
+        assertEquals(java.util.List.of("1|INTEREST|2000.00", "1|PRINCIPAL|7455.96"), owner().queryForList("""
+                SELECT a.installment_no || '|' || a.component || '|' || round(a.amount, 2) FROM lending.repayment_allocation a
+                  JOIN lending.repayment r USING (tenant_id, repayment_id) WHERE r.provider_ref = 'TA57ZBCAL1' ORDER BY a.line_no
+                """, String.class));
+        // No interest had been accrued by EOD yet, so the interest goes straight to income.
+        assertEquals(java.util.List.of("C 1200-LOANS-PRINCIPAL 7455.96", "C 2400-LOAN-OVERPAYMENTS 544.04",
+                "C 4000-INTEREST-INCOME 2000.00", "D 1120-MPESA-C2B-CLEARING 10000.00"), owner().queryForList("""
+                SELECT side || ' ' || account_code || ' ' || round(amount, 2) FROM ledger.journal_line
+                 WHERE entry_id = ?::uuid ORDER BY side, account_code
+                """, String.class, entryId));
+        String replay = c2b("", confirmation("TA57ZBCAL1", "ln-000001", "10000.00"), integrationToken(), ok);
+        assertEquals(Boolean.TRUE, JsonPath.read(replay, "$.replayed"));
+        assertEquals(1, owner().queryForObject("SELECT count(*) FROM lending.repayment WHERE provider_ref = 'TA57ZBCAL1'", Integer.class));
+    }
+
+    /** Unmatched receipts leave suspense only with two different people: to a savings account or to a loan. */
+    @Test
+    void suspenseClearanceNeedsMakerAndChecker() throws Exception {
+        var ok = status().isOk();
+        String toAccount = JsonPath.read(c2b("", confirmation("TA57ZBCAS1", "TYPO-REF", "300.00"), integrationToken(), ok), "$.paymentId");
+        String toLoan = JsonPath.read(c2b("", confirmation("TA57ZBCAS2", "TYPO-2", "9455.96"), integrationToken(), ok), "$.paymentId");
+
+        String items = mvc.perform(get("/api/v1/payments/suspense/items").with(staff("ops-1", "OPERATIONS")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, items.contains(toAccount) && items.contains(toLoan));
+        mvc.perform(get("/api/v1/payments/suspense/items").with(teller(TENANT_A))).andExpect(status().isForbidden());
+
+        String r1 = JsonPath.read(mvc.perform(post("/api/v1/payments/suspense/items/" + toAccount + "/resolutions")
+                .with(staff("ops-1", "OPERATIONS")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetType\":\"DEPOSIT_ACCOUNT\",\"targetReference\":\"0100000005\",\"reason\":\"Customer called: typo in account number\"}"))
+            .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.resolutionId");
+        // A second live resolution for the same receipt is refused.
+        mvc.perform(post("/api/v1/payments/suspense/items/" + toAccount + "/resolutions")
+                .with(staff("ops-2", "OPERATIONS")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetType\":\"DEPOSIT_ACCOUNT\",\"targetReference\":\"0100000004\",\"reason\":\"duplicate\"}"))
+            .andExpect(status().isConflict());
+        // The requester cannot approve, even holding the supervisor role as well.
+        mvc.perform(post("/api/v1/payments/suspense/resolutions/" + r1 + "/approve")
+                .with(jwt().jwt(j -> j.subject("ops-1").claim("tenant_id", TENANT_A))
+                    .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/payments/suspense/resolutions/" + r1 + "/approve").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(ok).andExpect(jsonPath("$.status").value("APPROVED"));
+        mvc.perform(post("/api/v1/payments/suspense/resolutions/" + r1 + "/approve").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(status().isConflict());
+        expectBalance("0100000005", "300.00", "0.00", "300.00");
+
+        String r2 = JsonPath.read(mvc.perform(post("/api/v1/payments/suspense/items/" + toLoan + "/resolutions")
+                .with(staff("ops-1", "OPERATIONS")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetType\":\"LOAN\",\"targetReference\":\"LN-000002\",\"reason\":\"Loan number mistyped\"}"))
+            .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.resolutionId");
+        mvc.perform(post("/api/v1/payments/suspense/resolutions/" + r2 + "/approve").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(ok);
+        assertEquals("SUSPENSE", owner().queryForObject(
+                "SELECT channel FROM lending.repayment WHERE provider_ref = ?", String.class, r2));
+        assertEquals(0, owner().queryForObject(
+                "SELECT unallocated FROM lending.repayment WHERE provider_ref = ?", BigDecimal.class, r2).signum());
+
+        String after = mvc.perform(get("/api/v1/payments/suspense/items").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.FALSE, after.contains(toAccount) || after.contains(toLoan));
     }
 }

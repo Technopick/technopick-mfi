@@ -14,6 +14,7 @@ import ke.co.technopick.mfi.core.accounting.domain.JournalEntry;
 import ke.co.technopick.mfi.core.accounting.domain.JournalLine;
 import ke.co.technopick.mfi.core.accounting.domain.Side;
 import ke.co.technopick.mfi.core.accounting.persistence.JdbcJournal;
+import ke.co.technopick.mfi.core.lending.application.LoanRepaymentService;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.tenancy.persistence.BusinessDates;
 import ke.co.technopick.mfi.core.tenancy.persistence.TenantSession;
@@ -29,8 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
  * when the account reference matches an account that accepts credits, otherwise to suspense as an
  * UNMATCHED item for maker-checker resolution. Either way the money is always on the ledger.
  *
- * <p>Account references are matched to deposit account numbers after trimming and upper-casing.
- * Loan repayments by loan number are added with the loan servicing API.
+ * <p>Account references are matched, after trimming and upper-casing, first to a deposit account
+ * number, then to an ACTIVE loan number (the receipt is then applied as a loan repayment).
  */
 @Service
 public class MpesaC2bService {
@@ -45,9 +46,10 @@ public class MpesaC2bService {
     public record C2bPayment(UUID tenantId, String transId, String shortCode, Money amount, String billRef,
                              String msisdnMasked, OffsetDateTime transTime, String correlationId) { }
 
-    public enum Outcome { APPLIED, UNMATCHED }
+    public enum Outcome { APPLIED, LOAN_REPAYMENT, UNMATCHED }
 
     public record Applied(UUID paymentId, Outcome outcome, UUID journalEntryId, String accountNumber, boolean replayed) { }
+
 
     private record Paybill(String shortCode, Currency currency, String branchCode, String glClearing, String glSuspense,
                            BigDecimal maxAmount) { }
@@ -60,14 +62,16 @@ public class MpesaC2bService {
     private final BusinessDates businessDates;
     private final JdbcJournal journal;
     private final Outbox outbox;
+    private final LoanRepaymentService loans;
 
     public MpesaC2bService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, JdbcJournal journal,
-                           Outbox outbox) {
+                           Outbox outbox, LoanRepaymentService loans) {
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
         this.journal = journal;
         this.outbox = outbox;
+        this.loans = loans;
     }
 
     @Transactional(readOnly = true)
@@ -82,10 +86,13 @@ public class MpesaC2bService {
             return new Validation("C2B00013", "Invalid amount");
         }
         Optional<Account> account = account(billRef);
-        if (account.isEmpty() || !acceptsCredits(account.get())) {
-            return new Validation("C2B00012", "Invalid account number");
+        if (account.isPresent() && acceptsCredits(account.get())) {
+            return Validation.accept();
         }
-        return Validation.accept();
+        if (activeLoan(billRef).isPresent()) {
+            return Validation.accept();
+        }
+        return new Validation("C2B00012", "Invalid account number");
     }
 
     @Transactional
@@ -101,21 +108,32 @@ public class MpesaC2bService {
             throw new IllegalArgumentException("currency does not match the paybill");
         }
         Optional<Account> account = account(p.billRef()).filter(MpesaC2bService::acceptsCredits);
+        Optional<LoanRepaymentService.LoanRef> loan = account.isPresent() ? Optional.empty() : activeLoan(p.billRef());
         String key = "mpesa-c2b:" + p.transId();
-        UUID entryId = UUID.nameUUIDFromBytes((p.tenantId() + "|" + key).getBytes(StandardCharsets.UTF_8));
         UUID paymentId = UUID.nameUUIDFromBytes((p.tenantId() + "|payment|" + key).getBytes(StandardCharsets.UTF_8));
-        String branch = account.map(Account::branchCode).orElse(paybill.branchCode());
-        JournalLine credit = account.isPresent()
-                ? JournalLine.onAccount(account.get().glControl(), Side.CREDIT, p.amount(), branch, account.get().accountId())
-                : JournalLine.credit(paybill.glSuspense(), p.amount(), branch);
-        journal.post(new JournalEntry(entryId, p.tenantId(), key, businessDates.current(), "MPESA", p.correlationId(),
-                p.transId(), null, List.of(JournalLine.debit(paybill.glClearing(), p.amount(), branch), credit)), "provider:mpesa");
-        Outcome outcome = account.isPresent() ? Outcome.APPLIED : Outcome.UNMATCHED;
+        UUID entryId;
+        Outcome outcome;
+        if (loan.isPresent()) {
+            LoanRepaymentService.Result r = loans.apply(p.tenantId(), loan.get().loanId(), p.amount(), "MPESA_C2B",
+                    p.transId(), paybill.glClearing(), businessDates.current(), p.correlationId(), "provider:mpesa");
+            entryId = r.journalEntryId();
+            outcome = Outcome.LOAN_REPAYMENT;
+        } else {
+            entryId = UUID.nameUUIDFromBytes((p.tenantId() + "|" + key).getBytes(StandardCharsets.UTF_8));
+            String branch = account.map(Account::branchCode).orElse(paybill.branchCode());
+            JournalLine credit = account.isPresent()
+                    ? JournalLine.onAccount(account.get().glControl(), Side.CREDIT, p.amount(), branch, account.get().accountId())
+                    : JournalLine.credit(paybill.glSuspense(), p.amount(), branch);
+            journal.post(new JournalEntry(entryId, p.tenantId(), key, businessDates.current(), "MPESA", p.correlationId(),
+                    p.transId(), null, List.of(JournalLine.debit(paybill.glClearing(), p.amount(), branch), credit)),
+                    "provider:mpesa");
+            outcome = account.isPresent() ? Outcome.APPLIED : Outcome.UNMATCHED;
+        }
         jdbc.sql("""
                 INSERT INTO payments.provider_payment (tenant_id, payment_id, provider, provider_ref, short_code, amount,
-                    currency, bill_ref, msisdn_masked, provider_time, status, deposit_account_id, journal_entry_id)
+                    currency, bill_ref, msisdn_masked, provider_time, status, deposit_account_id, loan_id, journal_entry_id)
                 VALUES (:tenant, :id, 'MPESA_C2B', :ref, :shortCode, :amount, :ccy, :billRef, :msisdn, :time, :status,
-                    :account, :entry)
+                    :account, :loan, :entry)
                 """)
             .param("tenant", p.tenantId())
             .param("id", paymentId)
@@ -128,22 +146,28 @@ public class MpesaC2bService {
             .param("time", p.transTime())
             .param("status", outcome.name())
             .param("account", account.map(Account::accountId).orElse(null))
+            .param("loan", loan.map(LoanRepaymentService.LoanRef::loanId).orElse(null))
             .param("entry", entryId)
             .update();
         outbox.record(p.tenantId(), "MpesaPaymentReceived", "provider_payment", paymentId.toString(),
                 "{\"paymentId\":\"%s\",\"transId\":\"%s\",\"outcome\":\"%s\",\"amount\":\"%s\",\"currency\":\"%s\"%s}"
                         .formatted(paymentId, p.transId(), outcome, p.amount().amount().toPlainString(),
                                 p.amount().currency().getCurrencyCode(),
-                                account.map(a -> ",\"accountId\":\"" + a.accountId() + "\"").orElse("")),
+                                account.map(a -> ",\"accountId\":\"" + a.accountId() + "\"")
+                                        .or(() -> loan.map(l -> ",\"loanId\":\"" + l.loanId() + "\""))
+                                        .orElse("")),
                 p.correlationId());
-        return new Applied(paymentId, outcome, entryId, account.map(Account::accountNumber).orElse(null), false);
+        return new Applied(paymentId, outcome, entryId,
+                account.map(Account::accountNumber).or(() -> loan.map(LoanRepaymentService.LoanRef::loanNumber)).orElse(null),
+                false);
     }
 
     private Optional<Applied> existing(String transId) {
         return jdbc.sql("""
-                SELECT p.payment_id, p.status, p.journal_entry_id, a.account_number
+                SELECT p.payment_id, p.status, p.journal_entry_id, COALESCE(a.account_number, l.loan_number) AS account_number
                   FROM payments.provider_payment p
                   LEFT JOIN savings.deposit_account a ON a.tenant_id = p.tenant_id AND a.account_id = p.deposit_account_id
+                  LEFT JOIN lending.loan l ON l.tenant_id = p.tenant_id AND l.loan_id = p.loan_id
                  WHERE p.provider = 'MPESA_C2B' AND p.provider_ref = :ref
                 """)
             .param("ref", transId)
@@ -177,6 +201,13 @@ public class MpesaC2bService {
                     rs.getString("status"), rs.getString("gl_control_account"), rs.getString("branch_code"),
                     rs.getString("currency")))
             .optional();
+    }
+
+    private Optional<LoanRepaymentService.LoanRef> activeLoan(String billRef) {
+        if (billRef == null || billRef.isBlank()) {
+            return Optional.empty();
+        }
+        return loans.findByNumber(billRef.strip().toUpperCase(Locale.ROOT)).filter(l -> "ACTIVE".equals(l.status()));
     }
 
     private static boolean acceptsCredits(Account a) {

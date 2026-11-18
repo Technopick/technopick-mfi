@@ -114,4 +114,20 @@ class LoanPostingRulesTest {
             assertEquals(dr, cr);
         }
     }
+
+    @Test
+    void interestPaidBeforeAccrualGoesToIncome() {
+        List<InstallmentDue> dues = List.of(new InstallmentDue(1, LocalDate.of(2026, 11, 18), Map.of(
+                DueComponent.INTEREST, kes("2000.00"), DueComponent.PRINCIPAL, kes("7455.96"))));
+        RepaymentAllocator.Result r = LoanFixtures.biasharaV1().allocator().allocate(kes("9455.96"), dues);
+        JournalEntry e = LoanPostingRules.repayment(LoanFixtures.context(), kes("9455.96"), r, MPESA_C2B, D, "QK7X3", "c",
+                kes("600.00"));
+        assertEquals(Set.of(
+                "DEBIT 1120-MPESA-C2B-CLEARING 9455.96",
+                "CREDIT 1210-INTEREST-RECEIVABLE 1400.00",
+                "CREDIT 4000-INTEREST-INCOME 600.00",
+                "CREDIT 1200-LOANS-PRINCIPAL 7455.96"), lines(e));
+        assertThrows(IllegalArgumentException.class, () -> LoanPostingRules.repayment(LoanFixtures.context(),
+                kes("9455.96"), r, MPESA_C2B, D, "QK7X4", "c", kes("2000.01")));
+    }
 }
