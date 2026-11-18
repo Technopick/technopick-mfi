@@ -43,14 +43,22 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 4)
+## What is verified (2026-11-18, first CI run)
 
-| Item | Result | How |
+GitHub Actions run 44250639856 on `main`: all four jobs green.
+
+| Item | Result | Where |
 | --- | --- | --- |
-| Domain code compiles with `-Xlint:all -Werror` | Yes | `javac --release 21` (JDK 21.0.13) |
-| 83 unit tests (Money, canonical model, journals, schedules, repayment allocation, holds, authorization, product versions, posting rules, accrual, arrears/PAR, penalties, EOD planner; incl. seeded property tests) | 83/83 pass | JUnit 5 test sources run through a local JUnit-API shim, because Maven Central was unreachable from the build workspace |
-| Ledger, savings and lending DB rules (balance, immutability, closed period, idempotency, reversals, subledger/control, holds, available balance, product versioning, maker-checker, loans, schedules, repayments, business date/EOD, accrual/penalty records, arrears snapshots, PAR, RLS) | 70/70 checks pass incl. two-session race tests; mutation runs detect a disabled balance trigger, a missing row lock, a disabled allocation check and a disabled EOD-completion check | PostgreSQL 16.15, app role `mfi_app` without BYPASSRLS |
-| `mvn verify`, ArchUnit rules, Docker images, CI workflow, PowerShell scripts | **Not yet run** | Need a networked build (GitHub Actions or a developer PC) |
+| `mvn verify` on JDK 25 (Temurin), `-Xlint:all -Werror` | BUILD SUCCESS | ubuntu-latest and windows-latest |
+| Unit tests (JUnit 5) incl. seeded property tests | 87/87 pass on each OS (16 canonical-model + 71 core-banking) | both runners |
+| ArchUnit rules: framework-free domain, no float/double in money code, no module cycles, lending isolation | 4/4 pass | both runners |
+| Ledger, savings, lending and EOD database rules | 70/70 checks pass | PostgreSQL 17 service container |
+| Two-session race tests (holds vs holds, hold vs debit) | pass | PostgreSQL 17 |
+| PowerShell install/uninstall scripts | parse cleanly | windows-latest |
+| Mutation runs (balance trigger, row lock, allocation check, EOD check removed) | each makes its test fail | local PostgreSQL 16 |
+
+Not yet verified: Spring Boot application layer, jPOS switch, Camel routes, Docker images,
+executing (not just parsing) the Windows service scripts on Windows Server, load tests.
 
 ## Non-negotiables
 Financial accuracy, immutable posted ledger history, double-entry, tenant isolation,
