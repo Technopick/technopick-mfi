@@ -1,0 +1,50 @@
+# Core banking configuration. Secrets come from the environment / secret store, never this file.
+spring:
+  application:
+    name: core-banking
+  threads:
+    virtual:
+      enabled: true
+  # Application connects as the least-privilege role mfi_app (NOSUPERUSER, NOBYPASSRLS).
+  datasource:
+    url: ${MFI_DB_URL:jdbc:postgresql://localhost:5432/mfi}
+    username: ${MFI_DB_APP_USER:mfi_app}
+    password: ${MFI_DB_APP_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${MFI_DB_POOL_SIZE:20}
+      auto-commit: false
+  # Migrations run as the schema owner, never as the application role.
+  flyway:
+    url: ${MFI_DB_URL:jdbc:postgresql://localhost:5432/mfi}
+    user: ${MFI_DB_OWNER_USER:mfi_owner}
+    password: ${MFI_DB_OWNER_PASSWORD:}
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  # OIDC issuer: set SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI in each environment.
+  # The service refuses to start without it (no JwtDecoder), so it can never run unauthenticated.
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+mfi:
+  security:
+    # JWT claim carrying the caller's tenant for staff and customer tokens.
+    tenant-claim: tenant_id
+    roles-claim: roles

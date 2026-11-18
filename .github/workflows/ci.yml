@@ -23,8 +23,9 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Build and unit tests
-        run: mvn -B -ntp verify
+      - name: Build and tests
+        # Container-based integration tests need Linux containers: they run on ubuntu only.
+        run: mvn -B -ntp verify ${{ matrix.os == 'windows-latest' && '-Dsurefire.excludedGroups=integration' || '' }}
 
   ledger-db-tests:
     name: ledger database invariants (PostgreSQL)
