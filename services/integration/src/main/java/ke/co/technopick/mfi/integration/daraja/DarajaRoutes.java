@@ -32,7 +32,7 @@ public class DarajaRoutes extends RouteBuilder {
         from("direct:daraja-c2b-validation")
             .routeId("daraja-c2b-validation")
             .circuitBreaker()
-                .resilience4jConfiguration().timeoutEnabled(true).timeoutDuration(3000).end()
+                .resilience4jConfiguration().timeoutEnabled(true).timeoutDuration("3000").end()
                 .process(e -> e.getMessage().setBody(validateInCore(e.getMessage().getBody(C2bCallback.class))))
             .onFallback()
                 .process(e -> e.getMessage().setBody(onValidationError()))

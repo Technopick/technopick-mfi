@@ -1,6 +1,77 @@
 {
   "components": {
     "schemas": {
+      "ApplyRequest": {
+        "properties": {
+          "amount": {
+            "minLength": 1,
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "billRef": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "currency": {
+            "minLength": 1,
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "msisdnMasked": {
+            "type": "string"
+          },
+          "shortCode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "transId": {
+            "minLength": 1,
+            "pattern": "^[A-Z0-9]{8,20}$",
+            "type": "string"
+          },
+          "transTime": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "shortCode",
+          "tenantId",
+          "transId",
+          "transTime"
+        ],
+        "type": "object"
+      },
+      "ApplyResponse": {
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "paymentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "AuthorizeRequest": {
         "properties": {
           "accountNumber": {
@@ -207,6 +278,49 @@
           }
         },
         "type": "object"
+      },
+      "ValidateRequest": {
+        "properties": {
+          "amount": {
+            "minLength": 1,
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "billRef": {
+            "type": "string"
+          },
+          "currency": {
+            "minLength": 1,
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "shortCode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "shortCode",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "ValidateResponse": {
+        "properties": {
+          "resultCode": {
+            "type": "string"
+          },
+          "resultDesc": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -363,6 +477,66 @@
         },
         "tags": [
           "authorization-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/c2b": {
+      "post": {
+        "operationId": "apply",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-c-2b-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/c2b/validation": {
+      "post": {
+        "operationId": "validate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-c-2b-controller"
         ]
       }
     }
