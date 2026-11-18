@@ -188,7 +188,9 @@ public final class DarajaSimulator implements AutoCloseable {
             return;
         }
         String merchant = random.nextInt(10000, 99999) + "-" + random.nextInt(1000000, 9999999) + "-1";
-        String checkout = "ws_CO_" + ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("ddMMyyyyHHmmssSSS")) + phone;
+        // Opaque id: timestamp plus random digits (never the customer's phone number).
+        String checkout = "ws_CO_" + ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("ddMMyyyyHHmmssSSS"))
+                + random.nextInt(100_000_000, 999_999_999);
         stkCalls.add(new StkCall(shortCode, phone, amount, accountRef, callback, checkout, 200));
         Map<String, Object> callbackBody = outcome(merchant, checkout, phone, amount);
         results.put(checkout, callbackBody);
