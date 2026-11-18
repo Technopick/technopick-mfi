@@ -137,7 +137,8 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000003', '0100000003', 'C3', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000004', '0100000004', 'C4', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000005', '0100000005', 'C5', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
-              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000006', '0100000006', 'C6', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000006', '0100000006', 'C6', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000007', '0100000007', 'C7', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
             INSERT INTO payments.mpesa_paybill (tenant_id, short_code, branch_code, gl_clearing, gl_suspense, max_amount)
               VALUES ('%1$s', '600991', 'NBO01', '1120-MPESA-C2B-CLEARING', '2900-SUSPENSE', 150000);
             INSERT INTO payments.channel_config (tenant_id, channel_code, currency, per_txn_max, daily_max,
@@ -605,7 +606,7 @@ class AuthorizationApiIntegrationTest {
     ke.co.technopick.mfi.core.payments.application.MpesaStkService stkService;
 
     String stkSubmitted(String key, String checkout) throws Exception {
-        String id = JsonPath.read(stk("", stkCreate(key, "0712345678", "50", "0100000001"), teller(TENANT_A), status().isOk()),
+        String id = JsonPath.read(stk("", stkCreate(key, "0712345678", "50", "0100000007"), teller(TENANT_A), status().isOk()),
                 "$.requestId");
         stk("/" + id + "/dispatch", "{\"tenantId\":\"" + TENANT_A + "\"}", integrationToken(), status().isOk());
         if (checkout != null) {
@@ -625,7 +626,7 @@ class AuthorizationApiIntegrationTest {
     @Test
     void mpesaStkReconciliation() throws Exception {
         var ok = status().isOk();
-        String neverSent = JsonPath.read(stk("", stkCreate("rec-1", "0712345678", "50", "0100000001"), teller(TENANT_A), ok),
+        String neverSent = JsonPath.read(stk("", stkCreate("rec-1", "0712345678", "50", "0100000007"), teller(TENANT_A), ok),
                 "$.requestId");
         String unknownSend = stkSubmitted("rec-2", null);
         String paidNoReceipt = stkSubmitted("rec-3", "ws_CO_R3");
@@ -674,6 +675,7 @@ class AuthorizationApiIntegrationTest {
 
         String late = stk("/" + paidNoReceipt + "/result", stkResult("ws_CO_R3", "0", "SIMREC0003", "50.00"), integrationToken(), ok);
         assertEquals("COMPLETED", JsonPath.read(late, "$.status"));
+        expectBalance("0100000007", "50.00", "0.00", "50.00");
         String after = mvc.perform(get("/api/v1/payments/mpesa/stk-requests/attention").with(staff("ops-1", "OPERATIONS")))
             .andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals(Boolean.FALSE, after.contains(paidNoReceipt));

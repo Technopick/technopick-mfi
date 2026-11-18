@@ -72,6 +72,48 @@
         },
         "type": "object"
       },
+      "AttentionItem": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "attention": {
+            "type": "string"
+          },
+          "checkCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "checkoutRequestId": {
+            "type": "string"
+          },
+          "msisdnMasked": {
+            "type": "string"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DISPATCHED",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "targetReference": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "AuthorizeRequest": {
         "properties": {
           "accountNumber": {
@@ -373,6 +415,34 @@
         },
         "type": "object"
       },
+      "QueryResult": {
+        "properties": {
+          "checkoutRequestId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultCode": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultDesc": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkoutRequestId",
+          "tenantId"
+        ],
+        "type": "object"
+      },
       "ResolutionCreated": {
         "properties": {
           "resolutionId": {
@@ -508,6 +578,68 @@
         },
         "required": [
           "code",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "StaleItem": {
+        "properties": {
+          "checkCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "checkoutRequestId": {
+            "type": "string"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DISPATCHED",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StaleItems": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StaleItem"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "StaleRequest": {
+        "properties": {
+          "limit": {
+            "exclusiveMinimum": 0,
+            "format": "int32",
+            "type": "integer"
+          },
+          "olderThanSeconds": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
           "tenantId"
         ],
         "type": "object"
@@ -892,6 +1024,59 @@
         ]
       }
     },
+    "/api/v1/payments/mpesa/stk-requests/attention": {
+      "get": {
+        "operationId": "attention",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AttentionItem"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/reconciliation/stale": {
+      "post": {
+        "operationId": "stale",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaleItems"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
     "/api/v1/payments/mpesa/stk-requests/{requestId}": {
       "get": {
         "operationId": "get",
@@ -953,6 +1138,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Dispatch"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-stk-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/stk-requests/{requestId}/query-result": {
+      "post": {
+        "operationId": "queryResult",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryResult"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
                 }
               }
             },
