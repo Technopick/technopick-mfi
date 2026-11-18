@@ -49,6 +49,18 @@ public class CallbackGuard {
         return Optional.ofNullable(match);
     }
 
+    /** Constant-time comparison against every configured B2C callback token. */
+    public Optional<DarajaProperties.B2cAccount> b2cAccountFor(String token) {
+        byte[] presented = token.getBytes(StandardCharsets.UTF_8);
+        DarajaProperties.B2cAccount match = null;
+        for (DarajaProperties.B2cAccount a : props.b2cAccounts()) {
+            if (MessageDigest.isEqual(presented, a.token().getBytes(StandardCharsets.UTF_8))) {
+                match = a;
+            }
+        }
+        return Optional.ofNullable(match);
+    }
+
     static boolean inRange(InetAddress address, String cidr) throws UnknownHostException {
         String[] parts = cidr.split("/");
         InetAddress network = InetAddress.getByName(parts[0]);

@@ -44,6 +44,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
     "mfi.outbox.enabled=false",
     "mfi.daraja.processor-enabled=false",
     "mfi.daraja.stk-consumer-enabled=false",
+    "mfi.daraja.b2c-consumer-enabled=false",
     "mfi.daraja.retry-backoff=PT0S",
     "mfi.daraja.allowed-cidrs[0]=127.0.0.1/32",
     "mfi.daraja.paybills[0].token=test-only-token-a-6f1c",

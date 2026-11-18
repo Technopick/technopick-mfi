@@ -45,6 +45,8 @@ public class DarajaClient {
 
     public record QueryOutcome(QueryKind kind, String resultCode, String resultDesc) { }
 
+    public record B2cOutcome(Kind kind, String conversationId, String code, String description) { }
+
     private final DarajaProperties props;
     private final RestClient http;
     private final JsonMapper json = JsonMapper.builder().build();
@@ -105,6 +107,55 @@ public class DarajaClient {
         } catch (RestClientException | IllegalStateException e) {
             LOG.warn("STK Push outcome unknown: {}", e.toString());
             return new StkOutcome(Kind.UNKNOWN, null, null, "UNKNOWN", e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * B2C payment request (v3). {@code originatorConversationId} is our disbursement id, so the
+     * result can be matched to it. Same outcome classification as STK Push.
+     */
+    public B2cOutcome b2c(DarajaProperties.B2cAccount account, String originatorConversationId, String msisdn,
+                          String amount, String remarks, String occasion, String resultUrl, String timeoutUrl) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        String bearer;
+        try {
+            body.put("OriginatorConversationID", originatorConversationId);
+            body.put("InitiatorName", account.initiatorName());
+            body.put("SecurityCredential", SecurityCredential.encrypt(props.certificatePem(), account.initiatorPassword()));
+            body.put("CommandID", "BusinessPayment");
+            body.put("Amount", amount);
+            body.put("PartyA", account.shortCode());
+            body.put("PartyB", msisdn);
+            body.put("Remarks", remarks);
+            body.put("QueueTimeOutURL", timeoutUrl);
+            body.put("ResultURL", resultUrl);
+            body.put("Occassion", occasion); // Daraja's spelling
+            bearer = accessToken();
+        } catch (RuntimeException e) {
+            // Nothing was sent to the payment endpoint, so no money can have moved.
+            LOG.warn("B2C request not sent: {}", e.toString());
+            return new B2cOutcome(Kind.REJECTED, null, "PREPARE", e.getClass().getSimpleName());
+        }
+        try {
+            Map<String, Object> r = Objects.requireNonNull(http.post()
+                .uri(props.baseUrl() + "/mpesa/b2c/v3/paymentrequest")
+                .header("Authorization", "Bearer " + bearer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP));
+            String code = String.valueOf(r.get("ResponseCode"));
+            if ("0".equals(code)) {
+                return new B2cOutcome(Kind.ACCEPTED, str(r.get("ConversationID")), code, str(r.get("ResponseDescription")));
+            }
+            return new B2cOutcome(Kind.REJECTED, null, code, str(r.get("ResponseDescription")));
+        } catch (HttpClientErrorException e) {
+            Map<String, Object> err = parse(e.getResponseBodyAsString());
+            return new B2cOutcome(Kind.REJECTED, null, str(err.getOrDefault("errorCode", "HTTP" + e.getStatusCode().value())),
+                    str(err.getOrDefault("errorMessage", e.getStatusText())));
+        } catch (RestClientException | IllegalStateException e) {
+            LOG.warn("B2C outcome unknown: {}", e.toString());
+            return new B2cOutcome(Kind.UNKNOWN, null, "UNKNOWN", e.getClass().getSimpleName());
         }
     }
 

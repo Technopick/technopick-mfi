@@ -10,7 +10,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
-/** Runs {@link MpesaStkService#housekeep} for every active tenant (moves to the worker with other jobs). */
+/**
+ * Runs STK and B2C housekeeping for every active tenant (moves to the worker with other jobs).
+ */
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(name = "mfi.jobs.enabled", havingValue = "true")
@@ -19,13 +21,15 @@ public class StkHousekeepingJob {
     private static final Logger LOG = LoggerFactory.getLogger(StkHousekeepingJob.class);
 
     private final MpesaStkService service;
+    private final B2cDisbursementService b2c;
     private final Duration pendingTimeout;
     private final Duration unknownAfter;
 
-    public StkHousekeepingJob(MpesaStkService service,
+    public StkHousekeepingJob(MpesaStkService service, B2cDisbursementService b2c,
                               @Value("${mfi.payments.stk.pending-timeout:PT10M}") Duration pendingTimeout,
                               @Value("${mfi.payments.stk.unknown-after:PT10M}") Duration unknownAfter) {
         this.service = service;
+        this.b2c = b2c;
         this.pendingTimeout = pendingTimeout;
         this.unknownAfter = unknownAfter;
     }
@@ -38,8 +42,12 @@ public class StkHousekeepingJob {
                 if (n[0] + n[1] > 0) {
                     LOG.info("tenant {}: {} STK requests expired, {} flagged for operations", tenant, n[0], n[1]);
                 }
+                int flagged = b2c.housekeep(tenant, unknownAfter);
+                if (flagged > 0) {
+                    LOG.warn("tenant {}: {} B2C disbursements with unknown send outcome flagged", tenant, flagged);
+                }
             } catch (RuntimeException e) {
-                LOG.error("STK housekeeping failed for tenant {}", tenant, e);
+                LOG.error("M-Pesa housekeeping failed for tenant {}", tenant, e);
             }
         }
     }

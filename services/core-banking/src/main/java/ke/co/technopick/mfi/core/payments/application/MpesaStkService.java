@@ -99,7 +99,7 @@ public class MpesaStkService {
         return digits;
     }
 
-    static String mask(String msisdn) {
+    public static String mask(String msisdn) {
         return msisdn.substring(0, 4) + "*****" + msisdn.substring(msisdn.length() - 3);
     }
 

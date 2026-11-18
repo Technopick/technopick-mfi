@@ -54,6 +54,12 @@ mfi:
     reconciler-enabled: ${MFI_DARAJA_RECONCILER_ENABLED:true}
     reconcile-interval-ms: 60000
     reconcile-after: PT3M
+    # B2C (ADR-0012): per tenant B2C short code with its callback token, initiator name and initiator
+    # password (secret store). certificate-pem: Safaricom's public certificate for the environment.
+    b2c-accounts: []
+    certificate-pem: ${MFI_DARAJA_CERTIFICATE_PEM:}
+    b2c-consumer-enabled: ${MFI_DARAJA_B2C_CONSUMER_ENABLED:true}
+    b2c-queue: mfi.integration.mpesa-b2c-disbursements
     process-interval-ms: 2000
     max-attempts: 10
     retry-backoff: PT30S

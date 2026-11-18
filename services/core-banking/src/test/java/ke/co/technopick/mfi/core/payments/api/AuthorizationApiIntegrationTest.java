@@ -209,6 +209,19 @@ class AuthorizationApiIntegrationTest {
             UPDATE lending.loan SET status = 'ACTIVE', disbursement_entry_id = '77777777-0000-0000-0000-000000000002'
              WHERE loan_id = 'bbbbbbbb-0000-0000-0000-000000000002';
             COMMIT;
+            BEGIN;
+            INSERT INTO payments.mpesa_b2c_account (tenant_id, short_code, branch_code, gl_clearing)
+              VALUES ('%1$s', '600000', 'NBO01', '1110-MPESA-B2C-CLEARING');
+            INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency,
+                principal, term_months, created_by, approved_by) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000003', 'LN-000003', 'C3', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000004', 'LN-000004', 'C4', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000005', 'LN-000005', 'C5', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager');
+            INSERT INTO lending.schedule_installment (tenant_id, loan_id, schedule_version, installment_no, due_date, principal, interest) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000003', 1, 1, '2026-12-18', 100000, 2000),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000004', 1, 1, '2026-12-18', 100000, 2000),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000005', 1, 1, '2026-12-18', 100000, 2000);
+            COMMIT;
             """.formatted(TENANT_A, TENANT_B));
     }
 
@@ -679,5 +692,111 @@ class AuthorizationApiIntegrationTest {
         String after = mvc.perform(get("/api/v1/payments/mpesa/stk-requests/attention").with(staff("ops-1", "OPERATIONS")))
             .andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals(Boolean.FALSE, after.contains(paidNoReceipt));
+    }
+
+    String b2c(String path, String body, org.springframework.test.web.servlet.request.RequestPostProcessor auth,
+               org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        var builder = post("/api/v1/payments/mpesa/b2c/disbursements" + path).with(auth);
+        if (body != null) {
+            builder = builder.contentType(MediaType.APPLICATION_JSON).content(body);
+        }
+        return mvc.perform(builder).andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    static String b2cCreate(String key, String loan) {
+        return """
+            {"idempotencyKey":"%s","loanNumber":"%s","phoneNumber":"0712345678"}
+            """.formatted(key, loan);
+    }
+
+    static String b2cResult(String conversation, String code, String txn, String amount) {
+        return """
+            {"tenantId":"%s","conversationId":"%s","resultCode":"%s","resultDesc":"test","transactionId":%s,"amount":%s}
+            """.formatted(TENANT_A, conversation, code, txn == null ? "null" : "\"" + txn + "\"",
+                amount == null ? "null" : "\"" + amount + "\"");
+    }
+
+    String approvedAndDispatched(String key, String loan) throws Exception {
+        String id = JsonPath.read(b2c("", b2cCreate(key, loan), staff("officer-1", "LOAN_OFFICER"), status().isOk()),
+                "$.disbursementId");
+        b2c("/" + id + "/approve", null, staff("sup-1", "SUPERVISOR"), status().isOk());
+        b2c("/" + id + "/dispatch", "{\"tenantId\":\"" + TENANT_A + "\"}", integrationToken(), status().isOk());
+        return id;
+    }
+
+    /** B2C disbursement: maker-checker, single dispatch, post + activate only on a matching success. */
+    @Test
+    void mpesaB2cDisbursement() throws Exception {
+        var ok = status().isOk();
+        String tenantBody = "{\"tenantId\":\"" + TENANT_A + "\"}";
+        b2c("", b2cCreate("b2c-0", "LN-000003"), teller(TENANT_A), status().isForbidden());
+        b2c("", b2cCreate("b2c-x", "LN-000001"), staff("officer-1", "LOAN_OFFICER"), status().isBadRequest()); // already active
+        String created = b2c("", b2cCreate("b2c-1", "LN-000003"), staff("officer-1", "LOAN_OFFICER"), ok);
+        String id = JsonPath.read(created, "$.disbursementId");
+        assertEquals("98000.00", JsonPath.read(created, "$.amount")); // 100,000 less the 2% upfront fee
+        assertEquals(id, JsonPath.read(b2c("", b2cCreate("b2c-1", "LN-000003"), staff("officer-1", "LOAN_OFFICER"), ok),
+                "$.disbursementId"));
+        b2c("", b2cCreate("b2c-2", "LN-000003"), staff("officer-2", "LOAN_OFFICER"), status().isConflict()); // one live per loan
+        b2c("/" + id + "/dispatch", tenantBody, integrationToken(), status().isConflict()); // not approved yet
+        mvc.perform(post("/api/v1/payments/mpesa/b2c/disbursements/" + id + "/approve")
+                .with(jwt().jwt(j -> j.subject("officer-1").claim("tenant_id", TENANT_A))
+                    .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))
+            .andExpect(status().isForbidden()); // requester cannot approve, whatever roles they hold
+        b2c("/" + id + "/approve", null, staff("officer-2", "LOAN_OFFICER"), status().isForbidden());
+        assertEquals("APPROVED", JsonPath.read(b2c("/" + id + "/approve", null, staff("sup-1", "SUPERVISOR"), ok), "$.status"));
+        String event = owner().queryForObject("""
+                SELECT payload::text FROM messaging.outbox_event WHERE event_type = 'MpesaB2cDisbursementApproved' AND aggregate_id = ?
+                """, String.class, id);
+        assertEquals(Boolean.FALSE, event.contains("712345678"), event);
+
+        String dispatch = b2c("/" + id + "/dispatch", tenantBody, integrationToken(), ok);
+        assertEquals("254712345678", JsonPath.read(dispatch, "$.msisdn"));
+        assertEquals("98000", JsonPath.read(dispatch, "$.amount"));
+        b2c("/" + id + "/dispatch", tenantBody, integrationToken(), status().isConflict()); // sent at most once
+        b2c("/" + id + "/submitted", "{\"tenantId\":\"" + TENANT_A + "\",\"conversationId\":\"AG_1\"}", integrationToken(), ok);
+        b2c("/" + id + "/result", b2cResult("AG_2", "0", "SIMB2C0001", "98000.00"), integrationToken(), status().isConflict());
+
+        String done = b2c("/" + id + "/result", b2cResult("AG_1", "0", "SIMB2C0001", "98000.00"), integrationToken(), ok);
+        assertEquals("COMPLETED", JsonPath.read(done, "$.status"));
+        String entry = JsonPath.read(done, "$.journalEntryId");
+        assertEquals(List.of("C 1110-MPESA-B2C-CLEARING 98000.00", "C 4100-FEE-PROCESSING 2000.00", "D 1200-LOANS-PRINCIPAL 100000.00"),
+                owner().queryForList("""
+                    SELECT side || ' ' || account_code || ' ' || round(amount, 2) FROM ledger.journal_line
+                     WHERE entry_id = ?::uuid ORDER BY side, account_code
+                    """, String.class, entry));
+        assertEquals("ACTIVE", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-000003'", String.class));
+        assertEquals(null, owner().queryForObject("SELECT msisdn FROM payments.b2c_disbursement WHERE disbursement_id = ?::uuid",
+                String.class, id));
+        b2c("/" + id + "/result", b2cResult("AG_1", "0", "SIMB2C0001", "98000.00"), integrationToken(), ok); // replay
+        b2c("/" + id + "/result", b2cResult("AG_1", "0", "SIMB2C9999", "98000.00"), integrationToken(), status().isConflict());
+
+        // Definitive failure: loan stays APPROVED, a new attempt may be requested; a later success is an alarm.
+        String failed = approvedAndDispatched("b2c-3", "LN-000004");
+        assertEquals("FAILED", JsonPath.read(b2c("/" + failed + "/result", b2cResult("AG_3", "1", null, null), integrationToken(), ok),
+                "$.status"));
+        assertEquals("APPROVED", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-000004'", String.class));
+        String retry = JsonPath.read(b2c("", b2cCreate("b2c-4", "LN-000004"), staff("officer-1", "LOAN_OFFICER"), ok), "$.disbursementId");
+        assertEquals("REJECTED", JsonPath.read(b2c("/" + retry + "/reject", null, staff("sup-1", "SUPERVISOR"), ok), "$.status"));
+        String alarm = b2c("/" + failed + "/result", b2cResult("AG_3", "0", "SIMB2C0003", "98000.00"), integrationToken(), ok);
+        assertEquals("FAILED", JsonPath.read(alarm, "$.status"));
+        assertEquals("SUCCESS_AFTER_FAILURE", JsonPath.read(alarm, "$.attention"));
+        assertEquals("APPROVED", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-000004'", String.class));
+
+        // Timeout: unknown outcome, flagged; a mismatched amount is never posted.
+        String timedOut = approvedAndDispatched("b2c-5", "LN-000005");
+        b2c("/" + timedOut + "/submitted", "{\"tenantId\":\"" + TENANT_A + "\",\"conversationId\":\"AG_5\"}", integrationToken(), ok);
+        assertEquals("TIMEOUT_UNKNOWN", JsonPath.read(b2c("/" + timedOut + "/timeout", tenantBody, integrationToken(), ok), "$.attention"));
+        String mismatch = b2c("/" + timedOut + "/result", b2cResult("AG_5", "0", "SIMB2C0005", "90000.00"), integrationToken(), ok);
+        assertEquals("SUBMITTED", JsonPath.read(mismatch, "$.status"));
+        assertEquals("AMOUNT_MISMATCH", JsonPath.read(mismatch, "$.attention"));
+        assertEquals("APPROVED", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-000005'", String.class));
+
+        String attention = mvc.perform(get("/api/v1/payments/mpesa/b2c/disbursements/attention").with(staff("ops-1", "OPERATIONS")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, attention.contains(failed) && attention.contains(timedOut) && !attention.contains(id), attention);
+        mvc.perform(get("/api/v1/payments/mpesa/b2c/disbursements/attention").with(teller(TENANT_A))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/payments/mpesa/b2c/disbursements/" + id).with(jwt().jwt(j -> j.subject("x").claim("tenant_id", TENANT_B))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))
+            .andExpect(status().isNotFound());
     }
 }

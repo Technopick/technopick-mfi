@@ -10,7 +10,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import javax.crypto.Cipher;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -29,8 +33,8 @@ import java.util.concurrent.TimeUnit;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * TEST-ONLY simulator of Safaricom Daraja: OAuth token, STK Push request, STK Push query and
- * asynchronous result callbacks. It implements the request/response shapes of the public Daraja
+ * TEST-ONLY simulator of Safaricom Daraja: OAuth token, STK Push request, STK Push query, B2C
+ * payment request (v3) and asynchronous result / queue-timeout callbacks. It implements the request/response shapes of the public Daraja
  * documentation closely enough to exercise the integration runtime; it is not a certification
  * environment and never moves money. Receipt numbers start with {@code SIM} so simulator data is
  * recognisable anywhere it ends up.
@@ -48,6 +52,12 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>{@code 500} HTTP 500 (outcome unknown to the caller; no prompt shown)</li>
  *   <li>anything else: success</li>
  * </ul>
+ *
+ * <p>B2C outcome is scripted by the last three digits of PartyB: {@code 001} insufficient float
+ * (ResultCode 1), {@code 777} queue timeout (callback to QueueTimeOutURL), {@code 999} no callback,
+ * {@code 222} result delivered twice, {@code 400} refused, {@code 500} provider error, else success.
+ * The SecurityCredential is checked by decrypting it with the simulator's own RSA key; tests
+ * configure the integration runtime with {@link #publicKeyPem()} in place of Safaricom's certificate.
  */
 public final class DarajaSimulator implements AutoCloseable {
 
@@ -59,6 +69,13 @@ public final class DarajaSimulator implements AutoCloseable {
     /** One STK Push request as received, for test assertions. */
     public record StkCall(String shortCode, String phone, String amount, String accountReference, String callbackUrl,
                           String checkoutRequestId, int httpStatus) { }
+
+    /** One B2C payment request as received, for test assertions. */
+    public record B2cCall(String originatorConversationId, String shortCode, String partyB, String amount,
+                          String conversationId, int httpStatus) { }
+
+    /** B2C initiator credentials per short code (TEST values). */
+    public record Initiator(String name, String password) { }
 
     /** One callback delivery attempt, for test assertions. */
     public record Delivery(String checkoutRequestId, String url, int resultCode, int httpStatus) { }
@@ -81,9 +98,21 @@ public final class DarajaSimulator implements AutoCloseable {
     private final List<StkCall> stkCalls = new CopyOnWriteArrayList<>();
     private final List<Delivery> deliveries = new CopyOnWriteArrayList<>();
     private final List<String> queries = new CopyOnWriteArrayList<>();
+    private final List<B2cCall> b2cCalls = new CopyOnWriteArrayList<>();
+    private final Map<String, Initiator> initiators;
+    private final KeyPair keys;
 
-    private DarajaSimulator(String consumerKey, String consumerSecret, Map<String, String> passkeys, long callbackDelayMs,
-                            String host, int port) throws IOException {
+    private DarajaSimulator(String consumerKey, String consumerSecret, Map<String, String> passkeys,
+                            Map<String, Initiator> initiators, long callbackDelayMs, String host, int port)
+            throws IOException {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            this.keys = generator.generateKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        this.initiators = Map.copyOf(initiators);
         this.consumerKey = consumerKey;
         this.consumerSecret = consumerSecret;
         this.passkeys = Map.copyOf(passkeys);
@@ -92,6 +121,7 @@ public final class DarajaSimulator implements AutoCloseable {
         server.createContext("/oauth/v1/generate", this::token);
         server.createContext("/mpesa/stkpush/v1/processrequest", this::stkPush);
         server.createContext("/mpesa/stkpushquery/v1/query", this::stkQuery);
+        server.createContext("/mpesa/b2c/v3/paymentrequest", this::b2c);
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
     }
@@ -99,7 +129,26 @@ public final class DarajaSimulator implements AutoCloseable {
     /** Starts on the loopback interface; port 0 picks a free port. */
     public static DarajaSimulator start(String consumerKey, String consumerSecret, Map<String, String> passkeysByShortCode,
                                         long callbackDelayMs, int port) throws IOException {
-        return new DarajaSimulator(consumerKey, consumerSecret, passkeysByShortCode, callbackDelayMs, "127.0.0.1", port);
+        return start(consumerKey, consumerSecret, passkeysByShortCode, Map.of(), callbackDelayMs, port);
+    }
+
+    /** As {@link #start(String, String, Map, long, int)}, with B2C initiators per short code. */
+    public static DarajaSimulator start(String consumerKey, String consumerSecret, Map<String, String> passkeysByShortCode,
+                                        Map<String, Initiator> b2cInitiators, long callbackDelayMs, int port)
+            throws IOException {
+        return new DarajaSimulator(consumerKey, consumerSecret, passkeysByShortCode, b2cInitiators, callbackDelayMs,
+                "127.0.0.1", port);
+    }
+
+    /** Public key (X.509 SubjectPublicKeyInfo PEM) to encrypt B2C initiator passwords for this simulator. */
+    public String publicKeyPem() {
+        return "-----BEGIN PUBLIC KEY-----\n"
+                + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII)).encodeToString(keys.getPublic().getEncoded())
+                + "\n-----END PUBLIC KEY-----\n";
+    }
+
+    public List<B2cCall> b2cCalls() {
+        return List.copyOf(b2cCalls);
     }
 
     public String baseUrl() {
@@ -247,7 +296,10 @@ public final class DarajaSimulator implements AutoCloseable {
     }
 
     private void deliver(String url, String checkout, Map<String, Object> body) {
-        int resultCode = ((Number) castMap(castMap(body.get("Body")).get("stkCallback")).get("ResultCode")).intValue();
+        Map<String, Object> inner = body.containsKey("Body") ? castMap(castMap(body.get("Body")).get("stkCallback"))
+                : castMap(body.get("Result"));
+        Object code = inner.get("ResultCode");
+        int resultCode = code instanceof Number n ? n.intValue() : -1;
         try {
             HttpResponse<Void> response = client.send(HttpRequest.newBuilder(URI.create(url))
                     .timeout(Duration.ofSeconds(5))
@@ -285,6 +337,110 @@ public final class DarajaSimulator implements AutoCloseable {
         reply(ex, 200, Map.of("ResponseCode", "0", "ResponseDescription", "The service request has been accepted successsfully",
                 "MerchantRequestID", cb.get("MerchantRequestID"), "CheckoutRequestID", cb.get("CheckoutRequestID"),
                 "ResultCode", String.valueOf(cb.get("ResultCode")), "ResultDesc", cb.get("ResultDesc")));
+    }
+
+    private boolean credentialValid(String credential, String expectedPassword) {
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keys.getPrivate());
+            String plain = new String(cipher.doFinal(Base64.getDecoder().decode(credential)), StandardCharsets.UTF_8);
+            return plain.equals(expectedPassword);
+        } catch (java.security.GeneralSecurityException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private void b2c(HttpExchange ex) throws IOException {
+        if (!authorised(ex)) {
+            reply(ex, 401, Map.of("errorCode", "404.001.04", "errorMessage", "Invalid Access Token"));
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> r = json.readValue(ex.getRequestBody().readAllBytes(), Map.class);
+        String originator = str(r.get("OriginatorConversationID"));
+        String shortCode = str(r.get("PartyA"));
+        String partyB = str(r.get("PartyB"));
+        String amount = str(r.get("Amount"));
+        String resultUrl = str(r.get("ResultURL"));
+        String timeoutUrl = str(r.get("QueueTimeOutURL"));
+        Initiator initiator = initiators.get(shortCode);
+        String error = null;
+        if (initiator == null) {
+            error = "Invalid PartyA";
+        } else if (!initiator.name().equals(str(r.get("InitiatorName")))) {
+            error = "Invalid InitiatorName";
+        } else if (!credentialValid(str(r.get("SecurityCredential")), initiator.password())) {
+            error = "Invalid SecurityCredential";
+        } else if (originator.isEmpty()) {
+            error = "Invalid OriginatorConversationID";
+        } else if (!List.of("BusinessPayment", "SalaryPayment", "PromotionPayment").contains(str(r.get("CommandID")))) {
+            error = "Invalid CommandID";
+        } else if (!amount.matches("^[1-9][0-9]{1,5}$")) {
+            error = "Invalid Amount";
+        } else if (!partyB.matches("^254[17][0-9]{8}$") || partyB.endsWith("400")) {
+            error = "Invalid PartyB";
+        } else if (!resultUrl.startsWith("http") || !timeoutUrl.startsWith("http")) {
+            error = "Invalid ResultURL";
+        }
+        if (error != null) {
+            b2cCalls.add(new B2cCall(originator, shortCode, partyB, amount, null, 400));
+            reply(ex, 400, Map.of("requestId", UUID.randomUUID().toString(), "errorCode", "400.002.02",
+                    "errorMessage", "Bad Request - " + error));
+            return;
+        }
+        if (partyB.endsWith("500")) {
+            b2cCalls.add(new B2cCall(originator, shortCode, partyB, amount, null, 500));
+            reply(ex, 500, Map.of("requestId", UUID.randomUUID().toString(), "errorCode", "500.003.1001",
+                    "errorMessage", "Simulated internal error"));
+            return;
+        }
+        String conversation = "AG_" + ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_"
+                + random.nextInt(100_000_000, 999_999_999);
+        b2cCalls.add(new B2cCall(originator, shortCode, partyB, amount, conversation, 200));
+        if (partyB.endsWith("777")) {
+            Map<String, Object> timeout = Map.of("Result", Map.of("ResultType", 1, "ResultCode", "SIM-TIMEOUT",
+                    "ResultDesc", "Simulated queue timeout", "OriginatorConversationID", originator,
+                    "ConversationID", conversation));
+            scheduler.schedule(() -> deliver(timeoutUrl, conversation, timeout), callbackDelayMs, TimeUnit.MILLISECONDS);
+        } else if (!partyB.endsWith("999")) {
+            Map<String, Object> result = b2cResult(originator, conversation, partyB, amount);
+            int times = partyB.endsWith("222") ? 2 : 1;
+            for (int i = 0; i < times; i++) {
+                scheduler.schedule(() -> deliver(resultUrl, conversation, result), callbackDelayMs * (i + 1),
+                        TimeUnit.MILLISECONDS);
+            }
+        }
+        reply(ex, 200, Map.of("ConversationID", conversation, "OriginatorConversationID", originator,
+                "ResponseCode", "0", "ResponseDescription", "Accept the service request successfully."));
+    }
+
+    private Map<String, Object> b2cResult(String originator, String conversation, String partyB, String amount) {
+        StringBuilder txn = new StringBuilder("SIM");
+        for (int i = 0; i < 7; i++) {
+            txn.append(ALNUM.charAt(random.nextInt(ALNUM.length())));
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ResultType", 0);
+        result.put("OriginatorConversationID", originator);
+        result.put("ConversationID", conversation);
+        result.put("TransactionID", txn.toString());
+        if (partyB.endsWith("001")) {
+            result.put("ResultCode", 1);
+            result.put("ResultDesc", "The balance is insufficient for the transaction.");
+        } else {
+            result.put("ResultCode", 0);
+            result.put("ResultDesc", "The service request is processed successfully.");
+            List<Map<String, Object>> params = new ArrayList<>();
+            params.add(Map.of("Key", "TransactionAmount", "Value", new BigDecimal(amount)));
+            params.add(Map.of("Key", "TransactionReceipt", "Value", txn.toString()));
+            params.add(Map.of("Key", "ReceiverPartyPublicName", "Value", partyB + " - TEST CUSTOMER"));
+            params.add(Map.of("Key", "TransactionCompletedDateTime",
+                    "Value", ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))));
+            params.add(Map.of("Key", "B2CUtilityAccountAvailableFunds", "Value", new BigDecimal("1000000.00")));
+            params.add(Map.of("Key", "B2CRecipientIsRegisteredCustomer", "Value", "Y"));
+            result.put("ResultParameters", Map.of("ResultParameter", params));
+        }
+        return Map.of("Result", result);
     }
 
     @SuppressWarnings("unchecked")

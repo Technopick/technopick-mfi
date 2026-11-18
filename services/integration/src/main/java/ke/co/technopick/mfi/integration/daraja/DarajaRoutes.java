@@ -18,6 +18,8 @@ import org.springframework.stereotype.Component;
  *   <li>{@code daraja-stk-result}: persist then acknowledge STK results (idempotent on CheckoutRequestID).</li>
  *   <li>{@code daraja-stk-processor}: timer that applies stored STK results in core, with retries.</li>
  *   <li>{@code daraja-stk-reconciler}: timer that queries Daraja for overdue STK results.</li>
+ *   <li>{@code daraja-b2c-dispatch}: consumes {@code MpesaB2cDisbursementApproved} events and sends the payment.</li>
+ *   <li>{@code daraja-b2c-processor}: timer that applies stored B2C results and timeouts in core.</li>
  * </ul>
  */
 @Component
@@ -26,11 +28,14 @@ public class DarajaRoutes extends RouteBuilder {
     private final CoreClient core;
     private final DarajaProperties props;
     private final StkDispatcher stkDispatcher;
+    private final B2cDispatcher b2cDispatcher;
 
-    public DarajaRoutes(CoreClient core, DarajaProperties props, StkDispatcher stkDispatcher) {
+    public DarajaRoutes(CoreClient core, DarajaProperties props, StkDispatcher stkDispatcher,
+                        B2cDispatcher b2cDispatcher) {
         this.core = core;
         this.props = props;
         this.stkDispatcher = stkDispatcher;
+        this.b2cDispatcher = b2cDispatcher;
     }
 
     private StkDispatcher dispatcher() {
@@ -75,6 +80,21 @@ public class DarajaRoutes extends RouteBuilder {
             .routeId("daraja-stk-processor")
             .autoStartup("{{mfi.daraja.processor-enabled}}")
             .bean(StkResultProcessor.class, "processPending");
+
+        // B2C disbursements (ADR-0012): approved disbursements arrive as outbox events. Redelivery is
+        // limited and never resends money: core's dispatch claim admits one send per disbursement.
+        from("spring-rabbitmq:{{mfi.outbox.exchange}}?queues={{mfi.daraja.b2c-queue}}&autoDeclare=false"
+                + "&concurrentConsumers=1")
+            .routeId("daraja-b2c-dispatch")
+            .autoStartup("{{mfi.daraja.b2c-consumer-enabled}}")
+            .errorHandler(defaultErrorHandler().maximumRedeliveries(5).redeliveryDelay(2000).useExponentialBackOff())
+            .process(e -> e.getMessage().setBody(b2cDispatcher.dispatch(e.getMessage().getBody(String.class),
+                    e.getMessage().getHeader("mfiTenantId", String.class)).name()));
+
+        from("timer:daraja-b2c-processor?period={{mfi.daraja.process-interval-ms}}&delay=2000")
+            .routeId("daraja-b2c-processor")
+            .autoStartup("{{mfi.daraja.processor-enabled}}")
+            .bean(B2cResultProcessor.class, "processPending");
 
         from("timer:daraja-stk-reconciler?period={{mfi.daraja.reconcile-interval-ms}}&delay=10000")
             .routeId("daraja-stk-reconciler")

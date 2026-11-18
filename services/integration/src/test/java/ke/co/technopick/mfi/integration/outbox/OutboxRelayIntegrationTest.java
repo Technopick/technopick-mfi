@@ -40,7 +40,7 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
  */
 @Tag("integration")
 @Testcontainers
-@SpringBootTest(properties = {"mfi.outbox.enabled=false", "mfi.daraja.stk-consumer-enabled=false"})
+@SpringBootTest(properties = {"mfi.outbox.enabled=false", "mfi.daraja.stk-consumer-enabled=false", "mfi.daraja.b2c-consumer-enabled=false"})
 class OutboxRelayIntegrationTest {
 
     static final String A = "00000000-0000-0000-0000-0000000000a1";

@@ -130,11 +130,12 @@ public class LoanRepaymentService {
                 allocation.unallocated());
     }
 
-    private record Loaded(String loanNumber, String status, String branchCode, LoanProductVersion product) { }
+    record Loaded(String loanNumber, String status, String branchCode, BigDecimal principal, LoanProductVersion product) { }
 
-    private Loaded load(UUID loanId) {
+    /** Loads and locks a loan with its product version (FOR UPDATE OF the loan row). */
+    Loaded load(UUID loanId) {
         return jdbc.sql("""
-                SELECT l.loan_number, l.status, l.branch_code, p.currency, v.*
+                SELECT l.loan_number, l.status, l.branch_code, l.principal, p.currency, v.*
                   FROM lending.loan l
                   JOIN lending.loan_product_version v ON v.tenant_id = l.tenant_id AND v.version_id = l.product_version_id
                   JOIN lending.loan_product p ON p.tenant_id = v.tenant_id AND p.product_code = v.product_code
@@ -161,7 +162,8 @@ public class LoanRepaymentService {
                                 rs.getString("gl_fee_income"), rs.getString("gl_penalty_receivable"),
                                 rs.getString("gl_penalty_income"), rs.getString("gl_overpayment"),
                                 rs.getString("gl_write_off")));
-                return new Loaded(rs.getString("loan_number"), rs.getString("status"), rs.getString("branch_code"), v);
+                return new Loaded(rs.getString("loan_number"), rs.getString("status"), rs.getString("branch_code"),
+                        rs.getBigDecimal("principal"), v);
             })
             .optional()
             .orElseThrow(() -> new IllegalArgumentException("loan not found"));
