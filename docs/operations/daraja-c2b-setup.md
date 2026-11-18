@@ -10,6 +10,8 @@
    `https://<integration-host>/daraja/c2b/<token>/validation` and `.../confirmation`.
 5. Test in sandbox: known account -> credited; unknown reference -> rejected at validation (or
    suspense if validation is not enabled on the short code); duplicate confirmation -> one posting.
-6. Monitor: callbacks with status FAILED (dead letters), suspense balance, `mfi.holds.expired`.
+6. Monitor: callbacks with status FAILED (dead letters), suspense balance and ageing (with the
+   ACCEPT validation fallback, core outages can push mistyped references into suspense),
+   `mfi.holds.expired`.
 
 Production registration, certification and Safaricom approvals are pending (not implied by tests).

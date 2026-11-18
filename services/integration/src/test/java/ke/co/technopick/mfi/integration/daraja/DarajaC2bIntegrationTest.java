@@ -174,10 +174,11 @@ class DarajaC2bIntegrationTest {
         mvc.perform(post(BASE + "/validation").contentType(MediaType.APPLICATION_JSON)
                 .content(payload("TA57ZBCAV3", "0100000004", "10.00", "600992")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.ResultCode").value("C2B00015"));
-        // Core unavailable: circuit-breaker fallback rejects (configured default).
+        // Core unavailable: circuit-breaker fallback accepts (default, ADR-0009); the confirmation
+        // will then credit the account or post to suspense.
         mvc.perform(post(BASE + "/validation").contentType(MediaType.APPLICATION_JSON)
                 .content(payload("TA57ZBCAV4", "BOOM", "10.00", "600991")))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.ResultCode").value("C2B00016"));
+            .andExpect(status().isOk()).andExpect(jsonPath("$.ResultCode").value("0"));
     }
 
     @Test

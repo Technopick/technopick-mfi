@@ -36,7 +36,9 @@ mfi:
     paybills: []
     # Safaricom callback source ranges, from Safaricom's current documentation (never hard-coded).
     allowed-cidrs: []
-    validation-on-error: REJECT
+    # Business decision 2026-11-18 (ADR-0009): if core cannot be asked, let the payment go through;
+    # confirmation then credits the account or, if the reference is unknown, suspense.
+    validation-on-error: ${MFI_DARAJA_VALIDATION_ON_ERROR:ACCEPT}
     processor-enabled: ${MFI_DARAJA_PROCESSOR_ENABLED:true}
     process-interval-ms: 2000
     max-attempts: 10

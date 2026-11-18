@@ -10,7 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @param paybills          one entry per tenant paybill: path token, tenant, short code
  * @param allowedCidrs      callback source ranges allowed to reach the callback endpoints
- * @param validationOnError what to answer Daraja if core banking cannot be asked (REJECT or ACCEPT)
+ * @param validationOnError what to answer Daraja if core banking cannot be asked (default ACCEPT)
  */
 @ConfigurationProperties("mfi.daraja")
 public record DarajaProperties(List<Paybill> paybills, List<String> allowedCidrs, OnError validationOnError,
@@ -25,7 +25,7 @@ public record DarajaProperties(List<Paybill> paybills, List<String> allowedCidrs
         paybills = paybills == null ? List.of() : List.copyOf(paybills);
         allowedCidrs = allowedCidrs == null ? List.of() : List.copyOf(allowedCidrs);
         if (validationOnError == null) {
-            validationOnError = OnError.REJECT;
+            validationOnError = OnError.ACCEPT; // ADR-0009, business decision 2026-11-18
         }
         if (retryBackoff == null) {
             retryBackoff = Duration.ofSeconds(30);
