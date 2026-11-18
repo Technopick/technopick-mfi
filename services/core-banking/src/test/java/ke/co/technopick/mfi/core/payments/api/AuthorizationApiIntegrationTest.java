@@ -945,7 +945,7 @@ class AuthorizationApiIntegrationTest {
         String other = JsonPath.read(apply(application("app-2", "50000", 6, null), officer, ok), "$.applicationId");
         String declined = decideApplication(other, "decline", "{\"reason\":\"Existing arrears with another lender\"}", manager, ok);
         assertEquals("DECLINED", JsonPath.read(declined, "$.status"));
-        assertEquals(null, (Object) JsonPath.read(declined, "$.loanNumber"));
+        org.junit.jupiter.api.Assertions.assertNull(JsonPath.read(declined, "$.loanNumber"));
 
         // Disburse the new loan by B2C, then the customer pays through the paybill with the loan number.
         String disbursement = approvedAndDispatched("orig-b2c", loanNumber);
