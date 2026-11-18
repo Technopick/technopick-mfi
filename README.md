@@ -43,7 +43,7 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 14)
+## What is verified (2026-11-18, increment 15)
 
 GitHub Actions on `main`: all four jobs green.
 
@@ -61,6 +61,7 @@ GitHub Actions on `main`: all four jobs green.
 | Operations close-out of unsettled STK / B2C items: proposer and approver differ, applied through the normal exactly-once paths | core: 1 end-to-end test | ubuntu |
 | Loan origination: application with quote, maker-checker approval creating loan + schedule, loan numbering; full journey to B2C disbursement and paybill repayment | core: 1 end-to-end test | ubuntu |
 | Staff web app (worklist, applications, disbursements, M-Pesa close-out, suspense, schedule): money as text, four-eyes hints, role-based navigation, API types match contract, runtime deps audited | 11 UI tests; typecheck; production build | ubuntu and windows |
+| Whole platform in containers (PostgreSQL, RabbitMQ, Keycloak, core, integration, TEST-ONLY Daraja simulator, staff web behind nginx): a browser signs in as officer, manager and supervisor and takes a loan from application to M-Pesa disbursement to ACTIVE | Playwright (Chromium) journey | ubuntu (Docker Compose, `infrastructure/e2e`) |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
 | Ledger, savings, lending, origination, EOD, STK, B2C and close-out database rules | 89/89 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
@@ -69,7 +70,7 @@ GitHub Actions on `main`: all four jobs green.
 API contract: `shared/contracts/openapi/core-banking-v1.json` (OpenAPI 3.1); CI fails if the
 code and the committed contract diverge, or if an operation id is generator-numbered.
 
-Not yet verified: any Daraja sandbox or production run, B2C status query and float reconciliation, suspense refunds and splitting, jPOS switch, bank/CRB/SMS routes, Docker images, running the Windows service
+Not yet verified: any Daraja sandbox or production run, container images on Windows Server, B2C status query and float reconciliation, suspense refunds and splitting, jPOS switch, bank/CRB/SMS routes, Docker images, running the Windows service
 scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.
 
 ## Non-negotiables
