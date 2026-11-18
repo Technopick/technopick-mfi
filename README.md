@@ -11,7 +11,7 @@ financial switch. Java 25, Spring Boot 4.1, Apache Camel 4.22 LTS, jPOS 3, Postg
 shared/canonical-model/   Money + standard-neutral transaction model (JDK only)
 services/core-banking/    Modular monolith: accounting + lending domain, Flyway migrations
 services/switch/          jPOS switch (Phase 1 increment 3: sign-on/echo vs simulator)
-services/integration/     Camel runtime (Phase 1 increment 4: first tested route)
+services/integration/     Camel runtime: outbox relay to RabbitMQ (provider routes next)
 services/worker/          Batch / EOD / outbox relay
 simulators/               TEST-ONLY ISO 8583/20022 and provider simulators
 infrastructure/           docker (local dev), CI, Linux + Windows Server deployment
@@ -43,7 +43,7 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 6)
+## What is verified (2026-11-18, increment 7)
 
 GitHub Actions on `main`: all four jobs green.
 
@@ -53,6 +53,7 @@ GitHub Actions on `main`: all four jobs green.
 | Unit tests (JUnit 5) incl. seeded property tests | 87/87 on each OS | both runners |
 | ArchUnit rules (framework-free domain, no float/double money, no module cycles) | 4/4 | both runners |
 | Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 5 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend, hold expiry, OpenAPI contract drift | ubuntu (Testcontainers) |
+| Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
 | Ledger, savings, lending and EOD database rules | 70/70 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
@@ -60,7 +61,7 @@ GitHub Actions on `main`: all four jobs green.
 API contract: `shared/contracts/openapi/core-banking-v1.json` (OpenAPI 3.1); CI fails if the
 code and the committed contract diverge.
 
-Not yet verified: jPOS switch, Camel routes, Docker images, running the Windows service
+Not yet verified: jPOS switch, provider Camel routes (Daraja, banks, CRB, SMS), Docker images, running the Windows service
 scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.
 
 ## Non-negotiables
