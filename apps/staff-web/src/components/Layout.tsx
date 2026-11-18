@@ -5,6 +5,7 @@ import { hasAnyRole } from "../auth/session";
 /** Navigation entries and the roles that see them (the API enforces the same roles). */
 export const NAV: { to: string; label: string; roles: string[] }[] = [
   { to: "/", label: "Worklist", roles: [] },
+  { to: "/customers", label: "Customers", roles: ["LOAN_OFFICER", "TELLER", "BRANCH_MANAGER", "OPERATIONS", "SUPERVISOR"] },
   { to: "/applications", label: "Loan applications", roles: ["LOAN_OFFICER", "BRANCH_MANAGER"] },
   { to: "/disbursements", label: "Disbursements", roles: ["LOAN_OFFICER", "OPERATIONS", "BRANCH_MANAGER", "SUPERVISOR"] },
   { to: "/mpesa", label: "M-Pesa close-out", roles: ["OPERATIONS", "SUPERVISOR"] },

@@ -68,6 +68,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Customer_search"];
+        put?: never;
+        post: operations["Customer_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Customer_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerNumber}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Customer_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/applications": {
         parameters: {
             query?: never;
@@ -700,6 +748,66 @@ export interface components {
             /** @enum {string} */
             status?: "PENDING" | "DISPATCHED" | "SUBMITTED" | "COMPLETED" | "FAILED";
         };
+        CustomerDetail: {
+            branchCode?: string;
+            /** Format: date-time */
+            consentAt?: string;
+            consentVersion?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            customerNumber?: string;
+            /** Format: date */
+            dateOfBirth?: string;
+            email?: string;
+            firstName?: string;
+            idNumber?: string;
+            idType?: string;
+            kraPin?: string;
+            lastName?: string;
+            middleName?: string;
+            phoneNumber?: string;
+            status?: string;
+            statusReason?: string;
+            verificationNote?: string;
+            /** Format: date-time */
+            verifiedAt?: string;
+            verifiedBy?: string;
+        };
+        CustomerRegistered: {
+            customerNumber?: string;
+            replayed?: boolean;
+            status?: string;
+        };
+        CustomerRegistration: {
+            branchCode: string;
+            consentGiven?: boolean;
+            /** Format: date */
+            dateOfBirth: string;
+            /** Format: email */
+            email?: string;
+            firstName: string;
+            idNumber: string;
+            /** @enum {string} */
+            idType: "NATIONAL_ID" | "PASSPORT" | "ALIEN_ID";
+            idempotencyKey: string;
+            kraPin?: string;
+            lastName: string;
+            middleName?: string;
+            phoneNumber: string;
+        };
+        CustomerSummary: {
+            branchCode?: string;
+            customerNumber?: string;
+            fullName?: string;
+            idNumberMasked?: string;
+            idType?: string;
+            phoneMasked?: string;
+            status?: string;
+        };
+        CustomerVerification: {
+            note: string;
+        };
         Decision: {
             /** Format: uuid */
             journalEntryId?: string;
@@ -728,7 +836,7 @@ export interface components {
         DisbursementRequest: {
             idempotencyKey: string;
             loanNumber: string;
-            phoneNumber: string;
+            phoneNumber?: string;
             shortCode?: string;
         };
         DisbursementResultRequest: {
@@ -1122,6 +1230,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReverseResponse"];
+                };
+            };
+        };
+    };
+    Customer_search: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerSummary"][];
+                };
+            };
+        };
+    };
+    Customer_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerRegistration"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerRegistered"];
+                };
+            };
+        };
+    };
+    Customer_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+        };
+    };
+    Customer_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerVerification"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetail"];
                 };
             };
         };

@@ -343,6 +343,204 @@
         },
         "type": "object"
       },
+      "CustomerDetail": {
+        "properties": {
+          "branchCode": {
+            "type": "string"
+          },
+          "consentAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "consentVersion": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "format": "date",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "idNumber": {
+            "type": "string"
+          },
+          "idType": {
+            "type": "string"
+          },
+          "kraPin": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "middleName": {
+            "type": "string"
+          },
+          "phoneNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusReason": {
+            "type": "string"
+          },
+          "verificationNote": {
+            "type": "string"
+          },
+          "verifiedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "verifiedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerRegistered": {
+        "properties": {
+          "customerNumber": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerRegistration": {
+        "properties": {
+          "branchCode": {
+            "maxLength": 16,
+            "minLength": 0,
+            "type": "string"
+          },
+          "consentGiven": {
+            "type": "boolean"
+          },
+          "dateOfBirth": {
+            "format": "date",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string"
+          },
+          "firstName": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "idNumber": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "idType": {
+            "enum": [
+              "NATIONAL_ID",
+              "PASSPORT",
+              "ALIEN_ID"
+            ],
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          },
+          "kraPin": {
+            "maxLength": 11,
+            "minLength": 0,
+            "type": "string"
+          },
+          "lastName": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "middleName": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "phoneNumber": {
+            "maxLength": 16,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "branchCode",
+          "dateOfBirth",
+          "firstName",
+          "idNumber",
+          "idType",
+          "idempotencyKey",
+          "lastName",
+          "phoneNumber"
+        ],
+        "type": "object"
+      },
+      "CustomerSummary": {
+        "properties": {
+          "branchCode": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "idNumberMasked": {
+            "type": "string"
+          },
+          "idType": {
+            "type": "string"
+          },
+          "phoneMasked": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerVerification": {
+        "properties": {
+          "note": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "type": "object"
+      },
       "Decision": {
         "properties": {
           "journalEntryId": {
@@ -436,8 +634,7 @@
         },
         "required": [
           "idempotencyKey",
-          "loanNumber",
-          "phoneNumber"
+          "loanNumber"
         ],
         "type": "object"
       },
@@ -1497,6 +1694,145 @@
         },
         "tags": [
           "authorization-controller"
+        ]
+      }
+    },
+    "/api/v1/customers": {
+      "get": {
+        "operationId": "Customer_search",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerSummary"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "customer-controller"
+        ]
+      },
+      "post": {
+        "operationId": "Customer_register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRegistration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerRegistered"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "customer-controller"
+        ]
+      }
+    },
+    "/api/v1/customers/{customerNumber}": {
+      "get": {
+        "operationId": "Customer_detail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "customer-controller"
+        ]
+      }
+    },
+    "/api/v1/customers/{customerNumber}/verify": {
+      "post": {
+        "operationId": "Customer_verify",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerVerification"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "customer-controller"
         ]
       }
     },

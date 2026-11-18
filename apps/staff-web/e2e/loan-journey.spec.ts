@@ -1,8 +1,9 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 /**
- * A loan's life through the real stack, as four different staff members, each in their own
- * browser session: officer applies -> manager approves (loan + schedule) -> officer requests the
+ * A loan's life through the real stack, as different staff members, each in their own browser
+ * session: officer registers the customer (with consent) -> manager verifies KYC -> officer
+ * applies -> manager approves (loan + schedule) -> officer requests the
  * M-Pesa B2C disbursement -> supervisor approves and sends -> integration -> TEST-ONLY Daraja
  * simulator -> result callback -> core posts and activates the loan, which the manager sees ACTIVE.
  */
@@ -25,11 +26,31 @@ async function signIn(browser: Browser, user: keyof typeof USERS): Promise<Page>
 }
 
 test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser }) => {
-  const customer = `E2E-${Date.now()}`;
+  const idNumber = String(Date.now()).slice(-8);
 
   const officer = await signIn(browser, "officer");
+  await officer.goto("/customers/new");
+  await officer.getByLabel("First name").fill("Achieng");
+  await officer.getByLabel("Last name").fill("Otieno");
+  await officer.getByLabel("Date of birth").fill("1990-05-01");
+  await officer.getByLabel("ID number").fill(idNumber);
+  await officer.getByLabel("M-Pesa number").fill("0712345678");
+  await officer.getByLabel("Branch code").fill("NBO01");
+  await officer.getByRole("checkbox").check();
+  await officer.getByRole("button", { name: /^Register/ }).click();
+  const customerHeading = officer.getByRole("heading", { level: 2, name: /^CU\d{2}-\d{7}$/ });
+  await expect(customerHeading).toBeVisible();
+  const customer = (await customerHeading.textContent())!.trim();
+  await expect(officer.getByText(/a colleague must decide/i)).toHaveCount(0); // officers cannot verify at all
+
+  const manager = await signIn(browser, "manager");
+  await manager.goto(`/customers/${customer}`);
+  await manager.getByLabel(/what was checked/i).fill("National ID sighted at branch (e2e)");
+  await manager.getByRole("button", { name: "Verify identity" }).click();
+  await expect(manager.getByText("ACTIVE", { exact: true })).toBeVisible();
+
   await officer.goto("/applications/new");
-  await officer.getByLabel("Customer reference").fill(customer);
+  await officer.getByLabel("Customer number").fill(customer);
   await officer.getByLabel("Product code").fill("BIASHARA");
   await officer.getByLabel("Branch code").fill("NBO01");
   await officer.getByLabel("Amount (KES)").fill("50000");
@@ -42,7 +63,6 @@ test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser 
   await expect(officer.getByRole("button", { name: /approve/i })).toHaveCount(0);
   const applicationUrl = officer.url();
 
-  const manager = await signIn(browser, "manager");
   await manager.goto(applicationUrl);
   await manager.getByRole("button", { name: "Approve and create loan" }).click();
   const loanLink = manager.getByRole("link", { name: /^LN\d{2}-\d{7}$/ });
@@ -51,7 +71,7 @@ test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser 
 
   await officer.goto("/disbursements");
   await officer.getByLabel("Loan number").fill(loanNumber);
-  await officer.getByLabel("Customer M-Pesa number").fill("0712345678");
+  // Number left blank: the payout goes to the customer's registered M-Pesa number.
   await officer.getByRole("button", { name: "Request disbursement" }).click();
   await expect(officer.getByRole("status")).toContainText("KES 49,000.00");
 

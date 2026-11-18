@@ -17,6 +17,7 @@ function Tile({ to, label, path }: { to: string; label: string; path: string }) 
 export function WorklistPage() {
   const { session } = useAuth();
   const tiles: { to: string; label: string; path: string; roles: string[] }[] = [
+    { to: "/customers", label: "Customers awaiting KYC verification", path: "/api/v1/customers?status=PENDING_VERIFICATION", roles: ["BRANCH_MANAGER", "OPERATIONS"] },
     { to: "/applications", label: "Loan applications awaiting decision", path: "/api/v1/lending/applications", roles: ["BRANCH_MANAGER", "LOAN_OFFICER"] },
     { to: "/disbursements", label: "Disbursements awaiting approval", path: "/api/v1/payments/mpesa/b2c/disbursements", roles: ["BRANCH_MANAGER", "SUPERVISOR"] },
     { to: "/disbursements", label: "Disbursements needing attention", path: "/api/v1/payments/mpesa/b2c/disbursements/attention", roles: ["OPERATIONS", "SUPERVISOR"] },

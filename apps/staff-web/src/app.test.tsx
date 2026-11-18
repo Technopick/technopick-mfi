@@ -99,7 +99,7 @@ describe("screens", () => {
     const { api } = fakeApi({});
     renderAt("/", session("teller-1", "TELLER"), api);
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Loan schedule"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Loan schedule"]);
   });
 
   it("validates the amount locally and sends it as a string with an idempotency key", async () => {
@@ -108,7 +108,7 @@ describe("screens", () => {
       "GET /api/v1/lending/applications/a-2": () => ({ ...application, applicationId: "a-2" }),
     });
     renderAt("/applications/new", session("officer-1", "LOAN_OFFICER"), api);
-    await userEvent.type(await screen.findByLabelText(/customer reference/i), "CUST-1");
+    await userEvent.type(await screen.findByLabelText(/customer number/i), "CU26-0000001");
     await userEvent.type(screen.getByLabelText(/product code/i), "BIASHARA");
     await userEvent.type(screen.getByLabelText(/branch code/i), "NBO01");
     await userEvent.type(screen.getByLabelText(/amount/i), "1000.005");
@@ -131,5 +131,37 @@ describe("screens", () => {
     });
     renderAt("/disbursements", session("manager-1", "BRANCH_MANAGER"), api);
     expect((await screen.findByRole("alert")).textContent).toContain("Not allowed");
+  });
+
+  it("cannot register a customer without recorded consent, and hides verification from the registrar", async () => {
+    const { api, calls } = fakeApi({
+      "GET /api/v1/customers/CU26-0000001": () => ({
+        customerNumber: "CU26-0000001", firstName: "Achieng", lastName: "Otieno", status: "PENDING_VERIFICATION",
+        createdBy: "user:officer-1", idType: "NATIONAL_ID", idNumber: "12345678", phoneNumber: "254712345678",
+      }),
+    });
+    renderAt("/customers/new", session("officer-1", "LOAN_OFFICER"), api);
+    const register = await screen.findByRole("button", { name: /register/i });
+    expect((register as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(screen.getByRole("checkbox"));
+    expect((register as HTMLButtonElement).disabled).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("lets a different manager verify a customer's identity with a note", async () => {
+    const customer = {
+      customerNumber: "CU26-0000001", firstName: "Achieng", lastName: "Otieno", status: "PENDING_VERIFICATION",
+      createdBy: "user:officer-1", idType: "NATIONAL_ID", idNumber: "12345678", phoneNumber: "254712345678",
+    };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/customers/CU26-0000001": () => customer,
+      "POST /api/v1/customers/CU26-0000001/verify": () => ({ ...customer, status: "ACTIVE" }),
+    });
+    renderAt("/customers/CU26-0000001", session("manager-1", "BRANCH_MANAGER"), api);
+    const verify = await screen.findByRole("button", { name: /verify identity/i });
+    expect((verify as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText(/what was checked/i), "National ID sighted at branch");
+    await userEvent.click(verify);
+    await waitFor(() => expect(calls.some((c) => c.path.endsWith("/verify"))).toBe(true));
   });
 });

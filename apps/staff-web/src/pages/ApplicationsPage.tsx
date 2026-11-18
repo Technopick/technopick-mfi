@@ -24,7 +24,7 @@ export function ApplicationsPage() {
         <ProblemBox problem={error} />
         {loading ? <Loading /> : !data?.length ? <Empty>No applications are waiting.</Empty> : (
           <table>
-            <thead><tr><th>Customer</th><th>Product</th><th className="num">Amount</th><th>Term</th><th>Submitted</th><th /></tr></thead>
+            <thead><tr><th>Customer number</th><th>Product</th><th className="num">Amount</th><th>Term</th><th>Submitted</th><th /></tr></thead>
             <tbody>
               {data.map((a) => (
                 <tr key={a.applicationId}>
@@ -108,7 +108,7 @@ export function NewApplicationPage() {
       <h1>New loan application</h1>
       <Section title="Applicant and terms">
         <form onSubmit={submit} className="form">
-          <label>Customer reference<input required value={form.customerRef} onChange={set("customerRef")} /></label>
+          <label>Customer number<input required value={form.customerRef} onChange={set("customerRef")} placeholder="CU26-0000001 (verified customer)" /></label>
           <label>Product code<input required value={form.productCode} onChange={set("productCode")} placeholder="e.g. BIASHARA" /></label>
           <label>Branch code<input required value={form.branchCode} onChange={set("branchCode")} /></label>
           <label>Amount (KES)<input required inputMode="decimal" value={form.principal} onChange={set("principal")} /></label>

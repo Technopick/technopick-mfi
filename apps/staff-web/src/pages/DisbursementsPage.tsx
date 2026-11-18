@@ -19,7 +19,7 @@ function RequestForm({ onDone }: { onDone: () => void }) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     const r = await run(() => api.post<Schemas["DisbursementCreated"]>(BASE, {
-      idempotencyKey: key, loanNumber: loanNumber.trim(), phoneNumber: phone.trim(),
+      idempotencyKey: key, loanNumber: loanNumber.trim(), phoneNumber: phone.trim() || undefined,
     }));
     if (r) {
       setCreated(r);
@@ -30,7 +30,8 @@ function RequestForm({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={submit} className="form">
       <label>Loan number<input required value={loanNumber} onChange={(e) => setLoanNumber(e.target.value)} placeholder="LN26-0000001" /></label>
-      <label>Customer M-Pesa number<input required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XX XXX XXX" /></label>
+      <label>M-Pesa number (optional)<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="blank = customer's registered number" /></label>
+      <p className="muted wide">Payouts go only to the customer's registered M-Pesa number.</p>
       <ProblemBox problem={error} />
       {created && (
         <p className="ok" role="status">
