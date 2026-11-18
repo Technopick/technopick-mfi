@@ -27,6 +27,12 @@ jobs:
         shell: bash
         # Container-based integration tests need Linux containers: they run on ubuntu only.
         run: mvn -B -ntp verify ${{ matrix.os == 'windows-latest' && '-Dsurefire.excludedGroups=integration' || '' }}
+      - name: Print generated OpenAPI document (contract drift)
+        if: failure() && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          f=services/core-banking/target/openapi/core-banking-v1.json
+          if [ -f "$f" ]; then echo "----- BEGIN OPENAPI -----"; base64 -w0 "$f"; echo; echo "----- END OPENAPI -----"; fi
       - name: Upload generated OpenAPI document
         if: always() && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v5
