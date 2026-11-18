@@ -619,6 +619,109 @@
         },
         "type": "object"
       },
+      "MpesaResolutionCreated": {
+        "properties": {
+          "resolutionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MpesaResolutionProposal": {
+        "properties": {
+          "amount": {
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "evidence": {
+            "maxLength": 500,
+            "minLength": 10,
+            "type": "string"
+          },
+          "itemId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "itemType": {
+            "enum": [
+              "STK_REQUEST",
+              "B2C_DISBURSEMENT"
+            ],
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "PAID",
+              "NOT_PAID"
+            ],
+            "type": "string"
+          },
+          "providerRef": {
+            "pattern": "^[A-Z0-9]{8,20}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence",
+          "itemId",
+          "itemType",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      "MpesaResolutionView": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "itemId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "itemType": {
+            "enum": [
+              "STK_REQUEST",
+              "B2C_DISBURSEMENT"
+            ],
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "PAID",
+              "NOT_PAID"
+            ],
+            "type": "string"
+          },
+          "providerRef": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "resolutionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resultStatus": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "OpenItem": {
         "properties": {
           "ageDays": {
@@ -1256,7 +1359,7 @@
     },
     "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/approve": {
       "post": {
-        "operationId": "approve_1",
+        "operationId": "approve_2",
         "parameters": [
           {
             "in": "path",
@@ -1328,7 +1431,7 @@
     },
     "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/reject": {
       "post": {
-        "operationId": "reject_1",
+        "operationId": "reject_2",
         "parameters": [
           {
             "in": "path",
@@ -1578,6 +1681,119 @@
         },
         "tags": [
           "mpesa-c-2b-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/resolutions": {
+      "get": {
+        "operationId": "pending",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MpesaResolutionView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-resolution-controller"
+        ]
+      },
+      "post": {
+        "operationId": "propose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MpesaResolutionProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MpesaResolutionCreated"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-resolution-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/resolutions/{resolutionId}/approve": {
+      "post": {
+        "operationId": "approve_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resolutionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MpesaResolutionView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-resolution-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/resolutions/{resolutionId}/reject": {
+      "post": {
+        "operationId": "reject_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resolutionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MpesaResolutionView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-resolution-controller"
         ]
       }
     },

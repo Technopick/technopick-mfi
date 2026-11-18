@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import java.util.List;
+import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -27,5 +28,17 @@ public class OpenApiConfig {
             .addSecurityItem(new SecurityRequirement().addList("bearer"))
             // Relative, so the contract is identical in every environment.
             .servers(List.of(new Server().url("/").description("Relative to the deployment base URL")));
+    }
+
+    /**
+     * Stable operation ids: {@code <controller without "Controller">_<method>}, e.g.
+     * {@code B2cDisbursement_approve}. The generator's default (method name with a numeric suffix
+     * on clashes) renumbers existing operations whenever a controller is added, which breaks
+     * generated clients.
+     */
+    @Bean
+    OperationCustomizer stableOperationIds() {
+        return (operation, handler) -> operation.operationId(
+                handler.getBeanType().getSimpleName().replaceFirst("Controller$", "") + "_" + handler.getMethod().getName());
     }
 }

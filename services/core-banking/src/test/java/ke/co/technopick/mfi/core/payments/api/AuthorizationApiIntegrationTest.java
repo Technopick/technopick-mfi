@@ -388,6 +388,10 @@ class AuthorizationApiIntegrationTest {
         java.nio.file.Path out = java.nio.file.Path.of("target", "openapi", "core-banking-v1.json");
         java.nio.file.Files.createDirectories(out.getParent());
         java.nio.file.Files.writeString(out, live, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.regex.Matcher numbered = java.util.regex.Pattern.compile("\"operationId\":\"([^\"]*_\\d+)\"").matcher(live);
+        boolean autoNumbered = numbered.find();
+        org.junit.jupiter.api.Assertions.assertFalse(autoNumbered,
+                "auto-numbered operationId (unstable for generated clients): " + (autoNumbered ? numbered.group(1) : ""));
         java.nio.file.Path contract = java.nio.file.Path.of("..", "..", "shared", "contracts", "openapi", "core-banking-v1.json");
         org.junit.jupiter.api.Assertions.assertTrue(java.nio.file.Files.exists(contract),
                 "No committed contract yet: review " + out.toAbsolutePath() + " and copy it to " + contract);
