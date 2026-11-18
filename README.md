@@ -43,22 +43,22 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, first CI run)
+## What is verified (2026-11-18, increment 5)
 
-GitHub Actions run 44250639856 on `main`: all four jobs green.
+GitHub Actions on `main`: all four jobs green.
 
 | Item | Result | Where |
 | --- | --- | --- |
-| `mvn verify` on JDK 25 (Temurin), `-Xlint:all -Werror` | BUILD SUCCESS | ubuntu-latest and windows-latest |
-| Unit tests (JUnit 5) incl. seeded property tests | 87/87 pass on each OS (16 canonical-model + 71 core-banking) | both runners |
-| ArchUnit rules: framework-free domain, no float/double in money code, no module cycles, lending isolation | 4/4 pass | both runners |
-| Ledger, savings, lending and EOD database rules | 70/70 checks pass | PostgreSQL 17 service container |
-| Two-session race tests (holds vs holds, hold vs debit) | pass | PostgreSQL 17 |
+| `mvn verify` on JDK 25, `-Xlint:all -Werror` | BUILD SUCCESS | ubuntu-latest and windows-latest |
+| Unit tests (JUnit 5) incl. seeded property tests | 87/87 on each OS | both runners |
+| ArchUnit rules (framework-free domain, no float/double money, no module cycles) | 4/4 | both runners |
+| Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 3 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend | ubuntu (Testcontainers) |
+| Ledger, savings, lending and EOD database rules | 70/70 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
-| Mutation runs (balance trigger, row lock, allocation check, EOD check removed) | each makes its test fail | local PostgreSQL 16 |
+| Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
-Not yet verified: Spring Boot application layer, jPOS switch, Camel routes, Docker images,
-executing (not just parsing) the Windows service scripts on Windows Server, load tests.
+Not yet verified: jPOS switch, Camel routes, Docker images, running the Windows service
+scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.
 
 ## Non-negotiables
 Financial accuracy, immutable posted ledger history, double-entry, tenant isolation,
