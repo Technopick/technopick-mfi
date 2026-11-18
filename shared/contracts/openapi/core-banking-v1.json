@@ -1,0 +1,381 @@
+{
+  "components": {
+    "schemas": {
+      "AuthorizeRequest": {
+        "properties": {
+          "accountNumber": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "acquirerId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "amount": {
+            "minLength": 1,
+            "pattern": "^\\d{1,15}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "channel": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "currency": {
+            "minLength": 1,
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "fee": {
+            "pattern": "^\\d{1,15}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "rrn": {
+            "type": "string"
+          },
+          "stan": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "terminalId": {
+            "type": "string"
+          },
+          "transmissionDateTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "BALANCE_ENQUIRY",
+              "MINI_STATEMENT",
+              "CASH_WITHDRAWAL",
+              "CASH_DEPOSIT",
+              "PURCHASE",
+              "FUNDS_TRANSFER",
+              "BILL_PAYMENT",
+              "PRE_AUTHORIZATION",
+              "PRE_AUTHORIZATION_COMPLETION",
+              "REFUND",
+              "LOAN_REPAYMENT",
+              "LOAN_DISBURSEMENT"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountNumber",
+          "acquirerId",
+          "amount",
+          "channel",
+          "currency",
+          "stan",
+          "tenantId",
+          "transmissionDateTime",
+          "type"
+        ],
+        "type": "object"
+      },
+      "AuthorizeResponse": {
+        "properties": {
+          "approved": {
+            "type": "boolean"
+          },
+          "availableBalance": {
+            "type": "string"
+          },
+          "holdAmount": {
+            "type": "string"
+          },
+          "holdId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "BalanceResponse": {
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "activeHolds": {
+            "type": "string"
+          },
+          "availableBalance": {
+            "type": "string"
+          },
+          "ledgerBalance": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CompleteRequest": {
+        "properties": {
+          "amount": {
+            "minLength": 1,
+            "pattern": "^\\d{1,15}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "channel": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "currency": {
+            "minLength": 1,
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "fee": {
+            "pattern": "^\\d{1,15}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "channel",
+          "currency",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "CompleteResponse": {
+        "properties": {
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "holdId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ReverseRequest": {
+        "properties": {
+          "correlationId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "ReverseResponse": {
+        "properties": {
+          "holdId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "reversalEntryId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Core banking and switch authorization API. Money values are decimal strings. Errors are RFC 9457 problem details.",
+    "title": "Technopick Core Banking API",
+    "version": "v1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/accounts/{accountNumber}/balance": {
+      "get": {
+        "operationId": "balance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "accountNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "account-controller"
+        ]
+      }
+    },
+    "/api/v1/authorizations": {
+      "post": {
+        "operationId": "authorize",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "authorization-controller"
+        ]
+      }
+    },
+    "/api/v1/authorizations/{holdId}/completion": {
+      "post": {
+        "operationId": "complete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "holdId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompleteResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "authorization-controller"
+        ]
+      }
+    },
+    "/api/v1/authorizations/{holdId}/reversal": {
+      "post": {
+        "operationId": "reverse",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "holdId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReverseResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "authorization-controller"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "Relative to the deployment base URL",
+      "url": "/"
+    }
+  ]
+}
