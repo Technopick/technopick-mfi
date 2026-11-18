@@ -934,6 +934,357 @@
         ]
       }
     },
+    "/api/v1/payments/mpesa/b2c/disbursements": {
+      "post": {
+        "operationId": "create_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/attention": {
+      "get": {
+        "operationId": "attention_1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/View"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}": {
+      "get": {
+        "operationId": "get_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/approve": {
+      "post": {
+        "operationId": "approve_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/dispatch": {
+      "post": {
+        "operationId": "dispatch_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantOnly"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispatch"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/reject": {
+      "post": {
+        "operationId": "reject_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/result": {
+      "post": {
+        "operationId": "result_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/send-failure": {
+      "post": {
+        "operationId": "sendFailure_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendFailure"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/submitted": {
+      "post": {
+        "operationId": "submitted_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submitted"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/timeout": {
+      "post": {
+        "operationId": "timeout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantOnly"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      }
+    },
     "/api/v1/payments/mpesa/c2b": {
       "post": {
         "operationId": "apply",

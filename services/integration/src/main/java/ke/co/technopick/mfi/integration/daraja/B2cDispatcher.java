@@ -11,7 +11,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Sends one B2C payment for an {@code MpesaB2cDisbursementApproved} event (ADR-0012). Core's
+ * Sends one B2C payment for an {@code MpesaDisbursementApproved} event (ADR-0012). Core's
  * dispatch claim makes the send at-most-once; a redelivered event is dropped. An unknown outcome
  * is never retried: core flags it for a person after a while.
  */

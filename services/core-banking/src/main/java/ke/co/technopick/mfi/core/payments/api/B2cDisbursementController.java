@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.UUID;
 import ke.co.technopick.mfi.core.identity.api.CurrentCaller;
 import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService;
-import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService.Created;
-import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService.Dispatch;
-import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService.View;
+import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService.DisbursementCreated;
+import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService.DisbursementDispatch;
+import ke.co.technopick.mfi.core.payments.application.B2cDisbursementService.DisbursementView;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,18 +30,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(path = "/api/v1/payments/mpesa/b2c/disbursements", produces = "application/json")
 public class B2cDisbursementController {
 
-    public record CreateRequest(@NotBlank @Size(max = 80) String idempotencyKey,
+    public record DisbursementRequest(@NotBlank @Size(max = 80) String idempotencyKey,
                                 @NotBlank @Size(max = 34) String loanNumber,
                                 @NotBlank @Size(max = 16) String phoneNumber, String shortCode) { }
 
-    public record TenantOnly(@NotNull UUID tenantId) { }
+    public record DisbursementTenant(@NotNull UUID tenantId) { }
 
-    public record Submitted(@NotNull UUID tenantId, @NotBlank @Size(max = 60) String conversationId) { }
+    public record DisbursementSubmitted(@NotNull UUID tenantId, @NotBlank @Size(max = 60) String conversationId) { }
 
-    public record SendFailure(@NotNull UUID tenantId, @NotBlank @Size(max = 14) String code,
+    public record DisbursementSendFailure(@NotNull UUID tenantId, @NotBlank @Size(max = 14) String code,
                               @Size(max = 200) String description) { }
 
-    public record ResultRequest(@NotNull UUID tenantId, @Size(max = 60) String conversationId,
+    public record DisbursementResultRequest(@NotNull UUID tenantId, @Size(max = 60) String conversationId,
                                 @NotBlank @Size(max = 20) String resultCode, @Size(max = 200) String resultDesc,
                                 @Pattern(regexp = "^[A-Z0-9]{8,20}$") String transactionId,
                                 @Pattern(regexp = "^\\d{1,15}(\\.\\d{1,2})?$") String amount) { }
@@ -56,56 +56,56 @@ public class B2cDisbursementController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'OPERATIONS')")
-    public Created create(@Valid @RequestBody CreateRequest r) {
+    public DisbursementCreated create(@Valid @RequestBody DisbursementRequest r) {
         return service.request(caller.tenantId(), r.idempotencyKey(), r.loanNumber(), r.phoneNumber(), r.shortCode(),
                 caller.actor());
     }
 
     @GetMapping("/attention")
     @PreAuthorize("hasAnyRole('OPERATIONS', 'SUPERVISOR')")
-    public List<View> attention() {
+    public List<DisbursementView> attention() {
         return service.attention(caller.tenantId());
     }
 
     @GetMapping("/{disbursementId}")
     @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'OPERATIONS', 'BRANCH_MANAGER', 'SUPERVISOR')")
-    public View get(@PathVariable UUID disbursementId) {
+    public DisbursementView get(@PathVariable UUID disbursementId) {
         return service.view(caller.tenantId(), disbursementId);
     }
 
     @PostMapping("/{disbursementId}/approve")
     @PreAuthorize("hasAnyRole('BRANCH_MANAGER', 'SUPERVISOR')")
-    public View approve(@PathVariable UUID disbursementId) {
+    public DisbursementView approve(@PathVariable UUID disbursementId) {
         return service.decide(caller.tenantId(), disbursementId, true, caller.actor());
     }
 
     @PostMapping("/{disbursementId}/reject")
     @PreAuthorize("hasAnyRole('BRANCH_MANAGER', 'SUPERVISOR')")
-    public View reject(@PathVariable UUID disbursementId) {
+    public DisbursementView reject(@PathVariable UUID disbursementId) {
         return service.decide(caller.tenantId(), disbursementId, false, caller.actor());
     }
 
     @PostMapping("/{disbursementId}/dispatch")
     @PreAuthorize("hasRole('INTEGRATION')")
-    public Dispatch dispatch(@PathVariable UUID disbursementId, @Valid @RequestBody TenantOnly r) {
+    public DisbursementDispatch dispatch(@PathVariable UUID disbursementId, @Valid @RequestBody DisbursementTenant r) {
         return service.dispatch(r.tenantId(), disbursementId);
     }
 
     @PostMapping("/{disbursementId}/submitted")
     @PreAuthorize("hasRole('INTEGRATION')")
-    public View submitted(@PathVariable UUID disbursementId, @Valid @RequestBody Submitted r) {
+    public DisbursementView submitted(@PathVariable UUID disbursementId, @Valid @RequestBody DisbursementSubmitted r) {
         return service.submitted(r.tenantId(), disbursementId, r.conversationId());
     }
 
     @PostMapping("/{disbursementId}/send-failure")
     @PreAuthorize("hasRole('INTEGRATION')")
-    public View sendFailure(@PathVariable UUID disbursementId, @Valid @RequestBody SendFailure r) {
+    public DisbursementView sendFailure(@PathVariable UUID disbursementId, @Valid @RequestBody DisbursementSendFailure r) {
         return service.sendFailed(r.tenantId(), disbursementId, r.code(), r.description());
     }
 
     @PostMapping("/{disbursementId}/result")
     @PreAuthorize("hasRole('INTEGRATION')")
-    public View result(@PathVariable UUID disbursementId, @Valid @RequestBody ResultRequest r) {
+    public DisbursementView result(@PathVariable UUID disbursementId, @Valid @RequestBody DisbursementResultRequest r) {
         return service.result(r.tenantId(), disbursementId, new B2cDisbursementService.Result(r.conversationId(),
                 r.resultCode(), r.resultDesc(), r.transactionId(),
                 r.amount() == null ? null : B2cDisbursementService.amount(r.amount(), Currency.getInstance("KES"))),
@@ -114,7 +114,7 @@ public class B2cDisbursementController {
 
     @PostMapping("/{disbursementId}/timeout")
     @PreAuthorize("hasRole('INTEGRATION')")
-    public View timeout(@PathVariable UUID disbursementId, @Valid @RequestBody TenantOnly r) {
+    public DisbursementView timeout(@PathVariable UUID disbursementId, @Valid @RequestBody DisbursementTenant r) {
         return service.timeout(r.tenantId(), disbursementId);
     }
 }

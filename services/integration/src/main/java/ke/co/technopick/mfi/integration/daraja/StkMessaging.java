@@ -33,6 +33,6 @@ public class StkMessaging {
 
     @Bean
     Binding b2cDisbursementBinding(Queue b2cDisbursementQueue, TopicExchange eventsExchange) {
-        return BindingBuilder.bind(b2cDisbursementQueue).to(eventsExchange).with("MpesaB2cDisbursementApproved.#");
+        return BindingBuilder.bind(b2cDisbursementQueue).to(eventsExchange).with("MpesaDisbursementApproved.#");
     }
 }

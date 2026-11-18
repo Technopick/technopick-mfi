@@ -353,7 +353,7 @@ class DarajaStkIntegrationTest {
     static void publishB2c(String id) {
         owner().update("""
             INSERT INTO messaging.outbox_event (event_id, tenant_id, event_type, aggregate_type, aggregate_id, payload)
-            VALUES (?::uuid, ?::uuid, 'MpesaB2cDisbursementApproved', 'b2c_disbursement', ?, ?::jsonb)
+            VALUES (?::uuid, ?::uuid, 'MpesaDisbursementApproved', 'b2c_disbursement', ?, ?::jsonb)
             """, UUID.randomUUID().toString(), A, id, "{\"disbursementId\":\"" + id + "\",\"shortCode\":\"600000\"}");
     }
 

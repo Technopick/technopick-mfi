@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  *   <li>{@code daraja-stk-result}: persist then acknowledge STK results (idempotent on CheckoutRequestID).</li>
  *   <li>{@code daraja-stk-processor}: timer that applies stored STK results in core, with retries.</li>
  *   <li>{@code daraja-stk-reconciler}: timer that queries Daraja for overdue STK results.</li>
- *   <li>{@code daraja-b2c-dispatch}: consumes {@code MpesaB2cDisbursementApproved} events and sends the payment.</li>
+ *   <li>{@code daraja-b2c-dispatch}: consumes {@code MpesaDisbursementApproved} events and sends the payment.</li>
  *   <li>{@code daraja-b2c-processor}: timer that applies stored B2C results and timeouts in core.</li>
  * </ul>
  */

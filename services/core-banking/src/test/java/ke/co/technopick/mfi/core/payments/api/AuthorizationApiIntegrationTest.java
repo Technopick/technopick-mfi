@@ -745,7 +745,7 @@ class AuthorizationApiIntegrationTest {
         b2c("/" + id + "/approve", null, staff("officer-2", "LOAN_OFFICER"), status().isForbidden());
         assertEquals("APPROVED", JsonPath.read(b2c("/" + id + "/approve", null, staff("sup-1", "SUPERVISOR"), ok), "$.status"));
         String event = owner().queryForObject("""
-                SELECT payload::text FROM messaging.outbox_event WHERE event_type = 'MpesaB2cDisbursementApproved' AND aggregate_id = ?
+                SELECT payload::text FROM messaging.outbox_event WHERE event_type = 'MpesaDisbursementApproved' AND aggregate_id = ?
                 """, String.class, id);
         assertEquals(Boolean.FALSE, event.contains("712345678"), event);
 
