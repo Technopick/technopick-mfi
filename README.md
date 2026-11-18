@@ -43,7 +43,7 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 5)
+## What is verified (2026-11-18, increment 6)
 
 GitHub Actions on `main`: all four jobs green.
 
@@ -52,10 +52,13 @@ GitHub Actions on `main`: all four jobs green.
 | `mvn verify` on JDK 25, `-Xlint:all -Werror` | BUILD SUCCESS | ubuntu-latest and windows-latest |
 | Unit tests (JUnit 5) incl. seeded property tests | 87/87 on each OS | both runners |
 | ArchUnit rules (framework-free domain, no float/double money, no module cycles) | 4/4 | both runners |
-| Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 3 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend | ubuntu (Testcontainers) |
+| Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 5 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend, hold expiry, OpenAPI contract drift | ubuntu (Testcontainers) |
 | Ledger, savings, lending and EOD database rules | 70/70 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
+
+API contract: `shared/contracts/openapi/core-banking-v1.json` (OpenAPI 3.1); CI fails if the
+code and the committed contract diverge.
 
 Not yet verified: jPOS switch, Camel routes, Docker images, running the Windows service
 scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.
