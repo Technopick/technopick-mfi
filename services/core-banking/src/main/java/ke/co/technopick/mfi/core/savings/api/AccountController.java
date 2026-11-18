@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Staff balance enquiry. The tenant comes only from the caller's token, never from the request. */
 @RestController
-@RequestMapping("/api/v1/accounts")
+@RequestMapping(path = "/api/v1/accounts", produces = "application/json")
 public class AccountController {
 
     public record BalanceResponse(String accountNumber, String ledgerBalance, String activeHolds,

@@ -295,7 +295,10 @@ class AuthorizationApiIntegrationTest {
         java.nio.file.Path contract = java.nio.file.Path.of("..", "..", "shared", "contracts", "openapi", "core-banking-v1.json");
         org.junit.jupiter.api.Assertions.assertTrue(java.nio.file.Files.exists(contract),
                 "No committed contract yet: review " + out.toAbsolutePath() + " and copy it to " + contract);
-        assertEquals(java.nio.file.Files.readString(contract, java.nio.charset.StandardCharsets.UTF_8).strip(), live.strip(),
+        // Compared as parsed JSON, so the committed file can be pretty-printed for review.
+        org.springframework.boot.json.JsonParser parser = org.springframework.boot.json.JsonParserFactory.getJsonParser();
+        assertEquals(parser.parseMap(java.nio.file.Files.readString(contract, java.nio.charset.StandardCharsets.UTF_8)),
+                parser.parseMap(live),
                 "API changed: review target/openapi/core-banking-v1.json and update the committed contract");
     }
 }

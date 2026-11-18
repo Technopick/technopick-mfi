@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Money is exchanged as decimal strings, never JSON floating-point numbers.
  */
 @RestController
-@RequestMapping("/api/v1/authorizations")
+@RequestMapping(path = "/api/v1/authorizations", produces = "application/json")
 @PreAuthorize("hasRole('SWITCH')")
 public class AuthorizationController {
 
