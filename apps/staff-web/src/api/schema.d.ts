@@ -155,7 +155,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["B2cDisbursement_pending"];
         put?: never;
         post: operations["B2cDisbursement_create"];
         delete?: never;
@@ -1262,6 +1262,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoanScheduleView"];
+                };
+            };
+        };
+    };
+    B2cDisbursement_pending: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisbursementView"][];
                 };
             };
         };

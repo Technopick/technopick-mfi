@@ -1694,6 +1694,27 @@
       }
     },
     "/api/v1/payments/mpesa/b2c/disbursements": {
+      "get": {
+        "operationId": "B2cDisbursement_pending",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DisbursementView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-disbursement-controller"
+        ]
+      },
       "post": {
         "operationId": "B2cDisbursement_create",
         "requestBody": {
