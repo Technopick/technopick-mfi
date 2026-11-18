@@ -136,7 +136,8 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000002', '0100000002', 'C2', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000003', '0100000003', 'C3', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000004', '0100000004', 'C4', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
-              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000005', '0100000005', 'C5', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000005', '0100000005', 'C5', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000006', '0100000006', 'C6', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
             INSERT INTO payments.mpesa_paybill (tenant_id, short_code, branch_code, gl_clearing, gl_suspense, max_amount)
               VALUES ('%1$s', '600991', 'NBO01', '1120-MPESA-C2B-CLEARING', '2900-SUSPENSE', 150000);
             INSERT INTO payments.channel_config (tenant_id, channel_code, currency, per_txn_max, daily_max,
@@ -512,5 +513,91 @@ class AuthorizationApiIntegrationTest {
         String after = mvc.perform(get("/api/v1/payments/suspense/items").with(staff("sup-1", "SUPERVISOR")))
             .andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals(Boolean.FALSE, after.contains(toAccount) || after.contains(toLoan));
+    }
+
+    String stk(String path, String body, org.springframework.test.web.servlet.request.RequestPostProcessor auth,
+               org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mvc.perform(post("/api/v1/payments/mpesa/stk-requests" + path).with(auth)
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    static String stkCreate(String key, String phone, String amount, String target) {
+        return """
+            {"idempotencyKey":"%s","phoneNumber":"%s","amount":"%s","targetReference":"%s"}
+            """.formatted(key, phone, amount, target);
+    }
+
+    static String stkResult(String checkout, String code, String receipt, String amount) {
+        return """
+            {"tenantId":"%s","checkoutRequestId":"%s","merchantRequestId":"m-%s","resultCode":"%s","resultDesc":"test",
+             "receipt":%s,"amount":%s,"transactionTime":"2026-11-18T11:00:00+03:00"}
+            """.formatted(TENANT_A, checkout, checkout, code, receipt == null ? "null" : "\"" + receipt + "\"",
+                amount == null ? "null" : "\"" + amount + "\"");
+    }
+
+    /** STK Push: staff request, single dispatch, provider result applied once across STK and C2B. */
+    @Test
+    void mpesaStkPushLifecycle() throws Exception {
+        var ok = status().isOk();
+        var bad = status().isBadRequest();
+        stk("", stkCreate("stk-bad-1", "0712345678", "500.50", "0100000006"), teller(TENANT_A), bad);
+        stk("", stkCreate("stk-bad-2", "12345", "500", "0100000006"), teller(TENANT_A), bad);
+        stk("", stkCreate("stk-bad-3", "0712345678", "500", "NOPE"), teller(TENANT_A), bad);
+        stk("", stkCreate("stk-bad-4", "0712345678", "500", "0100000006"), integrationToken(), status().isForbidden());
+
+        String created = stk("", stkCreate("stk-1", "+254 712 345 678", "500", "0100000006"), teller(TENANT_A), ok);
+        String id = JsonPath.read(created, "$.requestId");
+        assertEquals("PENDING", JsonPath.read(created, "$.status"));
+        String replay = stk("", stkCreate("stk-1", "0712345678", "500.00", "0100000006"), teller(TENANT_A), ok);
+        assertEquals(id, JsonPath.read(replay, "$.requestId"));
+        assertEquals(Boolean.TRUE, JsonPath.read(replay, "$.replayed"));
+        stk("", stkCreate("stk-1", "0712345678", "600", "0100000006"), teller(TENANT_A), status().isConflict());
+        // The event carries no phone number.
+        String event = owner().queryForObject("""
+                SELECT payload::text FROM messaging.outbox_event WHERE event_type = 'MpesaStkPushRequested' AND aggregate_id = ?
+                """, String.class, id);
+        assertEquals(Boolean.FALSE, event.contains("712345678") || event.contains("phone"), event);
+
+        String tenantBody = "{\"tenantId\":\"" + TENANT_A + "\"}";
+        stk("/" + id + "/dispatch", tenantBody, teller(TENANT_A), status().isForbidden());
+        String dispatch = stk("/" + id + "/dispatch", tenantBody, integrationToken(), ok);
+        assertEquals("254712345678", JsonPath.read(dispatch, "$.msisdn"));
+        assertEquals("500", JsonPath.read(dispatch, "$.amount"));
+        assertEquals("0100000006", JsonPath.read(dispatch, "$.accountReference"));
+        stk("/" + id + "/dispatch", tenantBody, integrationToken(), status().isConflict()); // sent at most once
+
+        String submitted = "{\"tenantId\":\"" + TENANT_A + "\",\"merchantRequestId\":\"m-ws_CO_1\",\"checkoutRequestId\":\"ws_CO_1\"}";
+        assertEquals("SUBMITTED", JsonPath.read(stk("/" + id + "/submitted", submitted, integrationToken(), ok), "$.status"));
+        stk("/" + id + "/submitted", submitted, integrationToken(), ok); // repeat is harmless
+        stk("/" + id + "/result", stkResult("ws_CO_other", "0", "SIMSTK0001", "500.00"), integrationToken(), status().isConflict());
+
+        String done = stk("/" + id + "/result", stkResult("ws_CO_1", "0", "SIMSTK0001", "500.00"), integrationToken(), ok);
+        assertEquals("COMPLETED", JsonPath.read(done, "$.status"));
+        assertEquals("2547*****678", JsonPath.read(done, "$.msisdnMasked"));
+        expectBalance("0100000006", "500.00", "0.00", "500.00");
+        stk("/" + id + "/result", stkResult("ws_CO_1", "0", "SIMSTK0001", "500.00"), integrationToken(), ok);
+        // Safaricom may also report the same receipt as a C2B confirmation: replayed, not credited twice.
+        String c2bSame = c2b("", confirmation("SIMSTK0001", "0100000006", "500.00"), integrationToken(), ok);
+        assertEquals(Boolean.TRUE, JsonPath.read(c2bSame, "$.replayed"));
+        expectBalance("0100000006", "500.00", "0.00", "500.00");
+        assertEquals(null, owner().queryForObject("SELECT msisdn FROM payments.stk_request WHERE request_id = ?::uuid",
+                String.class, id));
+        assertEquals("MPESA_STK", owner().queryForObject(
+                "SELECT provider FROM payments.provider_payment WHERE provider_ref = 'SIMSTK0001'", String.class));
+
+        // Cancelled by the customer: no money, request FAILED with the provider's code.
+        String id2 = JsonPath.read(stk("", stkCreate("stk-2", "0112345678", "1000", "LN-000001"), teller(TENANT_A), ok), "$.requestId");
+        stk("/" + id2 + "/dispatch", tenantBody, integrationToken(), ok);
+        // Result arrives before the integration runtime reported the submission (callback race).
+        String failed = stk("/" + id2 + "/result", stkResult("ws_CO_2", "1032", null, null), integrationToken(), ok);
+        assertEquals("FAILED", JsonPath.read(failed, "$.status"));
+        assertEquals("1032", JsonPath.read(failed, "$.resultCode"));
+        assertEquals("ws_CO_2", JsonPath.read(failed, "$.checkoutRequestId"));
+        stk("/" + id2 + "/submitted", "{\"tenantId\":\"" + TENANT_A + "\",\"checkoutRequestId\":\"ws_CO_2\"}", integrationToken(), ok);
+        assertEquals("FAILED", JsonPath.read(mvc.perform(get("/api/v1/payments/mpesa/stk-requests/" + id2).with(teller(TENANT_A)))
+            .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.status"));
+        // Another tenant's staff cannot see it.
+        mvc.perform(get("/api/v1/payments/mpesa/stk-requests/" + id2).with(teller(TENANT_B))).andExpect(status().isNotFound());
     }
 }

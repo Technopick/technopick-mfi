@@ -18,6 +18,7 @@
   <modules>
     <module>shared/canonical-model</module>
     <module>services/core-banking</module>
+    <module>simulators/daraja-simulator</module>
     <module>services/integration</module>
   </modules>
 

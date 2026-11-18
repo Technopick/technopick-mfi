@@ -40,6 +40,16 @@ mfi:
     # confirmation then credits the account or, if the reference is unknown, suspense.
     validation-on-error: ${MFI_DARAJA_VALIDATION_ON_ERROR:ACCEPT}
     processor-enabled: ${MFI_DARAJA_PROCESSOR_ENABLED:true}
+    # STK Push (ADR-0011). base-url: Daraja sandbox or production, https only; consumer key/secret
+    # and each paybill's passkey come from the secret store.
+    base-url: ${MFI_DARAJA_BASE_URL:}
+    consumer-key: ${MFI_DARAJA_CONSUMER_KEY:}
+    consumer-secret: ${MFI_DARAJA_CONSUMER_SECRET:}
+    # Public https URL Safaricom calls back on, e.g. https://integration.example.co.ke
+    callback-base-url: ${MFI_DARAJA_CALLBACK_BASE_URL:}
+    allow-insecure-test-endpoint: false
+    stk-consumer-enabled: ${MFI_DARAJA_STK_CONSUMER_ENABLED:true}
+    stk-queue: mfi.integration.mpesa-stk-requests
     process-interval-ms: 2000
     max-attempts: 10
     retry-backoff: PT30S

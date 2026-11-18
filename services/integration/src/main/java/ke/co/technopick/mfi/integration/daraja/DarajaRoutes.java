@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
  *       breaker with a 3 s timeout (Daraja waits only briefly); fallback per configuration.</li>
  *   <li>{@code daraja-c2b-confirmation}: persist then acknowledge (idempotent consumer on TransID).</li>
  *   <li>{@code daraja-c2b-processor}: timer that applies stored confirmations in core, with retries.</li>
+ *   <li>{@code daraja-stk-dispatch}: consumes {@code MpesaStkPushRequested} events and sends the prompt.</li>
+ *   <li>{@code daraja-stk-result}: persist then acknowledge STK results (idempotent on CheckoutRequestID).</li>
+ *   <li>{@code daraja-stk-processor}: timer that applies stored STK results in core, with retries.</li>
  * </ul>
  */
 @Component
@@ -21,10 +24,16 @@ public class DarajaRoutes extends RouteBuilder {
 
     private final CoreClient core;
     private final DarajaProperties props;
+    private final StkDispatcher stkDispatcher;
 
-    public DarajaRoutes(CoreClient core, DarajaProperties props) {
+    public DarajaRoutes(CoreClient core, DarajaProperties props, StkDispatcher stkDispatcher) {
         this.core = core;
         this.props = props;
+        this.stkDispatcher = stkDispatcher;
+    }
+
+    private StkDispatcher dispatcher() {
+        return stkDispatcher;
     }
 
     @Override
@@ -46,6 +55,25 @@ public class DarajaRoutes extends RouteBuilder {
             .routeId("daraja-c2b-processor")
             .autoStartup("{{mfi.daraja.processor-enabled}}")
             .bean(C2bCallbackProcessor.class, "processPending");
+
+        // STK Push: requests arrive as outbox events (at-least-once); results as stored callbacks.
+        // Queue and binding are declared by StkMessaging (Spring AMQP), not by the endpoint.
+        from("spring-rabbitmq:{{mfi.outbox.exchange}}?queues={{mfi.daraja.stk-queue}}&autoDeclare=false"
+                + "&concurrentConsumers=2")
+            .routeId("daraja-stk-dispatch")
+            .autoStartup("{{mfi.daraja.stk-consumer-enabled}}")
+            .errorHandler(defaultErrorHandler().maximumRedeliveries(5).redeliveryDelay(2000).useExponentialBackOff())
+            .process(e -> e.getMessage().setBody(dispatcher().dispatch(e.getMessage().getBody(String.class),
+                    e.getMessage().getHeader("mfiTenantId", String.class)).name()));
+
+        from("direct:daraja-stk-result")
+            .routeId("daraja-stk-result")
+            .bean(StkCallbackStore.class, "store");
+
+        from("timer:daraja-stk-processor?period={{mfi.daraja.process-interval-ms}}&delay=2000")
+            .routeId("daraja-stk-processor")
+            .autoStartup("{{mfi.daraja.processor-enabled}}")
+            .bean(StkResultProcessor.class, "processPending");
     }
 
     private Map<String, Object> validateInCore(C2bCallback c) {

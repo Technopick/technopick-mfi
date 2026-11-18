@@ -97,6 +97,19 @@ public class MpesaC2bService {
 
     @Transactional
     public Applied apply(C2bPayment p) {
+        return applyReceipt(p, "MPESA_C2B");
+    }
+
+    /**
+     * Applies one M-Pesa receipt exactly once per tenant, whichever channel reports it: a C2B
+     * confirmation ({@code MPESA_C2B}) or an STK Push result ({@code MPESA_STK}). A receipt already
+     * applied through either channel is returned as a replay (database index K1 backs this up).
+     */
+    @Transactional
+    public Applied applyReceipt(C2bPayment p, String provider) {
+        if (!"MPESA_C2B".equals(provider) && !"MPESA_STK".equals(provider)) {
+            throw new IllegalArgumentException("unknown M-Pesa channel " + provider);
+        }
         session.bind(p.tenantId());
         Optional<Applied> existing = existing(p.transId());
         if (existing.isPresent()) {
@@ -109,12 +122,12 @@ public class MpesaC2bService {
         }
         Optional<Account> account = account(p.billRef()).filter(MpesaC2bService::acceptsCredits);
         Optional<LoanRepaymentService.LoanRef> loan = account.isPresent() ? Optional.empty() : activeLoan(p.billRef());
-        String key = "mpesa-c2b:" + p.transId();
+        String key = ("MPESA_C2B".equals(provider) ? "mpesa-c2b:" : "mpesa-stk:") + p.transId();
         UUID paymentId = UUID.nameUUIDFromBytes((p.tenantId() + "|payment|" + key).getBytes(StandardCharsets.UTF_8));
         UUID entryId;
         Outcome outcome;
         if (loan.isPresent()) {
-            LoanRepaymentService.Result r = loans.apply(p.tenantId(), loan.get().loanId(), p.amount(), "MPESA_C2B",
+            LoanRepaymentService.Result r = loans.apply(p.tenantId(), loan.get().loanId(), p.amount(), provider,
                     p.transId(), paybill.glClearing(), businessDates.current(), p.correlationId(), "provider:mpesa");
             entryId = r.journalEntryId();
             outcome = Outcome.LOAN_REPAYMENT;
@@ -132,11 +145,12 @@ public class MpesaC2bService {
         jdbc.sql("""
                 INSERT INTO payments.provider_payment (tenant_id, payment_id, provider, provider_ref, short_code, amount,
                     currency, bill_ref, msisdn_masked, provider_time, status, deposit_account_id, loan_id, journal_entry_id)
-                VALUES (:tenant, :id, 'MPESA_C2B', :ref, :shortCode, :amount, :ccy, :billRef, :msisdn, :time, :status,
+                VALUES (:tenant, :id, :provider, :ref, :shortCode, :amount, :ccy, :billRef, :msisdn, :time, :status,
                     :account, :loan, :entry)
                 """)
             .param("tenant", p.tenantId())
             .param("id", paymentId)
+            .param("provider", provider)
             .param("ref", p.transId())
             .param("shortCode", p.shortCode())
             .param("amount", p.amount().amount())
@@ -150,8 +164,8 @@ public class MpesaC2bService {
             .param("entry", entryId)
             .update();
         outbox.record(p.tenantId(), "MpesaPaymentReceived", "provider_payment", paymentId.toString(),
-                "{\"paymentId\":\"%s\",\"transId\":\"%s\",\"outcome\":\"%s\",\"amount\":\"%s\",\"currency\":\"%s\"%s}"
-                        .formatted(paymentId, p.transId(), outcome, p.amount().amount().toPlainString(),
+                "{\"paymentId\":\"%s\",\"channel\":\"%s\",\"transId\":\"%s\",\"outcome\":\"%s\",\"amount\":\"%s\",\"currency\":\"%s\"%s}"
+                        .formatted(paymentId, provider, p.transId(), outcome, p.amount().amount().toPlainString(),
                                 p.amount().currency().getCurrencyCode(),
                                 account.map(a -> ",\"accountId\":\"" + a.accountId() + "\"")
                                         .or(() -> loan.map(l -> ",\"loanId\":\"" + l.loanId() + "\""))
@@ -168,7 +182,7 @@ public class MpesaC2bService {
                   FROM payments.provider_payment p
                   LEFT JOIN savings.deposit_account a ON a.tenant_id = p.tenant_id AND a.account_id = p.deposit_account_id
                   LEFT JOIN lending.loan l ON l.tenant_id = p.tenant_id AND l.loan_id = p.loan_id
-                 WHERE p.provider = 'MPESA_C2B' AND p.provider_ref = :ref
+                 WHERE p.provider IN ('MPESA_C2B', 'MPESA_STK') AND p.provider_ref = :ref
                 """)
             .param("ref", transId)
             .query((rs, n) -> new Applied(rs.getObject("payment_id", UUID.class), Outcome.valueOf(rs.getString("status")),
