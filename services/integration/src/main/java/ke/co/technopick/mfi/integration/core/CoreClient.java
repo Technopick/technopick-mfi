@@ -24,9 +24,9 @@ public class CoreClient {
     private String token;
     private Instant tokenExpires = Instant.EPOCH;
 
-    public CoreClient(CoreProperties props, RestClient.Builder builder) {
+    public CoreClient(CoreProperties props) {
         this.props = props;
-        this.http = builder.build();
+        this.http = RestClient.builder().build();
     }
 
     public Map<String, Object> post(String path, Map<String, Object> body) {
