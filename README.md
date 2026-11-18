@@ -43,7 +43,7 @@ docker compose -f infrastructure/docker/docker-compose.yml up -d
 Windows Server service install (per deployable): see
 `infrastructure/scripts/powershell/Install-MfiService.ps1` and ADR-0005.
 
-## What is verified (2026-11-18, increment 7)
+## What is verified (2026-11-18, increment 8)
 
 GitHub Actions on `main`: all four jobs green.
 
@@ -52,7 +52,8 @@ GitHub Actions on `main`: all four jobs green.
 | `mvn verify` on JDK 25, `-Xlint:all -Werror` | BUILD SUCCESS | ubuntu-latest and windows-latest |
 | Unit tests (JUnit 5) incl. seeded property tests | 87/87 on each OS | both runners |
 | ArchUnit rules (framework-free domain, no float/double money, no module cycles) | 4/4 | both runners |
-| Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 5 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend, hold expiry, OpenAPI contract drift | ubuntu (Testcontainers) |
+| Spring Boot 4 application end to end (HTTP, security, service, JDBC, PostgreSQL 17 with RLS) | 6 integration tests pass: lifecycle, auth/roles, 10-way concurrent overspend, hold expiry, OpenAPI contract drift | ubuntu (Testcontainers) |
+| M-Pesa C2B: Daraja callbacks (token + source range auth, store-then-ack, retries, dead letters) and core application (exactly once, suspense when unmatched) | core: 1 end-to-end test; integration: 3 tests | ubuntu (Testcontainers + stub core) |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
 | Ledger, savings, lending and EOD database rules | 70/70 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
@@ -61,7 +62,7 @@ GitHub Actions on `main`: all four jobs green.
 API contract: `shared/contracts/openapi/core-banking-v1.json` (OpenAPI 3.1); CI fails if the
 code and the committed contract diverge.
 
-Not yet verified: jPOS switch, provider Camel routes (Daraja, banks, CRB, SMS), Docker images, running the Windows service
+Not yet verified: jPOS switch, Daraja STK Push / B2C and sandbox certification, bank/CRB/SMS routes, Docker images, running the Windows service
 scripts on Windows Server, real OIDC provider (tests use mock JWTs), load tests.
 
 ## Non-negotiables
