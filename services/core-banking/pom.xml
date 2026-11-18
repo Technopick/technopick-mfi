@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>ke.co.technopick.mfi</groupId>
+    <artifactId>technopick-mfi-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>core-banking</artifactId>
+  <name>Core banking (modular monolith)</name>
+
+  <!--
+    Phase 1, increment 1: pure-Java domain (accounting, lending) + Flyway migrations.
+    Spring Boot starters (web, security/oauth2-resource-server, data-jpa, validation,
+    actuator, modulith) are added in increment 2 together with the application shell,
+    so that every dependency added is exercised by a test in the same change.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>ke.co.technopick.mfi</groupId>
+      <artifactId>canonical-model</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

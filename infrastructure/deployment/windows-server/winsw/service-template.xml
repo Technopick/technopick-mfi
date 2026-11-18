@@ -1,0 +1,33 @@
+<!--
+  WinSW service definition template for one Technopick deployable.
+  Tokens (@@...@@) are filled by infrastructure/scripts/powershell/Install-MfiService.ps1.
+  One JAR per service; the same JAR as the Linux container image (ADR-0005).
+-->
+<service>
+  <id>@@SERVICE_ID@@</id>
+  <name>@@DISPLAY_NAME@@</name>
+  <description>Technopick MFI platform - @@SERVICE_ID@@</description>
+
+  <executable>@@JAVA_HOME@@\bin\java.exe</executable>
+  <arguments>@@JVM_OPTS@@ -Dfile.encoding=UTF-8 -Duser.timezone=UTC -jar "@@INSTALL_DIR@@\app\@@JAR_NAME@@" --spring.config.additional-location=optional:file:@@CONFIG_DIR@@/</arguments>
+  <workingdirectory>@@INSTALL_DIR@@</workingdirectory>
+
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  @@DEPENDS@@
+
+  <!-- Graceful shutdown: Spring Boot handles SIGTERM-equivalent via stoptimeout. -->
+  <stoptimeout>60 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="none"/>
+  <resetfailure>1 hour</resetfailure>
+
+  <logpath>@@LOG_DIR@@</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>20</keepFiles>
+  </log>
+
+  @@SERVICE_ACCOUNT@@
+</service>

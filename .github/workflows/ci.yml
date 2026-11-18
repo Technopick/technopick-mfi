@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build-test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Build and unit tests
+        run: mvn -B -ntp verify
+
+  ledger-db-tests:
+    name: ledger database invariants (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mfi_owner
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mfi_owner" --health-interval 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGUSER: mfi_owner
+      PGPASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install btree_gist in template
+        run: psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS btree_gist"
+      - name: Run ledger invariant tests
+        run: bash services/core-banking/src/test/sql/run-ledger-db-tests.sh
+
+  windows-packaging:
+    name: Windows service packaging smoke test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PowerShell scripts parse
+        shell: pwsh
+        run: |
+          Get-ChildItem infrastructure/scripts/powershell -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $errors; throw "Parse errors in $($_.Name)" }
+            Write-Host "OK $($_.Name)"
+          }

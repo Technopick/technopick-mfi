@@ -1,0 +1,9 @@
+# Normalise line endings so Linux and Windows builds see identical sources (brief 11.1).
+* text=auto eol=lf
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.jar   binary
+*.p12   binary
+*.png   binary

@@ -1,0 +1,15 @@
+target/
+build/
+*.class
+.idea/
+*.iml
+.vscode/
+node_modules/
+.env
+.env.*
+*.p12
+*.jks
+*.pem
+*.key
+application-local.yml
+/infrastructure/docker/.data/

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Runs the ledger database invariant tests against a throwaway PostgreSQL database.
+#
+# Usage: run-ledger-db-tests.sh
+# Env:   PGHOST, PGPORT, PGUSER  admin connection (able to CREATE DATABASE and CREATE ROLE)
+#        MFI_APP_HOST           host the app role connects through (default: PGHOST or localhost)
+#        MFI_TEST_APP_PASSWORD (optional; a random one is generated if unset)
+#
+# In CI this runs against a PostgreSQL service container; Testcontainers-based JUnit
+# tests will wrap the same SQL once the networked build is available.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MIGRATIONS="$HERE/../../main/resources/db/migration"
+DB="mfi_ledger_test_$$"
+APP_PW="${MFI_TEST_APP_PASSWORD:-$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')}"
+
+cleanup() {
+  psql -v ON_ERROR_STOP=0 -q -d postgres -c "DROP DATABASE IF EXISTS $DB" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+psql -v ON_ERROR_STOP=1 -q -d postgres <<SQL
+DO \$\$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mfi_app') THEN
+    CREATE ROLE mfi_app LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+  END IF;
+END \$\$;
+ALTER ROLE mfi_app PASSWORD '$APP_PW';
+CREATE DATABASE $DB;
+SQL
+
+echo "== applying migrations to $DB"
+for f in $(ls "$MIGRATIONS"/V*__*.sql | sort -V); do
+  echo "   $(basename "$f")"
+  psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$f"
+done
+
+echo "== seeding tenants (platform administration, as owner)"
+psql -v ON_ERROR_STOP=1 -q -d "$DB" <<'SQL'
+INSERT INTO tenancy.tenant (tenant_id, code, legal_name, licence_type, deposits_allowed, base_currency) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', 'TEST-MFB-A', 'TEST ONLY Microfinance Bank A', 'MICROFINANCE_BANK', true, 'KES'),
+ ('00000000-0000-0000-0000-0000000000b2', 'TEST-SACCO-B', 'TEST ONLY Sacco B', 'DEPOSIT_TAKING_SACCO', true, 'KES');
+SQL
+
+echo "== invariant tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/ledger_invariants_test.sql"
+
+echo "== immutability tests as schema owner"
+psql -d "$DB" -f "$HERE/owner_immutability_test.sql"
+echo "== done"
