@@ -28,6 +28,7 @@
     <spring-boot.version>4.1.1</spring-boot.version>
     <camel.version>4.22.2</camel.version>
     <jpos.version>3.0.2</jpos.version>
+    <springdoc.version>3.1.1</springdoc.version>
     <assertj.version>3.27.6</assertj.version>
     <jqwik.version>1.9.3</jqwik.version>
     <archunit.version>1.4.1</archunit.version>
@@ -54,6 +55,11 @@
         <version>${camel.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+        <version>${springdoc.version}</version>
       </dependency>
       <dependency>
         <groupId>org.jpos</groupId>

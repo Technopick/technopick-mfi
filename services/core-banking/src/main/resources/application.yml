@@ -44,7 +44,18 @@ management:
       show-details: never
 
 mfi:
+  jobs:
+    # Background jobs (hold expiry). Disabled in tests that drive jobs directly.
+    enabled: ${MFI_JOBS_ENABLED:true}
+    hold-expiry-interval: ${MFI_HOLD_EXPIRY_INTERVAL:PT1M}
   security:
     # JWT claim carrying the caller's tenant for staff and customer tokens.
     tenant-claim: tenant_id
     roles-claim: roles
+
+# OpenAPI document: off unless explicitly enabled; when on, only PLATFORM_ADMIN may read it.
+# The reviewed contract lives in shared/contracts/openapi/core-banking-v1.json.
+springdoc:
+  api-docs:
+    enabled: ${MFI_API_DOCS_ENABLED:false}
+  writer-with-order-by-keys: true

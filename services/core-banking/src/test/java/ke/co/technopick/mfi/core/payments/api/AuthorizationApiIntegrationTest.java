@@ -62,6 +62,8 @@ class AuthorizationApiIntegrationTest {
         r.add("spring.flyway.url", PG::getJdbcUrl);
         r.add("spring.flyway.user", PG::getUsername);
         r.add("spring.flyway.password", PG::getPassword);
+        r.add("mfi.jobs.enabled", () -> "false");          // jobs are driven directly in tests
+        r.add("springdoc.api-docs.enabled", () -> "true");  // for the contract drift check
     }
 
     /** Real tokens are never decoded in tests: requests carry a mock JWT via jwt(). */
@@ -77,6 +79,9 @@ class AuthorizationApiIntegrationTest {
 
     @Autowired
     WebApplicationContext context;
+
+    @Autowired
+    ke.co.technopick.mfi.core.savings.application.HoldExpiryService holdExpiry;
 
     MockMvc mvc;
     static boolean seeded;
@@ -114,7 +119,8 @@ class AuthorizationApiIntegrationTest {
             INSERT INTO savings.deposit_account (tenant_id, account_id, account_number, customer_ref, product_code, currency,
                 branch_code, gl_control_account, opened_on) VALUES
               ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000001', '0100000001', 'C1', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
-              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000002', '0100000002', 'C2', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000002', '0100000002', 'C2', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01'),
+              ('%1$s', 'aaaaaaaa-0000-0000-0000-000000000003', '0100000003', 'C3', 'SAV01', 'KES', 'NBO01', '2110-SAVINGS-CONTROL', '2026-11-01');
             INSERT INTO payments.channel_config (tenant_id, channel_code, currency, per_txn_max, daily_max,
                 gl_settlement_account, gl_fee_income) VALUES
               ('%1$s', 'AGENT', 'KES', 70000, 150000, '2300-AGENT-FLOAT-PAYABLE', '4200-FEE-WITHDRAWAL');
@@ -122,9 +128,10 @@ class AuthorizationApiIntegrationTest {
             INSERT INTO ledger.journal_entry (tenant_id, entry_id, idempotency_key, business_date, source, correlation_id, actor)
               VALUES ('%1$s', '44444444-0000-0000-0000-000000000001', 'seed-deposits', '2026-11-18', 'TELLER', 'seed', 'test');
             INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, side, amount, currency, branch_code, subledger_account_id) VALUES
-              ('%1$s', '44444444-0000-0000-0000-000000000001', 1, '1000-VAULT-CASH', 'D', 11000, 'KES', 'NBO01', NULL),
+              ('%1$s', '44444444-0000-0000-0000-000000000001', 1, '1000-VAULT-CASH', 'D', 11500, 'KES', 'NBO01', NULL),
               ('%1$s', '44444444-0000-0000-0000-000000000001', 2, '2110-SAVINGS-CONTROL', 'C', 10000, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000001'),
-              ('%1$s', '44444444-0000-0000-0000-000000000001', 3, '2110-SAVINGS-CONTROL', 'C', 1000, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000002');
+              ('%1$s', '44444444-0000-0000-0000-000000000001', 3, '2110-SAVINGS-CONTROL', 'C', 1000, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000002'),
+              ('%1$s', '44444444-0000-0000-0000-000000000001', 4, '2110-SAVINGS-CONTROL', 'C', 500, 'KES', 'NBO01', 'aaaaaaaa-0000-0000-0000-000000000003');
             COMMIT;
             """.formatted(TENANT_A, TENANT_B));
     }
@@ -251,5 +258,44 @@ class AuthorizationApiIntegrationTest {
                 "SELECT sum(amount) FROM savings.account_hold WHERE account_id = 'aaaaaaaa-0000-0000-0000-000000000002' AND status = 'ACTIVE'",
                 BigDecimal.class);
         assertEquals(0, new BigDecimal("700").compareTo(held));
+    }
+
+    /** Due holds expire exactly once; holds not yet due are untouched; funds come back. */
+    @Test
+    void holdExpiryReleasesOnlyDueHolds() throws Exception {
+        owner().execute("""
+            INSERT INTO savings.account_hold (tenant_id, hold_id, account_id, kind, amount, currency, idempotency_key, expires_at) VALUES
+              ('%1$s', 'eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000003', 'AUTHORIZATION', 100, 'KES', 'exp-due', now() - interval '1 minute'),
+              ('%1$s', 'eeeeeeee-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 'AUTHORIZATION', 50, 'KES', 'exp-later', now() + interval '1 day');
+            """.formatted(TENANT_A));
+        expectBalance("0100000003", "500.00", "150.00", "350.00");
+        assertEquals(true, holdExpiry.activeTenants().contains(java.util.UUID.fromString(TENANT_A)));
+        assertEquals(1, holdExpiry.expireDue(java.util.UUID.fromString(TENANT_A)));
+        assertEquals(0, holdExpiry.expireDue(java.util.UUID.fromString(TENANT_A)));
+        expectBalance("0100000003", "500.00", "50.00", "450.00");
+        assertEquals("EXPIRED", owner().queryForObject(
+                "SELECT status FROM savings.account_hold WHERE hold_id = 'eeeeeeee-0000-0000-0000-000000000001'", String.class));
+        assertEquals("ACTIVE", owner().queryForObject(
+                "SELECT status FROM savings.account_hold WHERE hold_id = 'eeeeeeee-0000-0000-0000-000000000002'", String.class));
+    }
+
+    /**
+     * The live OpenAPI document must equal the reviewed contract in shared/contracts. The
+     * generated document is always written to target/openapi so a change can be reviewed and
+     * committed deliberately.
+     */
+    @Test
+    void openApiMatchesCommittedContract() throws Exception {
+        mvc.perform(get("/v3/api-docs").with(teller(TENANT_A))).andExpect(status().isForbidden());
+        String live = mvc.perform(get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        java.nio.file.Path out = java.nio.file.Path.of("target", "openapi", "core-banking-v1.json");
+        java.nio.file.Files.createDirectories(out.getParent());
+        java.nio.file.Files.writeString(out, live, java.nio.charset.StandardCharsets.UTF_8);
+        java.nio.file.Path contract = java.nio.file.Path.of("..", "..", "shared", "contracts", "openapi", "core-banking-v1.json");
+        org.junit.jupiter.api.Assertions.assertTrue(java.nio.file.Files.exists(contract),
+                "No committed contract yet: review " + out.toAbsolutePath() + " and copy it to " + contract);
+        assertEquals(java.nio.file.Files.readString(contract, java.nio.charset.StandardCharsets.UTF_8).strip(), live.strip(),
+                "API changed: review target/openapi/core-banking-v1.json and update the committed contract");
     }
 }

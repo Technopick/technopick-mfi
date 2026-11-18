@@ -27,6 +27,13 @@ jobs:
         shell: bash
         # Container-based integration tests need Linux containers: they run on ubuntu only.
         run: mvn -B -ntp verify ${{ matrix.os == 'windows-latest' && '-Dsurefire.excludedGroups=integration' || '' }}
+      - name: Upload generated OpenAPI document
+        if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v5
+        with:
+          name: openapi
+          path: services/core-banking/target/openapi/
+          if-no-files-found: ignore
 
   ledger-db-tests:
     name: ledger database invariants (PostgreSQL)
