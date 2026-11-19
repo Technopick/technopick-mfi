@@ -70,6 +70,22 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== Customer and KYC tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/customer_test.sql"
 
+echo "== teller configuration (platform administration, as owner)"
+psql -v ON_ERROR_STOP=1 -q -d "$DB" <<'SQL'
+INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', '2111-TEST-SAVINGS', 'TEST savings control', 'LIABILITY', 'KES', true),
+ ('00000000-0000-0000-0000-0000000000a1', '1001-TEST-CASH', 'TEST branch cash', 'ASSET', 'KES', false);
+INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', 'SAVT', 'TEST savings', 'KES', '2111-TEST-SAVINGS');
+INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', 'NBO01', 'KES', '1001-TEST-CASH');
+INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', 'KES', 50000, 1000000);
+SQL
+
+echo "== savings accounts and teller tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/savings_teller_test.sql"
+
 echo "== Loan origination tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/loan_origination_test.sql"
 

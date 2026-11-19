@@ -213,6 +213,10 @@ class AuthorizationApiIntegrationTest {
             BEGIN;
             INSERT INTO payments.mpesa_b2c_account (tenant_id, short_code, branch_code, gl_clearing)
               VALUES ('%1$s', '600000', 'NBO01', '1110-MPESA-B2C-CLEARING');
+            INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash)
+              VALUES ('%1$s', 'NBO01', 'KES', '1000-VAULT-CASH');
+            INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above)
+              VALUES ('%1$s', 'KES', 50000, 1000000);
             INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency,
                 principal, term_months, created_by, approved_by) VALUES
               ('%1$s', 'bbbbbbbb-0000-0000-0000-000000000003', 'LN-000003', 'C3', 'cccccccc-0000-0000-0000-000000000001', 'NBO01', 'KES', 100000, 12, 'test:officer', 'test:manager'),
@@ -1047,5 +1051,90 @@ class AuthorizationApiIntegrationTest {
         // Nothing is due before 18 Dec, so today's payment is held as an overpayment (policy pending, ADR-0010).
         assertEquals(0, new BigDecimal("9455.96").compareTo(owner().queryForObject(
                 "SELECT unallocated FROM lending.repayment WHERE provider_ref = 'SIMORIGP01'", BigDecimal.class)));
+    }
+
+    String cashTxn(String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,
+                  org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mvc.perform(post("/api/v1/savings/teller/transactions").with(who).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(expected).andReturn().getResponse().getContentAsString();
+    }
+
+    static String cash(String key, String account, String kind, String amount) {
+        return """
+            {"idempotencyKey":"%s","accountNumber":"%s","kind":"%s","amount":"%s","narrative":"%s at counter"}
+            """.formatted(key, account, kind, amount, kind.toLowerCase());
+    }
+
+    /** Savings for a verified customer: open, teller cash in and out, large withdrawal approved by another person, statement. */
+    @Test
+    void savingsAccountAndTeller() throws Exception {
+        var ok = status().isOk();
+        var tellerUser = staff("teller-1", "TELLER");
+        String customer = registerAndVerify("sav-c", "44556677");
+        String opened = mvc.perform(post("/api/v1/savings/accounts").with(tellerUser).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"sav-open-1\",\"customerNumber\":\"" + customer + "\",\"productCode\":\"sav01\",\"branchCode\":\"NBO01\"}"))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        String account = JsonPath.read(opened, "$.accountNumber");
+        assertEquals(Boolean.TRUE, account.matches("^2\\d{9}$"), account);
+        // An unverified customer cannot open an account.
+        String pendingCustomer = JsonPath.read(mvc.perform(post("/api/v1/customers").with(staff("officer-1", "LOAN_OFFICER"))
+                .contentType(MediaType.APPLICATION_JSON).content(customerJson("sav-p", "44556678", "1990-01-01", true)))
+            .andReturn().getResponse().getContentAsString(), "$.customerNumber");
+        mvc.perform(post("/api/v1/savings/accounts").with(tellerUser).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"sav-open-2\",\"customerNumber\":\"" + pendingCustomer + "\",\"productCode\":\"SAV01\",\"branchCode\":\"NBO01\"}"))
+            .andExpect(status().isBadRequest());
+
+        assertEquals("POSTED", JsonPath.read(cashTxn(cash("t-dep-1", account, "DEPOSIT", "100000"), tellerUser, ok), "$.status"));
+        assertEquals(Boolean.TRUE, JsonPath.read(cashTxn(cash("t-dep-1", account, "DEPOSIT", "100000"), tellerUser, ok), "$.replayed"));
+        cashTxn(cash("t-dep-1", account, "DEPOSIT", "5"), tellerUser, status().isConflict());
+        assertEquals("POSTED", JsonPath.read(cashTxn(cash("t-wd-1", account, "WITHDRAWAL", "20000.50"), tellerUser, ok), "$.status"));
+        cashTxn(cash("t-wd-x", account, "WITHDRAWAL", "90000"), tellerUser, status().isBadRequest()); // more than available
+        cashTxn(cash("t-wd-y", account, "WITHDRAWAL", "10"), staff("ops-1", "OPERATIONS"), status().isForbidden());
+
+        // 60,000 is above the 50,000 policy: waits for a different person.
+        String big = cashTxn(cash("t-wd-2", account, "WITHDRAWAL", "60000"), tellerUser, ok);
+        assertEquals("PENDING_APPROVAL", JsonPath.read(big, "$.status"));
+        String bigId = JsonPath.read(big, "$.txnId");
+        expectBalance(account, "79999.50", "0.00", "79999.50");
+        mvc.perform(post("/api/v1/savings/teller/transactions/" + bigId + "/approve")
+                .with(jwt().jwt(j -> j.subject("teller-1").claim("tenant_id", TENANT_A))
+                    .authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))
+            .andExpect(status().isForbidden()); // the capturing teller cannot approve
+        String pending = mvc.perform(get("/api/v1/savings/teller/transactions").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, pending.contains(bigId));
+        assertEquals("POSTED", JsonPath.read(mvc.perform(post("/api/v1/savings/teller/transactions/" + bigId + "/approve")
+                .with(staff("sup-1", "SUPERVISOR"))).andExpect(ok).andReturn().getResponse().getContentAsString(), "$.status"));
+        mvc.perform(post("/api/v1/savings/teller/transactions/" + bigId + "/approve").with(staff("sup-1", "SUPERVISOR")))
+            .andExpect(status().isConflict());
+        expectBalance(account, "19999.50", "0.00", "19999.50");
+
+        // A requested-approval deposit, rejected with a reason: no money moves.
+        String asked = cashTxn("""
+            {"idempotencyKey":"t-dep-2","accountNumber":"%s","kind":"DEPOSIT","amount":"500","requestApproval":true}
+            """.formatted(account), tellerUser, ok);
+        String askedId = JsonPath.read(asked, "$.txnId");
+        mvc.perform(post("/api/v1/savings/teller/transactions/" + askedId + "/reject").with(staff("sup-1", "SUPERVISOR"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"\"}")).andExpect(status().isBadRequest());
+        assertEquals("REJECTED", JsonPath.read(mvc.perform(post("/api/v1/savings/teller/transactions/" + askedId + "/reject")
+                .with(staff("sup-1", "SUPERVISOR")).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Notes look counterfeit\"}"))
+            .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.status"));
+
+        String statement = mvc.perform(get("/api/v1/savings/accounts/" + account + "/statement").with(tellerUser))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("0.00", JsonPath.read(statement, "$.openingBalance"));
+        assertEquals("100000.00", JsonPath.read(statement, "$.totalCredits"));
+        assertEquals("80000.50", JsonPath.read(statement, "$.totalDebits"));
+        assertEquals("19999.50", JsonPath.read(statement, "$.closingBalance"));
+        assertEquals(List.of("deposit at counter", "withdrawal at counter", "withdrawal at counter"),
+                JsonPath.read(statement, "$.lines[*].description"));
+        assertEquals(List.of("100000.00", "79999.50", "19999.50"), JsonPath.read(statement, "$.lines[*].balance"));
+        String mine = mvc.perform(get("/api/v1/savings/accounts").param("customerNumber", customer).with(tellerUser))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(account, JsonPath.read(mine, "$[0].accountNumber"));
+        assertEquals("Achieng Otieno", JsonPath.read(mine, "$[0].customerName"));
+        // The savings account receives paybill payments like any other account.
+        assertEquals("APPLIED", JsonPath.read(c2b("", confirmation("SIMSAV0001", account, "250.00"), integrationToken(), ok), "$.outcome"));
+        expectBalance(account, "20249.50", "0.00", "20249.50");
     }
 }
