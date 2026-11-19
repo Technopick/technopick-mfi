@@ -1587,5 +1587,57 @@ class AuthorizationApiIntegrationTest {
             .getContentAsString();
         assertEquals(1, (Integer) JsonPath.read(live, "$.differences"));
         assertEquals(List.of("500.00"), JsonPath.read(live, "$.results[?(@.checkCode == 'LOAN_PRINCIPAL')].difference"));
+        // Manual journals and period close.
+        var finance2 = staffB("finance2-b", "FINANCE");
+        String mjTemplate = """
+            {"idempotencyKey":"%s","businessDate":"%s","narrative":"Reclassify part of the recovery as write-off reversal",
+             "lines":[{"accountCode":"%s","side":"DEBIT","amount":"100.00","branchCode":"NBO01"},
+                      {"accountCode":"4900-WRITE-OFF-RECOVERIES","side":"CREDIT","amount":"%s","branchCode":"NBO01"}]}
+            """;
+        String control = mvc.perform(post("/api/v1/accounting/manual-journals").with(finance).contentType(MediaType.APPLICATION_JSON)
+                .content(mjTemplate.formatted("mj-c", "2026-12-01", "1200-LOANS-PRINCIPAL", "100.00")))
+            .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, control.contains("control account"), control);
+        mvc.perform(post("/api/v1/accounting/manual-journals").with(finance).contentType(MediaType.APPLICATION_JSON)
+                .content(mjTemplate.formatted("mj-u", "2026-12-01", "5100-LOAN-WRITE-OFFS", "90.00")))
+            .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/accounting/manual-journals").with(teller).contentType(MediaType.APPLICATION_JSON)
+                .content(mjTemplate.formatted("mj-t", "2026-12-01", "5100-LOAN-WRITE-OFFS", "100.00")))
+            .andExpect(status().isForbidden());
+        String mj = mvc.perform(post("/api/v1/accounting/manual-journals").with(finance).contentType(MediaType.APPLICATION_JSON)
+                .content(mjTemplate.formatted("mj-1", "2026-12-01", "5100-LOAN-WRITE-OFFS", "100.00")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        String mjId = JsonPath.read(mj, "$.journalId");
+        assertEquals("PENDING", JsonPath.read(mj, "$.status"));
+        mvc.perform(post("/api/v1/accounting/manual-journals/" + mjId + "/post").with(finance)).andExpect(status().isForbidden());
+        String posted = mvc.perform(post("/api/v1/accounting/manual-journals/" + mjId + "/post").with(finance2)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString();
+        assertEquals("POSTED", JsonPath.read(posted, "$.status"));
+        assertEquals("MANUAL", JsonPath.read(mvc.perform(get("/api/v1/accounting/journal-entries/" + JsonPath.read(posted, "$.entryId"))
+                .with(finance)).andExpect(ok).andReturn().getResponse().getContentAsString(), "$.source"));
+
+        // November: a journal dated in it is pending, so it cannot close until that is decided.
+        String late = mvc.perform(post("/api/v1/accounting/manual-journals").with(finance).contentType(MediaType.APPLICATION_JSON)
+                .content(mjTemplate.formatted("mj-2", "2026-11-30", "5100-LOAN-WRITE-OFFS", "100.00")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        String periodsBefore = mvc.perform(get("/api/v1/accounting/periods").with(finance)).andExpect(ok).andReturn()
+            .getResponse().getContentAsString();
+        assertEquals(List.of(1), JsonPath.read(periodsBefore, "$[?(@.periodId == '2026-11')].pendingJournals"));
+        assertEquals(List.of(0), JsonPath.read(periodsBefore, "$[?(@.periodId == '2026-11')].reconciliationDifferences"));
+        String blocked = mvc.perform(post("/api/v1/accounting/periods/2026-11/close").with(finance)).andExpect(status().isBadRequest())
+            .andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, blocked.contains("still pending"), blocked);
+        mvc.perform(post("/api/v1/accounting/manual-journals/" + JsonPath.read(late, "$.journalId") + "/reject").with(finance2)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Belongs in December\"}")).andExpect(ok);
+        mvc.perform(post("/api/v1/accounting/periods/2026-12/close").with(finance)).andExpect(status().isBadRequest()); // not over yet
+        mvc.perform(post("/api/v1/accounting/periods/2026-11/close").with(teller)).andExpect(status().isForbidden());
+        assertEquals("CLOSED", JsonPath.read(mvc.perform(post("/api/v1/accounting/periods/2026-11/close").with(finance)).andExpect(ok)
+                .andReturn().getResponse().getContentAsString(), "$.status"));
+        String intoClosed = mvc.perform(post("/api/v1/accounting/manual-journals").with(finance).contentType(MediaType.APPLICATION_JSON)
+                .content(mjTemplate.formatted("mj-3", "2026-11-29", "5100-LOAN-WRITE-OFFS", "100.00")))
+            .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, intoClosed.contains("not in an open accounting period"), intoClosed);
+        assertEquals("2027-01", JsonPath.read(mvc.perform(post("/api/v1/accounting/periods/next").with(finance)).andExpect(ok)
+                .andReturn().getResponse().getContentAsString(), "$.periodId"));
     }
 }

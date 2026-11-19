@@ -81,6 +81,12 @@ public class EndOfDayService {
                 throw new ConflictException("close and balance every till first: " + st.openTills().stream()
                         .map(t -> t.tillCode() + " (" + t.teller() + ", " + t.status() + ")").toList());
             }
+            if (jdbc.sql("""
+                    SELECT count(*) FROM ledger.accounting_period WHERE status = 'OPEN' AND :d BETWEEN start_date AND end_date
+                    """).param("d", st.businessDate().plusDays(1)).query(Integer.class).single() == 0) {
+                throw new ConflictException("there is no open accounting period for " + st.businessDate().plusDays(1)
+                        + "; finance must open it before the day can close");
+            }
             if ("RUNNING".equals(st.runStatus()) && st.runStartedAt() != null
                     && st.runStartedAt().isAfter(OffsetDateTime.now().minusMinutes(STALE_MINUTES))) {
                 throw new ConflictException("end of day for " + st.businessDate() + " is already running");

@@ -138,4 +138,7 @@ bash "$HERE/concurrency_hold_race_test.sh" "$DB" "$APP_PW" "${MFI_APP_HOST:-${PG
 
 echo "== immutability tests as schema owner"
 psql -d "$DB" -f "$HERE/owner_immutability_test.sql"
+echo "== manual journal and period close tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/journals_periods_test.sql"
+
 echo "== done"
