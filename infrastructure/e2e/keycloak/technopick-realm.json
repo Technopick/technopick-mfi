@@ -197,7 +197,7 @@
       "enabled": true,
       "emailVerified": true,
       "firstName": "Fatuma",
-      "lastName": "Finance (TEST)",
+      "lastName": "Finance",
       "email": "finance@e2e.invalid",
       "realmRoles": [
         "FINANCE"
