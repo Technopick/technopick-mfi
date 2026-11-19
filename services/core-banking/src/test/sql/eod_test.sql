@@ -50,9 +50,29 @@ INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, sid
   (:tA::uuid, '99999999-0000-0000-0000-000000000001', 1, '1210-INTEREST-RECEIVABLE', 'D', 66.67, 'KES', 'NBO01'),
   (:tA::uuid, '99999999-0000-0000-0000-000000000001', 2, '4000-INTEREST-INCOME',     'C', 66.67, 'KES', 'NBO01');
 INSERT INTO lending.loan_accrual (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
-VALUES (:tA::uuid, :loan::uuid, 1, '2026-11-19', 66.67, '99999999-0000-0000-0000-000000000001');
+VALUES (:tA::uuid, :loan::uuid, 2, '2026-11-19', 66.67, '99999999-0000-0000-0000-000000000001');
 COMMIT;
 \echo PASS E3 accrual of 66.67 recorded with its journal entry
+
+-- ---------- N2: interest paid before it accrued (installment 1 was paid in full in L13) ----------
+BEGIN;
+SET LOCAL app.tenant_id = :tA;
+DO $$
+BEGIN
+  INSERT INTO lending.loan_accrual (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 1, '2026-11-19', 66.67,
+          '99999999-0000-0000-0000-000000000001');
+  RAISE EXCEPTION 'TEST FAILED N2a: paid interest recognised again';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE 'EOD_RECOGNITION_MISMATCH%' THEN RAISE; END IF;
+END $$;
+ROLLBACK;
+BEGIN;
+SET LOCAL app.tenant_id = :tA;
+INSERT INTO lending.loan_accrual (tenant_id, loan_id, installment_no, business_date, amount, recognized_earlier, entry_id)
+VALUES (:tA::uuid, :loan::uuid, 1, '2026-11-19', 66.67, 66.67, NULL);
+COMMIT;
+\echo PASS N2 accrual of interest already paid is recorded without posting it to income again
 
 -- ---------- E4: same installment and date cannot accrue twice ----------
 BEGIN;
@@ -60,7 +80,7 @@ SET LOCAL app.tenant_id = :tA;
 DO $$
 BEGIN
   INSERT INTO lending.loan_accrual (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
-  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 1, '2026-11-19', 66.67,
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 2, '2026-11-19', 66.67,
           '99999999-0000-0000-0000-000000000001');
   RAISE EXCEPTION 'TEST FAILED E4';
 EXCEPTION WHEN unique_violation THEN NULL;
@@ -74,7 +94,7 @@ SET LOCAL app.tenant_id = :tA;
 DO $$
 BEGIN
   INSERT INTO lending.loan_accrual (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
-  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 2, '2026-11-19', 66.67,
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 3, '2026-11-19', 66.67,
           '77777777-0000-0000-0000-000000000002');  -- the repayment entry
   RAISE EXCEPTION 'TEST FAILED E5';
 EXCEPTION WHEN raise_exception THEN
@@ -89,7 +109,7 @@ SET LOCAL app.tenant_id = :tA;
 DO $$
 BEGIN
   INSERT INTO lending.loan_accrual (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
-  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 2, '2026-11-19', 1.00,
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 3, '2026-11-19', 1.00,
           '99999999-0000-0000-0000-000000000001');  -- entry total stays 66.67, records now 67.67
   SET CONSTRAINTS ALL IMMEDIATE;
   RAISE EXCEPTION 'TEST FAILED E6';
@@ -99,27 +119,27 @@ END $$;
 ROLLBACK;
 \echo PASS E6 accrual records that disagree with the posted entry rejected
 
--- ---------- E7: penalty charged once per installment and date ----------
+-- ---------- E7 / N3: penalties only within the product's rule ----------
 BEGIN;
 SET LOCAL app.tenant_id = :tA;
 INSERT INTO ledger.journal_entry (tenant_id, entry_id, idempotency_key, business_date, source, correlation_id, actor)
-VALUES (:tA::uuid, '99999999-0000-0000-0000-000000000002', 'loan:bbbbbbbb-0000-0000-0000-000000000001:PENALTY:1:2026-11-19',
+VALUES (:tA::uuid, '99999999-0000-0000-0000-000000000002', 'loan:bbbbbbbb-0000-0000-0000-000000000001:PENALTY:2:2026-11-19',
         '2026-11-19', 'LOAN_EOD', 'eod', 'system:eod');
 INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, side, amount, currency, branch_code) VALUES
   (:tA::uuid, '99999999-0000-0000-0000-000000000002', 1, '1230-PENALTY-RECEIVABLE', 'D', 200.00, 'KES', 'NBO01'),
   (:tA::uuid, '99999999-0000-0000-0000-000000000002', 2, '4300-PENALTY-INCOME',     'C', 200.00, 'KES', 'NBO01');
-INSERT INTO lending.penalty_charge (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
-VALUES (:tA::uuid, :loan::uuid, 1, '2026-11-19', 200.00, '99999999-0000-0000-0000-000000000002');
 DO $$
 BEGIN
+  -- installment 2 is not yet due and the product has no penalty rule
   INSERT INTO lending.penalty_charge (tenant_id, loan_id, installment_no, business_date, amount, entry_id)
-  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 1, '2026-11-19', 200.00,
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', 2, '2026-11-19', 200.00,
           '99999999-0000-0000-0000-000000000002');
   RAISE EXCEPTION 'TEST FAILED E7';
-EXCEPTION WHEN unique_violation THEN NULL;
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE 'EOD_PENALTY_RULE%' THEN RAISE; END IF;
 END $$;
 ROLLBACK;
-\echo PASS E7 penalty recorded with its entry; repeat for same day rejected
+\echo PASS E7 N3 penalty outside the product rule rejected (no rule, not yet due)
 
 -- ---------- E8: over-accrual beyond scheduled interest rejected ----------
 BEGIN;
@@ -162,9 +182,25 @@ VALUES (:tA::uuid, :loan::uuid, '2026-11-19', 0, 'CURRENT', 'NORMAL', 0, 92544.0
 DO $$
 BEGIN
   INSERT INTO lending.arrears_snapshot (tenant_id, loan_id, as_of, days_past_due, bucket, classification, arrears_amount, outstanding_principal)
-  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', '2026-11-20', 45, 'DPD_1_30', 'WATCH', 10, 92544.04);
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', '2026-11-19', 45, 'DPD_1_30', 'WATCH', 10, 92544.04);
   RAISE EXCEPTION 'TEST FAILED E9 bucket';
 EXCEPTION WHEN check_violation THEN NULL;
+END $$;
+DO $$
+BEGIN
+  INSERT INTO lending.arrears_snapshot (tenant_id, loan_id, as_of, days_past_due, bucket, classification, arrears_amount, outstanding_principal)
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', '2026-11-20', 0, 'CURRENT', 'NORMAL', 0, 92544.04);
+  RAISE EXCEPTION 'TEST FAILED N4a: snapshot for another date';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE 'EOD_WRONG_DATE%' THEN RAISE; END IF;
+END $$;
+DO $$
+BEGIN
+  INSERT INTO lending.arrears_snapshot (tenant_id, loan_id, as_of, days_past_due, bucket, classification, arrears_amount, outstanding_principal)
+  VALUES ('00000000-0000-0000-0000-0000000000a1', 'bbbbbbbb-0000-0000-0000-000000000001', '2026-11-19', 0, 'CURRENT', 'NORMAL', 0, 100000);
+  RAISE EXCEPTION 'TEST FAILED N4b: outstanding principal ignores repayments';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE 'EOD_SNAPSHOT_PRINCIPAL%' THEN RAISE; END IF;
 END $$;
 DO $$
 BEGIN
@@ -173,7 +209,7 @@ BEGIN
 EXCEPTION WHEN insufficient_privilege THEN NULL;
 END $$;
 COMMIT;
-\echo PASS E9 snapshot stored; bucket inconsistent with DPD rejected; snapshots cannot be edited
+\echo PASS E9 snapshot stored; bucket inconsistent with DPD rejected; snapshots cannot be edited; N4 only for the day being closed, principal from repayments
 
 -- ---------- E10: PAR view ----------
 BEGIN;

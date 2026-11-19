@@ -33,15 +33,25 @@ public final class EndOfDayPlanner {
      * @param accruedSoFar      interest already accrued for this installment
      * @param penaltySoFar      penalty already charged on this installment
      * @param outstanding       unpaid amounts per component (from allocations)
+     * @param interestPaid      interest already paid on this installment; interest paid before it
+     *                          was accrued was recognised as income at repayment, so accruing it
+     *                          later must not recognise it again
      */
     public record InstallmentState(InstallmentDue outstanding, LocalDate periodStart, Money scheduledInterest,
-                                   Money accruedSoFar, Money penaltySoFar) {
+                                   Money accruedSoFar, Money penaltySoFar, Money interestPaid) {
         public InstallmentState {
             Objects.requireNonNull(outstanding, "outstanding");
             Objects.requireNonNull(periodStart, "periodStart");
             Objects.requireNonNull(scheduledInterest, "scheduledInterest");
             Objects.requireNonNull(accruedSoFar, "accruedSoFar");
             Objects.requireNonNull(penaltySoFar, "penaltySoFar");
+            Objects.requireNonNull(interestPaid, "interestPaid");
+        }
+
+        /** No interest paid yet. */
+        public InstallmentState(InstallmentDue outstanding, LocalDate periodStart, Money scheduledInterest,
+                                Money accruedSoFar, Money penaltySoFar) {
+            this(outstanding, periodStart, scheduledInterest, accruedSoFar, penaltySoFar, Money.zero(accruedSoFar.currency()));
         }
 
         public int number() {
@@ -51,8 +61,20 @@ public final class EndOfDayPlanner {
 
     public record InstallmentAmount(int installmentNumber, Money amount) { }
 
+    /**
+     * Interest accrued today on one installment. {@code recognizedEarlier} is the part already
+     * taken to income when the customer paid it before it accrued; only the rest is posted
+     * (Dr interest receivable / Cr interest income). Income recognised to date on an installment
+     * is always max(accrued, paid).
+     */
+    public record Accrual(int installmentNumber, Money amount, Money recognizedEarlier) {
+        public Money toPost() {
+            return amount.minus(recognizedEarlier);
+        }
+    }
+
     /** Everything the EOD job must persist for this loan and date. */
-    public record Plan(LocalDate businessDate, JournalEntry accrualEntry, List<InstallmentAmount> accruals,
+    public record Plan(LocalDate businessDate, JournalEntry accrualEntry, List<Accrual> accruals,
                        List<JournalEntry> penaltyEntries, List<InstallmentAmount> penalties,
                        ArrearsCalculator.Position arrears) {
         public Plan {
@@ -65,6 +87,10 @@ public final class EndOfDayPlanner {
     private EndOfDayPlanner() {
     }
 
+    private static Money max(Money a, Money b) {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+
     public static Plan plan(LoanPostingRules.LoanContext ctx, LocalDate businessDate, List<InstallmentState> installments,
                             PenaltyRule penaltyRule, Money arrearsTolerance, String correlationId) {
         Objects.requireNonNull(ctx, "ctx");
@@ -74,7 +100,7 @@ public final class EndOfDayPlanner {
         Currency ccy = ctx.product().currency();
         var rounding = ctx.product().rounding();
 
-        List<InstallmentAmount> accruals = new ArrayList<>();
+        List<Accrual> accruals = new ArrayList<>();
         Money accrualTotal = Money.zero(ccy);
         List<InstallmentAmount> penalties = new ArrayList<>();
         List<JournalEntry> penaltyEntries = new ArrayList<>();
@@ -86,8 +112,11 @@ public final class EndOfDayPlanner {
                 Money accrue = InterestAccrual.accrualDue(s.scheduledInterest(), s.periodStart(), due, businessDate,
                         s.accruedSoFar(), rounding);
                 if (accrue.isPositive()) {
-                    accruals.add(new InstallmentAmount(s.number(), accrue));
-                    accrualTotal = accrualTotal.plus(accrue);
+                    Money before = max(s.accruedSoFar(), s.interestPaid());
+                    Money after = max(s.accruedSoFar().plus(accrue), s.interestPaid());
+                    Money post = after.minus(before);
+                    accruals.add(new Accrual(s.number(), accrue, accrue.minus(post)));
+                    accrualTotal = accrualTotal.plus(post);
                 }
             }
             Money unpaid = s.outstanding().outstanding(DueComponent.PRINCIPAL, ccy)

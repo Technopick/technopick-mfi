@@ -153,7 +153,7 @@ public class LoanRepaymentService {
     }
 
     /** Maps a row holding {@code currency} and the {@code loan_product_version} columns. */
-    static LoanProductVersion product(java.sql.ResultSet rs) throws java.sql.SQLException {
+    public static LoanProductVersion product(java.sql.ResultSet rs) throws java.sql.SQLException {
         Currency c = Currency.getInstance(rs.getString("currency"));
         java.sql.Array order = rs.getArray("allocation_order");
         List<DueComponent> components = new ArrayList<>();

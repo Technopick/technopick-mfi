@@ -1279,7 +1279,7 @@ class AuthorizationApiIntegrationTest {
      * less 15% withholding tax.
      */
     @Test
-    void endOfDayAccruesAndCreditsSavingsInterest() throws Exception {
+    void endOfDayRunsLoansAndSavingsInterest() throws Exception {
         var ok = status().isOk();
         owner().execute("""
             INSERT INTO tenancy.branch (tenant_id, branch_code, name) VALUES ('%1$s', 'NBO01', 'Nairobi (B)');
@@ -1291,7 +1291,8 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '2120-INTEREST-PAYABLE', 'Savings interest payable', 'LIABILITY', 'KES', false),
               ('%1$s', '2960-WHT-PAYABLE', 'Withholding tax payable', 'LIABILITY', 'KES', false);
             INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date) VALUES
-              ('%1$s', '2026-11', '2026-11-01', '2026-11-30'), ('%1$s', '2026-12', '2026-12-01', '2026-12-31');
+              ('%1$s', '2026-10', '2026-10-01', '2026-10-31'), ('%1$s', '2026-11', '2026-11-01', '2026-11-30'),
+              ('%1$s', '2026-12', '2026-12-01', '2026-12-31');
             INSERT INTO tenancy.business_date (tenant_id, current_date_) VALUES ('%1$s', '2026-11-28');
             INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account, interest_rate,
                 interest_min_balance, withholding_tax_rate, gl_interest_expense, gl_interest_payable, gl_withholding_tax)
@@ -1302,6 +1303,46 @@ class AuthorizationApiIntegrationTest {
               VALUES ('%1$s', '7e000000-0000-0000-0000-0000000000b1', 'B-T1', 'NBO01', 'KES', '1001-TILL-NBO01-01');
             INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above)
               VALUES ('%1$s', 'KES', 50000, 1000000);
+            INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+              ('%1$s', '1200-LOANS-PRINCIPAL', 'Loans', 'ASSET', 'KES', false),
+              ('%1$s', '1210-INTEREST-RECEIVABLE', 'Interest receivable', 'ASSET', 'KES', false),
+              ('%1$s', '4000-INTEREST-INCOME', 'Interest income', 'INCOME', 'KES', false),
+              ('%1$s', '1220-FEE-RECEIVABLE', 'Fee receivable', 'ASSET', 'KES', false),
+              ('%1$s', '4100-FEE-PROCESSING', 'Fee income', 'INCOME', 'KES', false),
+              ('%1$s', '1230-PENALTY-RECEIVABLE', 'Penalty receivable', 'ASSET', 'KES', false),
+              ('%1$s', '4300-PENALTY-INCOME', 'Penalty income', 'INCOME', 'KES', false),
+              ('%1$s', '2400-LOAN-OVERPAYMENTS', 'Overpayments', 'LIABILITY', 'KES', false),
+              ('%1$s', '5100-LOAN-WRITE-OFFS', 'Write-offs', 'EXPENSE', 'KES', false),
+              ('%1$s', '1110-MPESA-B2C-CLEARING', 'B2C clearing', 'ASSET', 'KES', false);
+            INSERT INTO lending.loan_product (tenant_id, product_code, name, currency) VALUES ('%1$s', 'MKOPO', 'Member loan', 'KES');
+            INSERT INTO lending.loan_product_version (tenant_id, version_id, product_code, version, interest_method, annual_rate,
+                min_principal, max_principal, min_term_months, max_term_months, upfront_fee_rate, allocation_strategy,
+                allocation_order, gl_principal, gl_interest_receivable, gl_interest_income, gl_fee_receivable, gl_fee_income,
+                gl_penalty_receivable, gl_penalty_income, gl_overpayment, gl_write_off, created_by,
+                penalty_method, penalty_grace_days, penalty_flat, arrears_tolerance)
+              VALUES ('%1$s', 'cccccccc-0000-0000-0000-0000000000b1', 'MKOPO', 1, 'REDUCING_BALANCE', 0.36, 1000, 500000, 1, 24,
+                0, 'COMPONENT_FIRST', ARRAY['PENALTY','FEE','INTEREST','PRINCIPAL'], '1200-LOANS-PRINCIPAL',
+                '1210-INTEREST-RECEIVABLE', '4000-INTEREST-INCOME', '1220-FEE-RECEIVABLE', '4100-FEE-PROCESSING',
+                '1230-PENALTY-RECEIVABLE', '4300-PENALTY-INCOME', '2400-LOAN-OVERPAYMENTS', '5100-LOAN-WRITE-OFFS', 'test:maker',
+                'FLAT_ONCE', 3, 200, 0);
+            UPDATE lending.loan_product_version SET status = 'ACTIVE', approved_by = 'test:checker'
+             WHERE version_id = 'cccccccc-0000-0000-0000-0000000000b1';
+            BEGIN;
+            INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency,
+                principal, term_months, created_by, approved_by) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-0000000000b1', 'LN-B00001', 'CB1', 'cccccccc-0000-0000-0000-0000000000b1',
+               'NBO01', 'KES', 10000, 2, 'test:officer', 'test:manager');
+            INSERT INTO lending.schedule_installment (tenant_id, loan_id, schedule_version, installment_no, due_date, principal, interest) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-0000000000b1', 1, 1, '2026-11-24', 5000, 300),
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-0000000000b1', 1, 2, '2026-12-24', 5000, 150);
+            INSERT INTO ledger.journal_entry (tenant_id, entry_id, idempotency_key, business_date, source, correlation_id, actor) VALUES
+              ('%1$s', '77777777-0000-0000-0000-0000000000b1', 'loan:bbbbbbbb-0000-0000-0000-0000000000b1:DISBURSE:SEED', '2026-10-24', 'LOAN', 'seed', 'test');
+            INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, side, amount, currency, branch_code) VALUES
+              ('%1$s', '77777777-0000-0000-0000-0000000000b1', 1, '1200-LOANS-PRINCIPAL', 'D', 10000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-0000000000b1', 2, '1110-MPESA-B2C-CLEARING', 'C', 10000, 'KES', 'NBO01');
+            UPDATE lending.loan SET status = 'ACTIVE', disbursement_entry_id = '77777777-0000-0000-0000-0000000000b1'
+             WHERE loan_id = 'bbbbbbbb-0000-0000-0000-0000000000b1';
+            COMMIT;
             """.formatted(TENANT_B));
         var teller = staffB("teller-b", "TELLER");
         var ops = staffB("ops-b", "OPERATIONS");
@@ -1322,12 +1363,11 @@ class AuthorizationApiIntegrationTest {
             cashTxn(cash("eod-d" + i, accounts[i], "DEPOSIT", deposits[i]), teller, ok);
         }
 
-        // An open till blocks the day; tenant A cannot close either (loan end of day not built yet).
+        // An open till blocks the day.
         String status = mvc.perform(get("/api/v1/end-of-day").with(ops)).andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals("2026-11-28", JsonPath.read(status, "$.businessDate"));
         assertEquals(List.of("B-T1"), JsonPath.read(status, "$.openTills[*].tillCode"));
         assertEquals(Boolean.TRUE, eodRun(ops, status().isConflict()).contains("B-T1"));
-        assertEquals(Boolean.TRUE, eodRun(staff("ops-a", "OPERATIONS"), status().isConflict()).contains("loan end of day"));
         eodRun(teller, status().isForbidden());
         String session = JsonPath.read(mvc.perform(get("/api/v1/savings/till-sessions/mine").with(teller)).andExpect(ok)
             .andReturn().getResponse().getContentAsString(), "$.sessionId");
@@ -1340,7 +1380,16 @@ class AuthorizationApiIntegrationTest {
         assertEquals(2, (Integer) JsonPath.read(day1, "$.accountsAccrued"));
         assertEquals("8.25", JsonPath.read(day1, "$.interestAccrued"));
         assertEquals(0, (Integer) JsonPath.read(day1, "$.accountsCredited"));
-        assertEquals("8.24", JsonPath.read(eodRun(ops, ok), "$.interestAccrued"));
+        // Loan LN-B00001: installment 1 (due 24 Nov, interest 300) catches up in full; installment 2
+        // accrues 4/30 of 150 = 20.00; 4 days late is past the 3 grace days, so the flat 200 penalty.
+        assertEquals(1, (Integer) JsonPath.read(day1, "$.loansProcessed"));
+        assertEquals("320.00", JsonPath.read(day1, "$.loanInterestAccrued"));
+        assertEquals("200.00", JsonPath.read(day1, "$.penaltiesCharged"));
+        assertEquals(1, (Integer) JsonPath.read(day1, "$.loansInArrears"));
+        String day2 = eodRun(ops, ok);
+        assertEquals("8.24", JsonPath.read(day2, "$.interestAccrued"));
+        assertEquals("5.00", JsonPath.read(day2, "$.loanInterestAccrued"));
+        assertEquals("0.00", JsonPath.read(day2, "$.penaltiesCharged")); // the flat penalty is charged once
         String monthEnd = eodRun(ops, ok);
         assertEquals("2026-12-01", JsonPath.read(monthEnd, "$.newBusinessDate"));
         assertEquals("8.25", JsonPath.read(monthEnd, "$.interestAccrued"));
@@ -1362,6 +1411,22 @@ class AuthorizationApiIntegrationTest {
                  WHERE tenant_id = ? AND account_code = '2120-INTEREST-PAYABLE'
                 """, java.math.BigDecimal.class, java.util.UUID.fromString(TENANT_B)).longValueExact();
         assertEquals(0L, payable); // everything accrued has been paid out
+        var snapshot = owner().queryForMap("""
+                SELECT days_past_due, bucket, arrears_amount, outstanding_principal FROM lending.arrears_snapshot
+                 WHERE tenant_id = ? AND as_of = '2026-11-30'
+                """, java.util.UUID.fromString(TENANT_B));
+        assertEquals(6, ((Number) snapshot.get("days_past_due")).intValue());
+        assertEquals("DPD_1_30", snapshot.get("bucket"));
+        assertEquals(0, new java.math.BigDecimal("5300").compareTo((java.math.BigDecimal) snapshot.get("arrears_amount")));
+        assertEquals(0, new java.math.BigDecimal("10000").compareTo((java.math.BigDecimal) snapshot.get("outstanding_principal")));
+        java.math.BigDecimal receivable = owner().queryForObject("""
+                SELECT sum(CASE side WHEN 'D' THEN amount ELSE -amount END) FROM ledger.journal_line
+                 WHERE tenant_id = ? AND account_code = '1210-INTEREST-RECEIVABLE'
+                """, java.math.BigDecimal.class, java.util.UUID.fromString(TENANT_B));
+        assertEquals(0, new java.math.BigDecimal("330.00").compareTo(receivable)); // 320 + 5 + 5
+        assertEquals(1, owner().queryForObject(
+                "SELECT loans_processed FROM ledger.eod_run WHERE tenant_id = ? AND business_date = '2026-11-30'",
+                Integer.class, java.util.UUID.fromString(TENANT_B)));
         String after = mvc.perform(get("/api/v1/end-of-day").with(ops)).andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals("2026-11-30", JsonPath.read(after, "$.lastClosedDate"));
     }

@@ -19,14 +19,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Closes the business day (ADR-0019). Steps, each in its own transaction so a crash resumes
- * without double posting: start (or resume) the run, accrue savings interest per product and
- * branch, credit interest to accounts on the last day of the month, then complete the run and
- * move the business date forward one day. The database refuses to complete while any till is
- * open (V18) and refuses to move the date before the run has completed (V4).
- *
- * <p>Loan end of day (accrual, penalties, arrears snapshots) is not wired yet; until it is, the
- * run refuses tenants with active loans rather than closing days without their loan accruals.
+ * Closes the business day (ADR-0019, ADR-0020). Steps, each in its own transaction so a crash
+ * resumes without double posting: start (or resume) the run; for each active loan accrue interest,
+ * charge penalties and snapshot arrears; accrue savings interest per product and branch; credit
+ * interest to accounts on the last day of the month; then complete the run and move the business
+ * date forward one day. The database refuses to complete while any till is open (V18) and refuses
+ * to move the date before the run has completed (V4).
  */
 @Service
 public class EndOfDayService {
@@ -40,18 +38,22 @@ public class EndOfDayService {
                                  List<OpenTill> openTills, int activeLoans, boolean interestPostingDay,
                                  LocalDate lastClosedDate) { }
 
-    public record EndOfDaySummary(LocalDate closedDate, LocalDate newBusinessDate, int accountsAccrued,
+    public record EndOfDaySummary(LocalDate closedDate, LocalDate newBusinessDate, int loansProcessed,
+                                  String loanInterestAccrued, String penaltiesCharged, int loansInArrears,
+                                  int accountsAccrued,
                                   String interestAccrued, int accountsCredited, String interestCredited,
                                   String taxWithheld) { }
 
     private final JdbcClient jdbc;
     private final TenantSession session;
     private final SavingsInterestService interest;
+    private final LoanEndOfDayStep loans;
     private final Outbox outbox;
     private final TransactionTemplate tx;
 
-    public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, Outbox outbox,
-                           PlatformTransactionManager transactions) {
+    public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, LoanEndOfDayStep loans,
+                           Outbox outbox, PlatformTransactionManager transactions) {
+        this.loans = loans;
         this.jdbc = jdbc;
         this.session = session;
         this.interest = interest;
@@ -70,10 +72,6 @@ public class EndOfDayService {
         LocalDate date = tx.execute(s -> {
             session.bind(tenantId);
             EndOfDayStatus st = readStatus();
-            if (st.activeLoans() > 0) {
-                throw new ConflictException("loan end of day (accrual, penalties, arrears) is not built yet; this tenant has "
-                        + st.activeLoans() + " active loan(s), so the day cannot be closed without them");
-            }
             if (!st.openTills().isEmpty()) {
                 throw new ConflictException("close and balance every till first: " + st.openTills().stream()
                         .map(t -> t.tillCode() + " (" + t.teller() + ", " + t.status() + ")").toList());
@@ -94,6 +92,26 @@ public class EndOfDayService {
             return st.businessDate();
         });
         try {
+            int loansDone = 0;
+            int inArrears = 0;
+            BigDecimal loanInterest = BigDecimal.ZERO.setScale(2);
+            BigDecimal penalties = BigDecimal.ZERO.setScale(2);
+            List<UUID> loanIds = tx.execute(s -> {
+                session.bind(tenantId);
+                return loans.loansToProcess(date);
+            });
+            for (UUID loanId : loanIds) {
+                LoanEndOfDayStep.LoanResult r = tx.execute(s -> {
+                    session.bind(tenantId);
+                    return loans.process(tenantId, loanId, date, actor);
+                });
+                if (r.processed()) {
+                    loansDone++;
+                    loanInterest = loanInterest.add(r.interestAccrued().amount());
+                    penalties = penalties.add(r.penalties().amount());
+                    inArrears += r.daysPastDue() > 0 ? 1 : 0;
+                }
+            }
             int accrued = 0;
             BigDecimal accruedAmount = BigDecimal.ZERO.setScale(2);
             List<AccrualGroup> groups = tx.execute(s -> {
@@ -126,6 +144,10 @@ public class EndOfDayService {
                     tax = tax.add(r.tax());
                 }
             }
+            int loanCount = loansDone;
+            int arrearsCount = inArrears;
+            BigDecimal loanInterestTotal = loanInterest;
+            BigDecimal penaltyTotal = penalties;
             int accruedAccounts = accrued;
             BigDecimal accruedTotal = accruedAmount;
             int creditedAccounts = credited;
@@ -133,13 +155,18 @@ public class EndOfDayService {
             BigDecimal taxTotal = tax;
             return tx.execute(s -> {
                 session.bind(tenantId);
-                jdbc.sql("UPDATE ledger.eod_run SET status = 'COMPLETED' WHERE business_date = :d").param("d", date).update();
+                int processedToday = jdbc.sql("SELECT count(*) FROM lending.arrears_snapshot WHERE as_of = :d")
+                    .param("d", date).query(Integer.class).single();
+                jdbc.sql("UPDATE ledger.eod_run SET status = 'COMPLETED', loans_processed = :n WHERE business_date = :d")
+                    .param("n", processedToday).param("d", date).update();
                 jdbc.sql("UPDATE tenancy.business_date SET current_date_ = current_date_ + 1").update();
                 outbox.record(tenantId, "BusinessDayClosed", "eod_run", tenantId + ":" + date,
-                        "{\"closedDate\":\"%s\",\"newBusinessDate\":\"%s\",\"interestAccrued\":\"%s\",\"interestCredited\":\"%s\"}"
-                                .formatted(date, date.plusDays(1), accruedTotal.toPlainString(), creditedNet.toPlainString()),
+                        "{\"closedDate\":\"%s\",\"newBusinessDate\":\"%s\",\"loansProcessed\":%d,\"loanInterestAccrued\":\"%s\",\"penaltiesCharged\":\"%s\",\"interestAccrued\":\"%s\",\"interestCredited\":\"%s\"}"
+                                .formatted(date, date.plusDays(1), processedToday, loanInterestTotal.toPlainString(),
+                                        penaltyTotal.toPlainString(), accruedTotal.toPlainString(), creditedNet.toPlainString()),
                         "eod:" + date);
-                return new EndOfDaySummary(date, date.plusDays(1), accruedAccounts, accruedTotal.toPlainString(),
+                return new EndOfDaySummary(date, date.plusDays(1), loanCount, loanInterestTotal.toPlainString(),
+                        penaltyTotal.toPlainString(), arrearsCount, accruedAccounts, accruedTotal.toPlainString(),
                         creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString());
             });
         } catch (RuntimeException e) {

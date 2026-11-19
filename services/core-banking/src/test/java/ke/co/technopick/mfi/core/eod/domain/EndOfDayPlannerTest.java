@@ -97,4 +97,36 @@ class EndOfDayPlannerTest {
         assertNull(again.accrualEntry());
         assertTrue(again.accruals().isEmpty());
     }
+
+    /**
+     * The customer pays 1,000 of installment 1's interest on day 5, before it has accrued.
+     * Repayment takes the unaccrued part straight to income; EOD must then post only what goes
+     * beyond the paid amount, so income over the period is exactly the scheduled 2,000.00.
+     */
+    @Test
+    void interestPaidBeforeAccrualIsNotRecognisedTwice() {
+        Money accrued = kes("0");
+        Money posted = kes("0");
+        Money recognisedAtRepayment = kes("0");
+        Money paid = kes("0");
+        for (LocalDate d = DISBURSED.plusDays(1); !d.isAfter(DUE1); d = d.plusDays(1)) {
+            if (d.equals(DISBURSED.plusDays(5))) {
+                paid = kes("1000.00");
+                recognisedAtRepayment = paid.minus(accrued); // what LoanRepaymentService credits to income
+            }
+            InstallmentState one = new InstallmentState(new InstallmentDue(1, DUE1, Map.of(DueComponent.PRINCIPAL,
+                    kes("7455.96"), DueComponent.INTEREST, kes("2000.00").minus(paid))), DISBURSED, kes("2000.00"), accrued,
+                    kes("0"), paid);
+            Plan p = EndOfDayPlanner.plan(LoanFixtures.context(), d, List.of(one), PenaltyRule.none(), kes("0"), "c");
+            for (EndOfDayPlanner.Accrual a : p.accruals()) {
+                accrued = accrued.plus(a.amount());
+                posted = posted.plus(a.toPost());
+                assertTrue(!a.toPost().isNegative() && !a.recognizedEarlier().isNegative());
+            }
+            Money entry = p.accrualEntry() == null ? kes("0") : p.accrualEntry().lines().get(0).amount();
+            assertEquals(p.accruals().stream().map(EndOfDayPlanner.Accrual::toPost).reduce(kes("0"), Money::plus), entry);
+        }
+        assertEquals(kes("2000.00"), accrued);
+        assertEquals(kes("2000.00"), posted.plus(recognisedAtRepayment));
+    }
 }
