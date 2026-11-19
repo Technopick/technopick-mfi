@@ -144,8 +144,16 @@ public final class LoanPostingRules {
     /** Write-off of outstanding principal and accrued-but-unpaid interest. */
     public static JournalEntry writeOff(LoanContext ctx, Money principalOutstanding, Money interestOutstanding,
                                         LocalDate businessDate, String approvalRef, String correlationId) {
+        return writeOff(ctx, principalOutstanding, interestOutstanding, Money.zero(principalOutstanding.currency()),
+                businessDate, approvalRef, correlationId);
+    }
+
+    /** Write-off of outstanding principal, accrued-but-unpaid interest and unpaid penalties. */
+    public static JournalEntry writeOff(LoanContext ctx, Money principalOutstanding, Money interestOutstanding,
+                                        Money penaltyOutstanding, LocalDate businessDate, String approvalRef,
+                                        String correlationId) {
         LoanGlMapping gl = ctx.product().gl();
-        Money total = principalOutstanding.plus(interestOutstanding);
+        Money total = principalOutstanding.plus(interestOutstanding).plus(penaltyOutstanding);
         List<JournalLine> lines = new ArrayList<>();
         lines.add(JournalLine.debit(gl.writeOffExpense(), total, ctx.branchCode()));
         if (principalOutstanding.isPositive()) {
@@ -153,6 +161,9 @@ public final class LoanPostingRules {
         }
         if (interestOutstanding.isPositive()) {
             lines.add(JournalLine.credit(gl.interestReceivable(), interestOutstanding, ctx.branchCode()));
+        }
+        if (penaltyOutstanding.isPositive()) {
+            lines.add(JournalLine.credit(gl.penaltyReceivable(), penaltyOutstanding, ctx.branchCode()));
         }
         return entry(ctx, "WRITEOFF:" + approvalRef, businessDate, "LOAN", correlationId, lines);
     }

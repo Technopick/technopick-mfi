@@ -111,6 +111,16 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== loan closure and credit tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/loan_closure_test.sql"
 
+echo "== write-off policy (platform administration, as owner)"
+psql -v ON_ERROR_STOP=1 -q -d "$DB" <<'SQL'
+INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', '4900-TEST-RECOVERIES', 'TEST recoveries of written-off loans', 'INCOME', 'KES', false);
+INSERT INTO lending.write_off_policy (tenant_id, min_days_past_due) VALUES ('00000000-0000-0000-0000-0000000000a1', 90);
+SQL
+
+echo "== write-off tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/write_off_test.sql"
+
 echo "== concurrency: two sessions racing for the same funds"
 bash "$HERE/concurrency_hold_race_test.sh" "$DB" "$APP_PW" "${MFI_APP_HOST:-${PGHOST:-localhost}}"
 

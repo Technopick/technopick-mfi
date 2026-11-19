@@ -1279,7 +1279,7 @@ class AuthorizationApiIntegrationTest {
      * less 15% withholding tax.
      */
     @Test
-    void endOfDayRunsLoansAndSavingsInterest() throws Exception {
+    void endOfDayLoansSavingsWriteOffAndRecovery() throws Exception {
         var ok = status().isOk();
         owner().execute("""
             INSERT INTO tenancy.branch (tenant_id, branch_code, name) VALUES ('%1$s', 'NBO01', 'Nairobi (B)');
@@ -1313,18 +1313,19 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '4300-PENALTY-INCOME', 'Penalty income', 'INCOME', 'KES', false),
               ('%1$s', '2400-LOAN-OVERPAYMENTS', 'Overpayments', 'LIABILITY', 'KES', false),
               ('%1$s', '5100-LOAN-WRITE-OFFS', 'Write-offs', 'EXPENSE', 'KES', false),
-              ('%1$s', '1110-MPESA-B2C-CLEARING', 'B2C clearing', 'ASSET', 'KES', false);
+              ('%1$s', '1110-MPESA-B2C-CLEARING', 'B2C clearing', 'ASSET', 'KES', false),
+              ('%1$s', '4900-WRITE-OFF-RECOVERIES', 'Recoveries of written-off loans', 'INCOME', 'KES', false);
             INSERT INTO lending.loan_product (tenant_id, product_code, name, currency) VALUES ('%1$s', 'MKOPO', 'Member loan', 'KES');
             INSERT INTO lending.loan_product_version (tenant_id, version_id, product_code, version, interest_method, annual_rate,
                 min_principal, max_principal, min_term_months, max_term_months, upfront_fee_rate, allocation_strategy,
                 allocation_order, gl_principal, gl_interest_receivable, gl_interest_income, gl_fee_receivable, gl_fee_income,
                 gl_penalty_receivable, gl_penalty_income, gl_overpayment, gl_write_off, created_by,
-                penalty_method, penalty_grace_days, penalty_flat, arrears_tolerance)
+                penalty_method, penalty_grace_days, penalty_flat, arrears_tolerance, gl_write_off_recovery)
               VALUES ('%1$s', 'cccccccc-0000-0000-0000-0000000000b1', 'MKOPO', 1, 'REDUCING_BALANCE', 0.36, 1000, 500000, 1, 24,
                 0, 'COMPONENT_FIRST', ARRAY['PENALTY','FEE','INTEREST','PRINCIPAL'], '1200-LOANS-PRINCIPAL',
                 '1210-INTEREST-RECEIVABLE', '4000-INTEREST-INCOME', '1220-FEE-RECEIVABLE', '4100-FEE-PROCESSING',
                 '1230-PENALTY-RECEIVABLE', '4300-PENALTY-INCOME', '2400-LOAN-OVERPAYMENTS', '5100-LOAN-WRITE-OFFS', 'test:maker',
-                'FLAT_ONCE', 3, 200, 0);
+                'FLAT_ONCE', 3, 200, 0, '4900-WRITE-OFF-RECOVERIES');
             UPDATE lending.loan_product_version SET status = 'ACTIVE', approved_by = 'test:checker'
              WHERE version_id = 'cccccccc-0000-0000-0000-0000000000b1';
             BEGIN;
@@ -1473,5 +1474,65 @@ class AuthorizationApiIntegrationTest {
         mvc.perform(get("/api/v1/reports/portfolio-at-risk").with(teller)).andExpect(status().isForbidden());
         String after = mvc.perform(get("/api/v1/end-of-day").with(ops)).andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals("2026-11-30", JsonPath.read(after, "$.lastClosedDate"));
+        // Write-off: LN-B00001 is 6 days late; this TEST tenant's policy allows write-off from 5 days.
+        owner().execute("""
+            INSERT INTO lending.write_off_policy (tenant_id, min_days_past_due) VALUES ('%1$s', 5);
+            INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+              ('%1$s', '1120-MPESA-C2B-CLEARING', 'Paybill clearing', 'ASSET', 'KES', false),
+              ('%1$s', '2900-SUSPENSE', 'Suspense', 'LIABILITY', 'KES', false);
+            INSERT INTO payments.mpesa_paybill (tenant_id, short_code, branch_code, gl_clearing, gl_suspense, max_amount)
+              VALUES ('%1$s', '600992', 'NBO01', '1120-MPESA-C2B-CLEARING', '2900-SUSPENSE', 150000);
+            """.formatted(TENANT_B));
+        var managerB = staffB("manager-b", "BRANCH_MANAGER");
+        var supB = staffB("sup-b", "SUPERVISOR");
+        String woBody = "{\"idempotencyKey\":\"wo-b1\",\"reason\":\"Member relocated; no contact for months\"}";
+        String wo = mvc.perform(post("/api/v1/lending/loans/LN-B00001/write-off").with(managerB).contentType(MediaType.APPLICATION_JSON)
+                .content(woBody)).andExpect(ok).andReturn().getResponse().getContentAsString();
+        String woId = JsonPath.read(wo, "$.writeOffId");
+        assertEquals("PENDING", JsonPath.read(wo, "$.status"));
+        assertEquals("10000.00", JsonPath.read(wo, "$.principalOutstanding"));
+        assertEquals("330.00", JsonPath.read(wo, "$.interestOutstanding"));
+        assertEquals("200.00", JsonPath.read(wo, "$.penaltyOutstanding"));
+        assertEquals(Boolean.TRUE, JsonPath.read(mvc.perform(post("/api/v1/lending/loans/LN-B00001/write-off").with(managerB)
+                .contentType(MediaType.APPLICATION_JSON).content(woBody)).andExpect(ok).andReturn().getResponse()
+                .getContentAsString(), "$.replayed"));
+        mvc.perform(post("/api/v1/lending/loans/LN-B00001/write-off").with(teller).contentType(MediaType.APPLICATION_JSON)
+                .content(woBody)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/lending/write-offs/" + woId + "/approve").with(managerB)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/lending/write-offs/" + woId + "/approve").with(staffB("manager-b", "SUPERVISOR")))
+            .andExpect(status().isForbidden()); // the requester cannot approve, whatever role they hold
+        assertEquals(List.of(woId), JsonPath.read(mvc.perform(get("/api/v1/lending/write-offs").param("status", "PENDING").with(supB))
+                .andExpect(ok).andReturn().getResponse().getContentAsString(), "$[*].writeOffId"));
+        String approved = mvc.perform(post("/api/v1/lending/write-offs/" + woId + "/approve").with(supB)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString();
+        assertEquals("APPROVED", JsonPath.read(approved, "$.status"));
+        assertEquals("10530.00", JsonPath.read(approved, "$.writtenOff"));
+        assertEquals("WRITTEN_OFF", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-B00001'", String.class));
+        for (String gl : List.of("1200-LOANS-PRINCIPAL", "1210-INTEREST-RECEIVABLE", "1230-PENALTY-RECEIVABLE")) {
+            java.math.BigDecimal left = owner().queryForObject("""
+                    SELECT sum(CASE side WHEN 'D' THEN amount ELSE -amount END) FROM ledger.journal_line l
+                      JOIN ledger.journal_entry e ON e.tenant_id = l.tenant_id AND e.entry_id = l.entry_id
+                     WHERE l.tenant_id = ? AND l.account_code = ? AND e.idempotency_key LIKE 'loan:bbbbbbbb-0000-0000-0000-0000000000b1:%'
+                    """, java.math.BigDecimal.class, java.util.UUID.fromString(TENANT_B), gl);
+            assertEquals(0, left.signum(), gl + " left " + left); // nothing remains receivable on the loan
+        }
+
+        // After write-off, M-Pesa receipts for the loan are recoveries, up to what was written off.
+        String recoveryCheck = """
+            {"tenantId":"%s","shortCode":"600992","billRef":"LN-B00001","amount":"%s","currency":"KES"}
+            """;
+        assertEquals("0", JsonPath.read(c2b("/validation", recoveryCheck.formatted(TENANT_B, "2000.00"), integrationToken(), ok),
+                "$.resultCode"));
+        assertEquals("C2B00012", JsonPath.read(c2b("/validation", recoveryCheck.formatted(TENANT_B, "10530.01"), integrationToken(),
+                ok), "$.resultCode"));
+        String recovered = c2b("", """
+            {"tenantId":"%s","transId":"RCVB000001","shortCode":"600992","amount":"2000.00","currency":"KES","billRef":"LN-B00001",
+             "msisdnMasked":"2547*****678","transTime":"2026-12-01T10:15:00+03:00"}
+            """.formatted(TENANT_B), integrationToken(), ok);
+        assertEquals("LOAN_RECOVERY", JsonPath.read(recovered, "$.outcome"));
+        String afterRecovery = mvc.perform(get("/api/v1/lending/loans/LN-B00001/write-off").with(supB)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString();
+        assertEquals("2000.00", JsonPath.read(afterRecovery, "$.recovered"));
+        assertEquals(List.of("RCVB000001"), JsonPath.read(afterRecovery, "$.recoveries[*].providerRef"));
     }
 }

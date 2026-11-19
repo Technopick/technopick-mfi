@@ -15,6 +15,7 @@ import ke.co.technopick.mfi.core.accounting.domain.JournalLine;
 import ke.co.technopick.mfi.core.accounting.domain.Side;
 import ke.co.technopick.mfi.core.accounting.persistence.JdbcJournal;
 import ke.co.technopick.mfi.core.lending.application.LoanRepaymentService;
+import ke.co.technopick.mfi.core.lending.application.LoanWriteOffService;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.tenancy.persistence.BusinessDates;
 import ke.co.technopick.mfi.core.tenancy.persistence.TenantSession;
@@ -46,7 +47,7 @@ public class MpesaC2bService {
     public record C2bPayment(UUID tenantId, String transId, String shortCode, Money amount, String billRef,
                              String msisdnMasked, OffsetDateTime transTime, String correlationId) { }
 
-    public enum Outcome { APPLIED, LOAN_REPAYMENT, UNMATCHED }
+    public enum Outcome { APPLIED, LOAN_REPAYMENT, LOAN_RECOVERY, UNMATCHED }
 
     public record Applied(UUID paymentId, Outcome outcome, UUID journalEntryId, String accountNumber, boolean replayed) { }
 
@@ -63,9 +64,11 @@ public class MpesaC2bService {
     private final JdbcJournal journal;
     private final Outbox outbox;
     private final LoanRepaymentService loans;
+    private final LoanWriteOffService writeOffs;
 
     public MpesaC2bService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, JdbcJournal journal,
-                           Outbox outbox, LoanRepaymentService loans) {
+                           Outbox outbox, LoanRepaymentService loans, LoanWriteOffService writeOffs) {
+        this.writeOffs = writeOffs;
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
@@ -90,6 +93,13 @@ public class MpesaC2bService {
             return Validation.accept();
         }
         if (activeLoan(billRef).isPresent()) {
+            return Validation.accept();
+        }
+        boolean recoverable = billRef != null && loans.findByNumber(billRef.strip().toUpperCase(Locale.ROOT))
+                .filter(l -> "WRITTEN_OFF".equals(l.status()))
+                .flatMap(l -> writeOffs.recoverable(l.loanId()))
+                .map(r -> r.compareTo(amount.amount()) >= 0).orElse(false);
+        if (recoverable) {
             return Validation.accept();
         }
         return new Validation("C2B00012", "Invalid account number");
@@ -122,11 +132,21 @@ public class MpesaC2bService {
         }
         Optional<Account> account = account(p.billRef()).filter(MpesaC2bService::acceptsCredits);
         Optional<LoanRepaymentService.LoanRef> loan = account.isPresent() ? Optional.empty() : activeLoan(p.billRef());
+        // A written-off loan still collects: the receipt is a recovery if it fits in what was written off (ADR-0022).
+        Optional<LoanRepaymentService.LoanRef> recovery = account.isPresent() || loan.isPresent() ? Optional.empty()
+                : loans.findByNumber(p.billRef().strip().toUpperCase(Locale.ROOT))
+                    .filter(l -> "WRITTEN_OFF".equals(l.status()))
+                    .filter(l -> writeOffs.recoverable(l.loanId())
+                            .map(r -> r.compareTo(p.amount().amount()) >= 0).orElse(false));
         String key = ("MPESA_C2B".equals(provider) ? "mpesa-c2b:" : "mpesa-stk:") + p.transId();
         UUID paymentId = UUID.nameUUIDFromBytes((p.tenantId() + "|payment|" + key).getBytes(StandardCharsets.UTF_8));
         UUID entryId;
         Outcome outcome;
-        if (loan.isPresent()) {
+        if (recovery.isPresent()) {
+            entryId = writeOffs.recordRecovery(p.tenantId(), recovery.get().loanId(), p.amount(), provider, p.transId(),
+                    paybill.glClearing(), businessDates.current(), p.correlationId(), "provider:mpesa");
+            outcome = Outcome.LOAN_RECOVERY;
+        } else if (loan.isPresent()) {
             LoanRepaymentService.Result r = loans.apply(p.tenantId(), loan.get().loanId(), p.amount(), provider,
                     p.transId(), paybill.glClearing(), businessDates.current(), p.correlationId(), "provider:mpesa");
             entryId = r.journalEntryId();
@@ -160,7 +180,7 @@ public class MpesaC2bService {
             .param("time", p.transTime())
             .param("status", outcome.name())
             .param("account", account.map(Account::accountId).orElse(null))
-            .param("loan", loan.map(LoanRepaymentService.LoanRef::loanId).orElse(null))
+            .param("loan", loan.or(() -> recovery).map(LoanRepaymentService.LoanRef::loanId).orElse(null))
             .param("entry", entryId)
             .update();
         outbox.record(p.tenantId(), "MpesaPaymentReceived", "provider_payment", paymentId.toString(),
@@ -168,11 +188,12 @@ public class MpesaC2bService {
                         .formatted(paymentId, provider, p.transId(), outcome, p.amount().amount().toPlainString(),
                                 p.amount().currency().getCurrencyCode(),
                                 account.map(a -> ",\"accountId\":\"" + a.accountId() + "\"")
-                                        .or(() -> loan.map(l -> ",\"loanId\":\"" + l.loanId() + "\""))
+                                        .or(() -> loan.or(() -> recovery).map(l -> ",\"loanId\":\"" + l.loanId() + "\""))
                                         .orElse("")),
                 p.correlationId());
         return new Applied(paymentId, outcome, entryId,
-                account.map(Account::accountNumber).or(() -> loan.map(LoanRepaymentService.LoanRef::loanNumber)).orElse(null),
+                account.map(Account::accountNumber)
+                        .or(() -> loan.or(() -> recovery).map(LoanRepaymentService.LoanRef::loanNumber)).orElse(null),
                 false);
     }
 
