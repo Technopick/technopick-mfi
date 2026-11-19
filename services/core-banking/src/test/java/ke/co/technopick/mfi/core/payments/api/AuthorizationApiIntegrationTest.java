@@ -123,7 +123,11 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '4300-PENALTY-INCOME', 'Penalty income', 'INCOME', 'KES', false),
               ('%1$s', '2400-LOAN-OVERPAYMENTS', 'Loan overpayments', 'LIABILITY', 'KES', false),
               ('%1$s', '5100-LOAN-WRITE-OFFS', 'Loan write-offs', 'EXPENSE', 'KES', false),
-              ('%1$s', '1110-MPESA-B2C-CLEARING', 'M-Pesa B2C clearing', 'ASSET', 'KES', false);
+              ('%1$s', '1110-MPESA-B2C-CLEARING', 'M-Pesa B2C clearing', 'ASSET', 'KES', false),
+              ('%1$s', '1001-TILL-NBO01-01', 'Till NBO01-T1', 'ASSET', 'KES', false),
+              ('%1$s', '1002-TILL-NBO01-02', 'Till NBO01-T2', 'ASSET', 'KES', false),
+              ('%1$s', '5200-TELLER-SHORTAGES', 'Teller shortages', 'EXPENSE', 'KES', false),
+              ('%1$s', '2950-TELLER-OVERAGES', 'Teller overages', 'LIABILITY', 'KES', false);
             INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date) VALUES
               ('%1$s', '2026-10', '2026-10-01', '2026-10-31'),
               ('%1$s', '2026-11', '2026-11-01', '2026-11-30');
@@ -213,8 +217,11 @@ class AuthorizationApiIntegrationTest {
             BEGIN;
             INSERT INTO payments.mpesa_b2c_account (tenant_id, short_code, branch_code, gl_clearing)
               VALUES ('%1$s', '600000', 'NBO01', '1110-MPESA-B2C-CLEARING');
-            INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash)
-              VALUES ('%1$s', 'NBO01', 'KES', '1000-VAULT-CASH');
+            INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash, gl_shortage, gl_overage)
+              VALUES ('%1$s', 'NBO01', 'KES', '1000-VAULT-CASH', '5200-TELLER-SHORTAGES', '2950-TELLER-OVERAGES');
+            INSERT INTO savings.till (tenant_id, till_id, till_code, branch_code, currency, gl_cash) VALUES
+              ('%1$s', '7e000000-0000-0000-0000-000000000001', 'NBO01-T1', 'NBO01', 'KES', '1001-TILL-NBO01-01'),
+              ('%1$s', '7e000000-0000-0000-0000-000000000002', 'NBO01-T2', 'NBO01', 'KES', '1002-TILL-NBO01-02');
             INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above)
               VALUES ('%1$s', 'KES', 50000, 1000000);
             INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency,
@@ -1093,6 +1100,12 @@ class AuthorizationApiIntegrationTest {
                 .content("{\"idempotencyKey\":\"sav-open-2\",\"customerNumber\":\"" + pendingCustomer + "\",\"productCode\":\"SAV01\",\"branchCode\":\"NBO01\"}"))
             .andExpect(status().isBadRequest());
 
+        // No cash without an open till.
+        assertEquals(Boolean.TRUE, cashTxn(cash("t-dep-0", account, "DEPOSIT", "100"), tellerUser, status().isBadRequest())
+                .contains("open your till"));
+        mvc.perform(post("/api/v1/savings/till-sessions").with(tellerUser).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tillCode\":\"NBO01-T1\"}")).andExpect(ok);
+
         assertEquals("POSTED", JsonPath.read(cashTxn(cash("t-dep-1", account, "DEPOSIT", "100000"), tellerUser, ok), "$.status"));
         assertEquals(Boolean.TRUE, JsonPath.read(cashTxn(cash("t-dep-1", account, "DEPOSIT", "100000"), tellerUser, ok), "$.replayed"));
         cashTxn(cash("t-dep-1", account, "DEPOSIT", "5"), tellerUser, status().isConflict());
@@ -1145,5 +1158,100 @@ class AuthorizationApiIntegrationTest {
         // The savings account receives paybill payments like any other account.
         assertEquals("APPLIED", JsonPath.read(c2b("", confirmation("SIMSAV0001", account, "250.00"), integrationToken(), ok), "$.outcome"));
         expectBalance(account, "20249.50", "0.00", "20249.50");
+    }
+
+    String tillPost(String path, String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,
+                    org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        var result = mvc.perform(post("/api/v1/savings" + path).with(who).contentType(MediaType.APPLICATION_JSON)
+                .content(body)).andReturn();
+        String response = result.getResponse().getContentAsString();
+        try {
+            expected.match(result);
+        } catch (AssertionError e) {
+            throw new AssertionError(e.getMessage() + " - response: " + response, e);
+        }
+        return response;
+    }
+
+    /** A till day: open, vault cash in (approved by another person), serve customers, count, approve a shortage. */
+    @Test
+    void tellerTillDay() throws Exception {
+        var ok = status().isOk();
+        var teller = staff("teller-2", "TELLER");
+        var sup = staff("sup-2", "SUPERVISOR");
+        String customer = registerAndVerify("till-c", "55667788");
+        String account = JsonPath.read(mvc.perform(post("/api/v1/savings/accounts").with(teller).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"till-open-1\",\"customerNumber\":\"" + customer + "\",\"productCode\":\"SAV01\",\"branchCode\":\"NBO01\"}"))
+            .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.accountNumber");
+
+        tillPost("/till-sessions", "{\"tillCode\":\"NBO01-T9\"}", teller, status().isBadRequest());
+        String opened = tillPost("/till-sessions", "{\"tillCode\":\"NBO01-T2\"}", teller, ok);
+        String sessionId = JsonPath.read(opened, "$.sessionId");
+        assertEquals("OPEN", JsonPath.read(opened, "$.status"));
+        assertEquals("0.00", JsonPath.read(opened, "$.expectedCash"));
+        tillPost("/till-sessions", "{\"tillCode\":\"NBO01-T1\"}", teller, status().isConflict()); // one till per teller
+        tillPost("/till-sessions", "{\"tillCode\":\"NBO01-T2\"}", staff("teller-3", "TELLER"), status().isConflict());
+        tillPost("/till-sessions", "{\"tillCode\":\"NBO01-T2\"}", sup, status().isForbidden());
+
+        // Paying out needs cash in the till.
+        cashTxn(cash("till-d-1", account, "DEPOSIT", "30000"), teller, ok);
+        assertEquals(Boolean.TRUE, cashTxn(cash("till-w-0", account, "WITHDRAWAL", "100"), teller, ok).contains("POSTED"));
+
+        String tr = "{\"idempotencyKey\":\"till-x-1\",\"direction\":\"VAULT_TO_TILL\",\"amount\":\"50000\"}";
+        String transfer = tillPost("/till-sessions/" + sessionId + "/transfers", tr, teller, ok);
+        String transferId = JsonPath.read(transfer, "$.transferId");
+        assertEquals("PENDING", JsonPath.read(transfer, "$.status"));
+        assertEquals(Boolean.TRUE, JsonPath.read(tillPost("/till-sessions/" + sessionId + "/transfers", tr, teller, ok), "$.replayed"));
+        tillPost("/till-sessions/" + sessionId + "/transfers", tr.replace("50000", "1"), teller, status().isConflict());
+        tillPost("/till-sessions/" + sessionId + "/transfers", tr.replace("till-x-1", "till-x-2"), staff("teller-3", "TELLER"),
+                status().isForbidden()); // not their till
+        tillPost("/cash-transfers/" + transferId + "/approve", "{}", teller, status().isForbidden());
+        // Cannot close while the transfer waits.
+        tillPost("/till-sessions/" + sessionId + "/close", "{\"countedAmount\":\"0\"}", teller, status().isUnprocessableContent());
+        assertEquals(Boolean.TRUE, mvc.perform(get("/api/v1/savings/cash-transfers").with(sup)).andExpect(ok).andReturn()
+                .getResponse().getContentAsString().contains(transferId));
+        assertEquals("POSTED", JsonPath.read(tillPost("/cash-transfers/" + transferId + "/approve", "{}", sup, ok), "$.status"));
+        tillPost("/cash-transfers/" + transferId + "/approve", "{}", sup, status().isConflict());
+
+        // Returning more than the till holds is refused.
+        tillPost("/till-sessions/" + sessionId + "/transfers",
+                "{\"idempotencyKey\":\"till-x-3\",\"direction\":\"TILL_TO_VAULT\",\"amount\":\"999999\"}", teller,
+                status().isBadRequest());
+
+        String mine = mvc.perform(get("/api/v1/savings/till-sessions/mine").with(teller)).andExpect(ok).andReturn()
+            .getResponse().getContentAsString();
+        assertEquals("79900.00", JsonPath.read(mine, "$.expectedCash"));
+
+        // Count 79,800: a 100 shortage waits for the supervisor.
+        String closing = tillPost("/till-sessions/" + sessionId + "/close", "{\"countedAmount\":\"79800\"}", teller, ok);
+        assertEquals("CLOSING", JsonPath.read(closing, "$.status"));
+        assertEquals("-100.00", JsonPath.read(closing, "$.variance"));
+        cashTxn(cash("till-d-2", account, "DEPOSIT", "10"), teller, status().isBadRequest()); // no cash while closing
+        // The supervisor sends it back for a recount; the teller recounts and finds 79,850.
+        tillPost("/till-sessions/" + sessionId + "/recount", "{\"reason\":\"Count the 50s again\"}", sup, ok);
+        assertEquals("CLOSING", JsonPath.read(tillPost("/till-sessions/" + sessionId + "/close",
+                "{\"countedAmount\":\"79850\"}", teller, ok), "$.status"));
+        tillPost("/till-sessions/" + sessionId + "/approve-variance", "{\"reason\":\"x\"}", sup, status().isBadRequest());
+        tillPost("/till-sessions/" + sessionId + "/approve-variance", "{\"reason\":\"Shortage accepted\"}",
+                staff("teller-2", "SUPERVISOR"), status().isForbidden()); // the teller cannot approve their own count
+        assertEquals(Boolean.TRUE, mvc.perform(get("/api/v1/savings/till-sessions/closing").with(sup)).andExpect(ok).andReturn()
+                .getResponse().getContentAsString().contains(sessionId));
+        String closed = tillPost("/till-sessions/" + sessionId + "/approve-variance",
+                "{\"reason\":\"Shortage of 50 accepted; teller counselled\"}", sup, ok);
+        assertEquals("CLOSED", JsonPath.read(closed, "$.status"));
+        assertEquals("-50.00", JsonPath.read(closed, "$.variance"));
+        assertEquals("79850.00", JsonPath.read(closed, "$.expectedCash")); // ledger now matches the count
+        mvc.perform(get("/api/v1/savings/till-sessions/mine").with(teller)).andExpect(status().isNotFound());
+        Long shortages = owner().queryForObject("""
+                SELECT sum(CASE side WHEN 'D' THEN amount ELSE -amount END) FROM ledger.journal_line
+                 WHERE tenant_id = ? AND account_code = '5200-TELLER-SHORTAGES'
+                """, Long.class, java.util.UUID.fromString(TENANT_A));
+        assertEquals(50L, shortages);
+
+        // Next day: a balanced count closes at once.
+        String again = tillPost("/till-sessions", "{\"tillCode\":\"NBO01-T2\"}", teller, ok);
+        assertEquals("79850.00", JsonPath.read(again, "$.expectedCash"));
+        assertEquals("CLOSED", JsonPath.read(tillPost("/till-sessions/" + JsonPath.read(again, "$.sessionId") + "/close",
+                "{\"countedAmount\":\"79850.00\"}", teller, ok), "$.status"));
     }
 }

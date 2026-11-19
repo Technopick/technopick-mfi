@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Teller cash deposits and withdrawals (ADR-0017). Each posts Dr/Cr the branch cash account against
+ * Teller cash deposits and withdrawals (ADR-0017, ADR-0018). Each posts Dr/Cr the teller's till against
  * the account's savings control (with the account as subledger) in one transaction. Amounts above
  * the tenant's policy wait for a second person; the database decides that, and refuses an
  * overdrawing withdrawal at commit whatever the application does.
@@ -42,7 +42,7 @@ public class TellerService {
                                         String decisionReason, UUID journalEntryId, boolean replayed) { }
 
     private record Txn(UUID id, UUID accountId, Kind kind, BigDecimal amount, String currency, String branch,
-                       String narrative, String status, String requestedBy) { }
+                       String narrative, String status, String requestedBy, UUID sessionId) { }
 
     private final JdbcClient jdbc;
     private final TenantSession session;
@@ -51,9 +51,11 @@ public class TellerService {
     private final CustomerService customers;
     private final JournalPosting journal;
     private final Outbox outbox;
+    private final TillService tills;
 
     public TellerService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, JdbcDepositAccounts accounts,
-                         CustomerService customers, JournalPosting journal, Outbox outbox) {
+                         CustomerService customers, JournalPosting journal, Outbox outbox, TillService tills) {
+        this.tills = tills;
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
@@ -84,10 +86,20 @@ public class TellerService {
             throw new IllegalArgumentException("amount must be positive");
         }
         checkAccountAllows(account, kind);
+        TillService.OpenTill till = tills.openTillOf(actor)
+                .orElseThrow(() -> new IllegalArgumentException("open your till before taking or paying out cash"));
+        if (!till.branchCode().equals(account.branchCode()) || !till.currency().equals(account.currency().getCurrencyCode())) {
+            throw new IllegalArgumentException("your till " + till.tillCode() + " is at branch " + till.branchCode()
+                    + "; the account is held at " + account.branchCode());
+        }
         if (kind == Kind.WITHDRAWAL) {
             BigDecimal available = accounts.balances(account.accountNumber()).map(b -> b[2]).orElse(BigDecimal.ZERO);
             if (available.compareTo(amount.amount()) < 0) {
                 throw new IllegalArgumentException("insufficient available balance (" + plain(available) + ")");
+            }
+            BigDecimal inTill = tills.tillCash(till.glCash());
+            if (inTill.compareTo(amount.amount()) < 0) {
+                throw new IllegalArgumentException("your till holds only " + plain(inTill) + "; ask for cash from the vault");
             }
         }
         BigDecimal threshold = jdbc.sql("""
@@ -99,16 +111,18 @@ public class TellerService {
                     + account.currency().getCurrencyCode()));
         boolean needsApproval = askApproval || amount.amount().compareTo(threshold) > 0;
         UUID txnId = UUID.randomUUID();
-        UUID entryId = needsApproval ? null : post(tenantId, txnId, account, kind, amount, actor);
+        UUID entryId = needsApproval ? null : post(tenantId, txnId, account, kind, amount, till.glCash(), actor);
         jdbc.sql("""
                 INSERT INTO savings.teller_transaction (tenant_id, txn_id, idempotency_key, account_id, kind, amount, currency,
-                    branch_code, narrative, status, requested_by, journal_entry_id)
-                VALUES (:tenant, :id, :key, :account, :kind, :amount, :ccy, :branch, :narrative, :status, :actor, :entry)
+                    branch_code, narrative, status, requested_by, journal_entry_id, session_id)
+                VALUES (:tenant, :id, :key, :account, :kind, :amount, :ccy, :branch, :narrative, :status, :actor, :entry,
+                    :session)
                 """)
             .param("tenant", tenantId).param("id", txnId).param("key", idempotencyKey).param("account", account.accountId())
             .param("kind", kind.name()).param("amount", amount.amount()).param("ccy", account.currency().getCurrencyCode())
             .param("branch", account.branchCode()).param("narrative", narrative(narrative, kind))
             .param("status", needsApproval ? "PENDING_APPROVAL" : "POSTED").param("actor", actor).param("entry", entryId)
+            .param("session", till.sessionId())
             .update();
         return view(tenantId, txnId, false);
     }
@@ -117,14 +131,14 @@ public class TellerService {
     public TellerTransactionView decide(UUID tenantId, UUID txnId, boolean approve, String reason, String actor) {
         session.bind(tenantId);
         Txn t = jdbc.sql("""
-                SELECT txn_id, account_id, kind, amount, currency, branch_code, narrative, status, requested_by
+                SELECT txn_id, account_id, kind, amount, currency, branch_code, narrative, status, requested_by, session_id
                   FROM savings.teller_transaction WHERE txn_id = :id FOR UPDATE
                 """)
             .param("id", txnId)
             .query((rs, i) -> new Txn(rs.getObject("txn_id", UUID.class), rs.getObject("account_id", UUID.class),
                     Kind.valueOf(rs.getString("kind")), rs.getBigDecimal("amount"), rs.getString("currency"),
                     rs.getString("branch_code"), rs.getString("narrative"), rs.getString("status"),
-                    rs.getString("requested_by")))
+                    rs.getString("requested_by"), rs.getObject("session_id", UUID.class)))
             .optional().orElseThrow(() -> new NotFoundException("teller transaction not found"));
         if (!"PENDING_APPROVAL".equals(t.status())) {
             throw new ConflictException("transaction is already " + t.status());
@@ -146,7 +160,11 @@ public class TellerService {
         JdbcDepositAccounts.AccountRow account = accounts.lockById(t.accountId())
                 .orElseThrow(() -> new IllegalStateException("account missing"));
         checkAccountAllows(account, t.kind());
-        UUID entryId = post(tenantId, txnId, account, t.kind(), money(t.amount(), account.currency()), actor);
+        String tillGl = tills.tillGlOfSession(t.sessionId());
+        if (t.kind() == Kind.WITHDRAWAL && tills.tillCash(tillGl).compareTo(t.amount()) < 0) {
+            throw new IllegalArgumentException("the teller's till holds only " + plain(tills.tillCash(tillGl)));
+        }
+        UUID entryId = post(tenantId, txnId, account, t.kind(), money(t.amount(), account.currency()), tillGl, actor);
         jdbc.sql("""
                 UPDATE savings.teller_transaction SET status = 'POSTED', decided_by = :actor, decision_reason = :reason,
                        journal_entry_id = :entry
@@ -203,11 +221,7 @@ public class TellerService {
     }
 
     private UUID post(UUID tenantId, UUID txnId, JdbcDepositAccounts.AccountRow account, Kind kind, Money amount,
-                      String actor) {
-        String cashGl = jdbc.sql("SELECT gl_cash FROM savings.branch_cash_account WHERE branch_code = :b AND currency = :c")
-            .param("b", account.branchCode()).param("c", account.currency().getCurrencyCode()).query(String.class)
-            .optional().orElseThrow(() -> new IllegalStateException("no cash account configured for branch "
-                    + account.branchCode()));
+                      String cashGl, String actor) {
         String key = "teller:" + txnId;
         UUID entryId = UUID.nameUUIDFromBytes((tenantId + "|" + key).getBytes(StandardCharsets.UTF_8));
         JournalLine cash = kind == Kind.DEPOSIT ? JournalLine.debit(cashGl, amount, account.branchCode())

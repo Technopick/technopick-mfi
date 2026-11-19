@@ -59,6 +59,13 @@ END $$;
 COMMIT;
 \echo PASS D1 D2 accounts only for verified customers, owner fixed, numbers 2+8 digits+Luhn
 
+-- The teller works in an open till session (V17).
+BEGIN;
+SET LOCAL app.tenant_id = :tA;
+INSERT INTO savings.till_session (tenant_id, session_id, till_id, teller, business_date)
+VALUES (:tA::uuid, '5e000000-0000-0000-0000-000000000001', '7e000000-0000-0000-0000-000000000001', 'user:teller', '2026-11-18');
+COMMIT;
+
 -- Deposit of 100,000 (below the 1,000,000 deposit threshold) posts directly.
 BEGIN;
 SET LOCAL app.tenant_id = :tA;
@@ -68,9 +75,10 @@ INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, sid
   (:tA::uuid, 'de000000-0000-0000-0000-000000000001', 1, '1001-TEST-CASH', 'D', 100000, 'KES', 'NBO01', NULL),
   (:tA::uuid, 'de000000-0000-0000-0000-000000000001', 2, '2111-TEST-SAVINGS', 'C', 100000, 'KES', 'NBO01', 'aa000000-0000-0000-0000-0000000000d1');
 INSERT INTO savings.teller_transaction (tenant_id, txn_id, idempotency_key, account_id, kind, amount, currency, branch_code,
-    narrative, status, requested_by, journal_entry_id)
+    narrative, status, requested_by, journal_entry_id, session_id)
 VALUES (:tA::uuid, 'ee000000-0000-0000-0000-000000000001', 't-1', 'aa000000-0000-0000-0000-0000000000d1', 'DEPOSIT', 100000, 'KES',
-        'NBO01', 'Cash deposit', 'POSTED', 'user:teller', 'de000000-0000-0000-0000-000000000001');
+        'NBO01', 'Cash deposit', 'POSTED', 'user:teller', 'de000000-0000-0000-0000-000000000001',
+        '5e000000-0000-0000-0000-000000000001');
 COMMIT;
 
 BEGIN;
@@ -78,17 +86,18 @@ SET LOCAL app.tenant_id = :tA;
 DO $$
 BEGIN
   INSERT INTO savings.teller_transaction (tenant_id, txn_id, idempotency_key, account_id, kind, amount, currency, branch_code,
-      narrative, status, requested_by, journal_entry_id)
+      narrative, status, requested_by, journal_entry_id, session_id)
   VALUES ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), 't-2', 'aa000000-0000-0000-0000-0000000000d1', 'WITHDRAWAL',
-          60000, 'KES', 'NBO01', 'Cash withdrawal', 'POSTED', 'user:teller', 'de000000-0000-0000-0000-000000000001');
+          60000, 'KES', 'NBO01', 'Cash withdrawal', 'POSTED', 'user:teller', 'de000000-0000-0000-0000-000000000001',
+          '5e000000-0000-0000-0000-000000000001');
   RAISE EXCEPTION 'TEST FAILED D4a: large withdrawal posted without approval';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM NOT LIKE 'TELLER_APPROVAL_REQUIRED%' THEN RAISE; END IF;
 END $$;
 INSERT INTO savings.teller_transaction (tenant_id, txn_id, idempotency_key, account_id, kind, amount, currency, branch_code,
-    narrative, status, requested_by)
+    narrative, status, requested_by, session_id)
 VALUES (:tA::uuid, 'ee000000-0000-0000-0000-000000000002', 't-2', 'aa000000-0000-0000-0000-0000000000d1', 'WITHDRAWAL', 60000, 'KES',
-        'NBO01', 'Cash withdrawal', 'PENDING_APPROVAL', 'user:teller');
+        'NBO01', 'Cash withdrawal', 'PENDING_APPROVAL', 'user:teller', '5e000000-0000-0000-0000-000000000001');
 DO $$
 BEGIN
   IF NOT (SELECT requires_approval FROM savings.teller_transaction WHERE txn_id = 'ee000000-0000-0000-0000-000000000002') THEN

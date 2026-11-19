@@ -74,17 +74,28 @@ echo "== teller configuration (platform administration, as owner)"
 psql -v ON_ERROR_STOP=1 -q -d "$DB" <<'SQL'
 INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
  ('00000000-0000-0000-0000-0000000000a1', '2111-TEST-SAVINGS', 'TEST savings control', 'LIABILITY', 'KES', true),
- ('00000000-0000-0000-0000-0000000000a1', '1001-TEST-CASH', 'TEST branch cash', 'ASSET', 'KES', false);
+ ('00000000-0000-0000-0000-0000000000a1', '1001-TEST-CASH', 'TEST branch cash', 'ASSET', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '1002-TEST-TILL-1', 'TEST till 1', 'ASSET', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '1003-TEST-TILL-2', 'TEST till 2', 'ASSET', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '5200-TEST-SHORTAGE', 'TEST teller shortages', 'EXPENSE', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '2950-TEST-OVERAGE', 'TEST teller overages', 'LIABILITY', 'KES', false);
 INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account) VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'SAVT', 'TEST savings', 'KES', '2111-TEST-SAVINGS');
 INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash) VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'NBO01', 'KES', '1001-TEST-CASH');
+UPDATE savings.branch_cash_account SET gl_shortage = '5200-TEST-SHORTAGE', gl_overage = '2950-TEST-OVERAGE';
+INSERT INTO savings.till (tenant_id, till_id, till_code, branch_code, currency, gl_cash) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', '7e000000-0000-0000-0000-000000000001', 'NBO01-T1', 'NBO01', 'KES', '1002-TEST-TILL-1'),
+ ('00000000-0000-0000-0000-0000000000a1', '7e000000-0000-0000-0000-000000000002', 'NBO01-T2', 'NBO01', 'KES', '1003-TEST-TILL-2');
 INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above) VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'KES', 50000, 1000000);
 SQL
 
 echo "== savings accounts and teller tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/savings_teller_test.sql"
+
+echo "== teller till tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/till_test.sql"
 
 echo "== Loan origination tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/loan_origination_test.sql"
