@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import ke.co.technopick.mfi.core.accounting.application.ReconciliationService;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService;
@@ -22,7 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Closes the business day (ADR-0019, ADR-0020). Steps, each in its own transaction so a crash
  * resumes without double posting: start (or resume) the run; for each active loan accrue interest,
  * charge penalties and snapshot arrears; accrue savings interest per product and branch; credit
- * interest to accounts on the last day of the month; then complete the run and move the business
+ * interest to accounts on the last day of the month; record the subledger-to-control
+ * reconciliation (ADR-0024); then complete the run and move the business
  * date forward one day. The database refuses to complete while any till is open (V18) and refuses
  * to move the date before the run has completed (V4).
  */
@@ -40,7 +42,7 @@ public class EndOfDayService {
 
     public record EndOfDaySummary(LocalDate closedDate, LocalDate newBusinessDate, int loansProcessed,
                                   String loanInterestAccrued, String penaltiesCharged, int loansInArrears,
-                                  int loansClosed, String creditApplied,
+                                  int loansClosed, String creditApplied, int reconciliationDifferences,
                                   int accountsAccrued,
                                   String interestAccrued, int accountsCredited, String interestCredited,
                                   String taxWithheld) { }
@@ -49,11 +51,13 @@ public class EndOfDayService {
     private final TenantSession session;
     private final SavingsInterestService interest;
     private final LoanEndOfDayStep loans;
+    private final ReconciliationService reconciliation;
     private final Outbox outbox;
     private final TransactionTemplate tx;
 
     public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, LoanEndOfDayStep loans,
-                           Outbox outbox, PlatformTransactionManager transactions) {
+                           ReconciliationService reconciliation, Outbox outbox, PlatformTransactionManager transactions) {
+        this.reconciliation = reconciliation;
         this.loans = loans;
         this.jdbc = jdbc;
         this.session = session;
@@ -162,18 +166,21 @@ public class EndOfDayService {
             BigDecimal taxTotal = tax;
             return tx.execute(s -> {
                 session.bind(tenantId);
+                int differences = (int) reconciliation.record(tenantId, date).stream()
+                    .filter(r -> !r.reconciled()).count();
                 int processedToday = jdbc.sql("SELECT count(*) FROM lending.arrears_snapshot WHERE as_of = :d")
                     .param("d", date).query(Integer.class).single();
                 jdbc.sql("UPDATE ledger.eod_run SET status = 'COMPLETED', loans_processed = :n WHERE business_date = :d")
                     .param("n", processedToday).param("d", date).update();
                 jdbc.sql("UPDATE tenancy.business_date SET current_date_ = current_date_ + 1").update();
                 outbox.record(tenantId, "BusinessDayClosed", "eod_run", tenantId + ":" + date,
-                        "{\"closedDate\":\"%s\",\"newBusinessDate\":\"%s\",\"loansProcessed\":%d,\"loanInterestAccrued\":\"%s\",\"penaltiesCharged\":\"%s\",\"interestAccrued\":\"%s\",\"interestCredited\":\"%s\"}"
+                        "{\"closedDate\":\"%s\",\"newBusinessDate\":\"%s\",\"loansProcessed\":%d,\"loanInterestAccrued\":\"%s\",\"penaltiesCharged\":\"%s\",\"interestAccrued\":\"%s\",\"interestCredited\":\"%s\",\"reconciliationDifferences\":%d}"
                                 .formatted(date, date.plusDays(1), processedToday, loanInterestTotal.toPlainString(),
-                                        penaltyTotal.toPlainString(), accruedTotal.toPlainString(), creditedNet.toPlainString()),
+                                        penaltyTotal.toPlainString(), accruedTotal.toPlainString(), creditedNet.toPlainString(),
+                                        differences),
                         "eod:" + date);
                 return new EndOfDaySummary(date, date.plusDays(1), loanCount, loanInterestTotal.toPlainString(),
-                        penaltyTotal.toPlainString(), arrearsCount, closedCount, creditTotal.toPlainString(),
+                        penaltyTotal.toPlainString(), arrearsCount, closedCount, creditTotal.toPlainString(), differences,
                         accruedAccounts, accruedTotal.toPlainString(),
                         creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString());
             });

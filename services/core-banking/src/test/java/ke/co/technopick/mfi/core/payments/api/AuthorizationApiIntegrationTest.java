@@ -1409,6 +1409,7 @@ class AuthorizationApiIntegrationTest {
         assertEquals("378.00", JsonPath.read(day1, "$.loanInterestAccrued"));
         assertEquals("200.00", JsonPath.read(day1, "$.penaltiesCharged"));
         assertEquals(1, (Integer) JsonPath.read(day1, "$.loansInArrears"));
+        assertEquals(0, (Integer) JsonPath.read(day1, "$.reconciliationDifferences"));
         String day2 = eodRun(ops, ok);
         assertEquals("8.24", JsonPath.read(day2, "$.interestAccrued"));
         assertEquals("5.00", JsonPath.read(day2, "$.loanInterestAccrued"));
@@ -1416,6 +1417,7 @@ class AuthorizationApiIntegrationTest {
         // 29 Nov: LN-B00002 falls due; its credit pays the 2,060 and the loan closes holding 40.00.
         assertEquals("2060.00", JsonPath.read(day2, "$.creditApplied"));
         assertEquals(1, (Integer) JsonPath.read(day2, "$.loansClosed"));
+        assertEquals(0, (Integer) JsonPath.read(day2, "$.reconciliationDifferences"));
         assertEquals(1, (Integer) JsonPath.read(day2, "$.loansProcessed"));
         assertEquals("CLOSED", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-B00002'", String.class));
         java.math.BigDecimal income = owner().queryForObject("""
@@ -1431,6 +1433,7 @@ class AuthorizationApiIntegrationTest {
         assertEquals(2, (Integer) JsonPath.read(monthEnd, "$.accountsCredited"));
         assertEquals("21.03", JsonPath.read(monthEnd, "$.interestCredited")); // 20.40 + 0.63
         assertEquals("3.71", JsonPath.read(monthEnd, "$.taxWithheld"));     // 3.60 + 0.11
+        assertEquals(0, (Integer) JsonPath.read(monthEnd, "$.reconciliationDifferences"));
 
         String statement = mvc.perform(get("/api/v1/savings/accounts/" + accounts[0] + "/statement").param("from", "2026-11-01")
                 .param("to", "2026-12-01").with(teller)).andExpect(ok).andReturn().getResponse().getContentAsString();
@@ -1562,5 +1565,27 @@ class AuthorizationApiIntegrationTest {
         // Tenant B's finance user cannot open tenant A's entries.
         mvc.perform(get("/api/v1/accounting/journal-entries/44444444-0000-0000-0000-000000000001").with(finance))
             .andExpect(status().isNotFound());
+        // Reconciliation: every closed day matched, and a posting without its business record is caught.
+        String recorded = mvc.perform(get("/api/v1/accounting/reconciliation").param("businessDate", "2026-11-30").with(finance))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals(Boolean.TRUE, JsonPath.read(recorded, "$.recorded"));
+        assertEquals(0, (Integer) JsonPath.read(recorded, "$.differences"));
+        assertEquals(List.of("10000.00"), JsonPath.read(recorded, "$.results[?(@.checkCode == 'LOAN_PRINCIPAL')].subledgerBalance"));
+        assertEquals(List.of("0.00"), JsonPath.read(recorded, "$.results[?(@.checkCode == 'SAVINGS_INTEREST_PAYABLE')].ledgerBalance")); // all credited at month end
+        assertEquals(0, (Integer) JsonPath.read(mvc.perform(get("/api/v1/accounting/reconciliation").with(finance)).andExpect(ok)
+                .andReturn().getResponse().getContentAsString(), "$.differences"));
+        owner().execute("""
+            BEGIN;
+            INSERT INTO ledger.journal_entry (tenant_id, entry_id, idempotency_key, business_date, source, correlation_id, actor)
+              VALUES ('%1$s', '77777777-0000-0000-0000-0000000000bf', 'stray-principal', '2026-12-01', 'MANUAL', 'test', 'test');
+            INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, side, amount, currency, branch_code) VALUES
+              ('%1$s', '77777777-0000-0000-0000-0000000000bf', 1, '1200-LOANS-PRINCIPAL', 'D', 500, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-0000000000bf', 2, '1110-MPESA-B2C-CLEARING', 'C', 500, 'KES', 'NBO01');
+            COMMIT;
+            """.formatted(TENANT_B));
+        String live = mvc.perform(get("/api/v1/accounting/reconciliation").with(finance)).andExpect(ok).andReturn().getResponse()
+            .getContentAsString();
+        assertEquals(1, (Integer) JsonPath.read(live, "$.differences"));
+        assertEquals(List.of("500.00"), JsonPath.read(live, "$.results[?(@.checkCode == 'LOAN_PRINCIPAL')].difference"));
     }
 }

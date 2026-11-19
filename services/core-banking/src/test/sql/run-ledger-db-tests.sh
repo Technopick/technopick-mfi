@@ -121,6 +121,18 @@ SQL
 echo "== write-off tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/write_off_test.sql"
 
+echo "== reconciliation tests as application role mfi_app"
+RECON_SQL="$(mktemp /tmp/recon-XXXXXX.sql)"
+python3 - "$HERE/../../main/java/ke/co/technopick/mfi/core/accounting/application/ReconciliationService.java" "$RECON_SQL" <<'PY'
+import sys
+s = open(sys.argv[1]).read()
+start = s.index('CHECKS = """') + len('CHECKS = """')
+open(sys.argv[2], 'w').write(s[start:s.index('""";', start)].strip() + ";\n")
+PY
+chmod 644 "$RECON_SQL"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -v recon_sql="$RECON_SQL" -f "$HERE/reconciliation_test.sql"
+rm -f "$RECON_SQL"
+
 echo "== concurrency: two sessions racing for the same funds"
 bash "$HERE/concurrency_hold_race_test.sh" "$DB" "$APP_PW" "${MFI_APP_HOST:-${PGHOST:-localhost}}"
 

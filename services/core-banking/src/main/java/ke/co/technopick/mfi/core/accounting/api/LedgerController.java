@@ -8,6 +8,8 @@ import ke.co.technopick.mfi.core.accounting.application.LedgerReportService.Acco
 import ke.co.technopick.mfi.core.accounting.application.LedgerReportService.EntryView;
 import ke.co.technopick.mfi.core.accounting.application.LedgerReportService.GlAccount;
 import ke.co.technopick.mfi.core.accounting.application.LedgerReportService.TrialBalance;
+import ke.co.technopick.mfi.core.accounting.application.ReconciliationService;
+import ke.co.technopick.mfi.core.accounting.application.ReconciliationService.Reconciliation;
 import ke.co.technopick.mfi.core.identity.api.CurrentCaller;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,10 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class LedgerController {
 
     private final LedgerReportService service;
+    private final ReconciliationService reconciliation;
     private final CurrentCaller caller;
 
-    public LedgerController(LedgerReportService service, CurrentCaller caller) {
+    public LedgerController(LedgerReportService service, ReconciliationService reconciliation, CurrentCaller caller) {
         this.service = service;
+        this.reconciliation = reconciliation;
         this.caller = caller;
     }
 
@@ -54,5 +58,12 @@ public class LedgerController {
     @GetMapping("/journal-entries/{entryId}")
     public EntryView entry(@PathVariable UUID entryId) {
         return service.entry(caller.tenantId(), entryId);
+    }
+
+    /** Subledger-to-control checks: live when no date is given, otherwise as recorded by that day's end of day. */
+    @GetMapping("/reconciliation")
+    public Reconciliation reconciliation(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate businessDate) {
+        return reconciliation.view(caller.tenantId(), businessDate);
     }
 }
