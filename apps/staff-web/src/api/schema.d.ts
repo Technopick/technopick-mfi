@@ -116,6 +116,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/end-of-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EndOfDay_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/end-of-day/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EndOfDay_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/applications": {
         parameters: {
             query?: never;
@@ -1191,6 +1223,33 @@ export interface components {
             requestId?: string;
             shortCode?: string;
         };
+        EndOfDayStatus: {
+            /** Format: int32 */
+            activeLoans?: number;
+            /** Format: date */
+            businessDate?: string;
+            failureReason?: string;
+            interestPostingDay?: boolean;
+            /** Format: date */
+            lastClosedDate?: string;
+            openTills?: components["schemas"]["OpenTill"][];
+            /** Format: date-time */
+            runStartedAt?: string;
+            runStatus?: string;
+        };
+        EndOfDaySummary: {
+            /** Format: int32 */
+            accountsAccrued?: number;
+            /** Format: int32 */
+            accountsCredited?: number;
+            /** Format: date */
+            closedDate?: string;
+            interestAccrued?: string;
+            interestCredited?: string;
+            /** Format: date */
+            newBusinessDate?: string;
+            taxWithheld?: string;
+        };
         LoanApplicationRequest: {
             branchCode: string;
             customerRef: string;
@@ -1303,6 +1362,11 @@ export interface components {
             /** Format: uuid */
             pendingResolutionId?: string;
             providerRef?: string;
+        };
+        OpenTill: {
+            status?: string;
+            teller?: string;
+            tillCode?: string;
         };
         QueryResult: {
             checkoutRequestId: string;
@@ -1745,6 +1809,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+        };
+    };
+    EndOfDay_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDayStatus"];
+                };
+            };
+        };
+    };
+    EndOfDay_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDaySummary"];
                 };
             };
         };

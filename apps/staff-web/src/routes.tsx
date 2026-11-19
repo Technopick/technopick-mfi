@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from "./pages/ApplicationsPage";
 import { CustomerPage, CustomersPage, NewCustomerPage } from "./pages/CustomersPage";
 import { DisbursementsPage } from "./pages/DisbursementsPage";
+import { EndOfDayPage } from "./pages/EndOfDayPage";
 import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
@@ -26,6 +27,7 @@ export const routes: RouteObject[] = [
       { path: "disbursements", element: <DisbursementsPage /> },
       { path: "mpesa", element: <MpesaPage /> },
       { path: "suspense", element: <SuspensePage /> },
+      { path: "end-of-day", element: <EndOfDayPage /> },
       { path: "loans", element: <LoanSchedulePage /> },
       { path: "loans/:number", element: <LoanSchedulePage /> },
       { path: "*", element: <p className="empty">Page not found.</p> },

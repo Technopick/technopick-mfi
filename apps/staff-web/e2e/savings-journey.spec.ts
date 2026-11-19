@@ -73,4 +73,9 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(count).toHaveCount(0);
   await teller.goto("/teller");
   await expect(teller.getByRole("button", { name: "Open till" })).toBeVisible();
+
+  // The day's state is visible to the supervisor (closing it needs loan end of day, not built yet).
+  await supervisor.goto("/end-of-day");
+  await expect(supervisor.getByRole("heading", { level: 1, name: "End of day" })).toBeVisible();
+  await expect(supervisor.getByText("All tills are closed and balanced.")).toBeVisible();
 });

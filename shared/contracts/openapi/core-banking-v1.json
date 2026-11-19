@@ -894,6 +894,72 @@
         },
         "type": "object"
       },
+      "EndOfDayStatus": {
+        "properties": {
+          "activeLoans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "failureReason": {
+            "type": "string"
+          },
+          "interestPostingDay": {
+            "type": "boolean"
+          },
+          "lastClosedDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "openTills": {
+            "items": {
+              "$ref": "#/components/schemas/OpenTill"
+            },
+            "type": "array"
+          },
+          "runStartedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "runStatus": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EndOfDaySummary": {
+        "properties": {
+          "accountsAccrued": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "accountsCredited": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "closedDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "interestAccrued": {
+            "type": "string"
+          },
+          "interestCredited": {
+            "type": "string"
+          },
+          "newBusinessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "taxWithheld": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "LoanApplicationRequest": {
         "properties": {
           "branchCode": {
@@ -1226,6 +1292,20 @@
             "type": "string"
           },
           "providerRef": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OpenTill": {
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "teller": {
+            "type": "string"
+          },
+          "tillCode": {
             "type": "string"
           }
         },
@@ -2286,6 +2366,46 @@
         },
         "tags": [
           "customer-controller"
+        ]
+      }
+    },
+    "/api/v1/end-of-day": {
+      "get": {
+        "operationId": "EndOfDay_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndOfDayStatus"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "end-of-day-controller"
+        ]
+      }
+    },
+    "/api/v1/end-of-day/run": {
+      "post": {
+        "operationId": "EndOfDay_run",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndOfDaySummary"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "end-of-day-controller"
         ]
       }
     },

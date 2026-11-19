@@ -45,8 +45,15 @@ VALUES (:t, '0e2e0000-0000-0000-0000-0000000000c1', 'BIASHARA', 1, 'REDUCING_BAL
         '1230-PENALTY-RECEIVABLE', '4300-PENALTY-INCOME', '2400-LOAN-OVERPAYMENTS', '5100-LOAN-WRITE-OFFS', 'seed:maker');
 UPDATE lending.loan_product_version SET status = 'ACTIVE', approved_by = 'seed:checker'
  WHERE version_id = '0e2e0000-0000-0000-0000-0000000000c1';
-INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account)
-VALUES (:t, 'SAV01', 'Ordinary savings (test)', 'KES', '2110-SAVINGS-CONTROL');
+INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+  (:t, '5300-SAVINGS-INTEREST', 'Interest on savings (test)', 'EXPENSE', 'KES', false),
+  (:t, '2120-INTEREST-PAYABLE', 'Savings interest payable (test)', 'LIABILITY', 'KES', false),
+  (:t, '2960-WHT-PAYABLE', 'Withholding tax payable (test)', 'LIABILITY', 'KES', false);
+-- TEST-ONLY interest terms; real rates and the withholding tax rate need finance and tax sign-off.
+INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account, interest_rate,
+    interest_min_balance, withholding_tax_rate, gl_interest_expense, gl_interest_payable, gl_withholding_tax)
+VALUES (:t, 'SAV01', 'Ordinary savings (test)', 'KES', '2110-SAVINGS-CONTROL', 6, 1000, 15,
+        '5300-SAVINGS-INTEREST', '2120-INTEREST-PAYABLE', '2960-WHT-PAYABLE');
 INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash, gl_shortage, gl_overage)
   VALUES (:t, 'NBO01', 'KES', '1000-CASH-NBO01', '5200-TELLER-SHORTAGES', '2950-TELLER-OVERAGES');
 INSERT INTO savings.till (tenant_id, till_id, till_code, branch_code, currency, gl_cash) VALUES
