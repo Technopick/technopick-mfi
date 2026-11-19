@@ -72,7 +72,7 @@ GitHub Actions on `main`: all four jobs green.
 | Staff web app (worklist, applications, disbursements, M-Pesa close-out, suspense, schedule): money as text, four-eyes hints, role-based navigation, API types match contract, runtime deps audited | 11 UI tests; typecheck; production build | ubuntu and windows |
 | Whole platform in containers (PostgreSQL, RabbitMQ, Keycloak, core, integration, TEST-ONLY Daraja simulator, staff web behind nginx): a browser signs in as officer, manager, supervisor and teller: loan from KYC to M-Pesa disbursement to ACTIVE, and savings from account opening to cash with approval to statement | Playwright (Chromium), 2 journeys | ubuntu (Docker Compose, `infrastructure/e2e`) |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
-| Ledger, savings, teller, lending, origination, customers, EOD, STK, B2C and close-out database rules | 110/110 checks | PostgreSQL 17 service container |
+| Ledger, savings, teller, lending, origination, customers, EOD, STK, B2C and close-out database rules | 109/109 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
