@@ -37,7 +37,8 @@ export function EndOfDayPage() {
           Business day {summary.closedDate} closed; the business date is now {summary.newBusinessDate}.
           {" "}Loans: {summary.loansProcessed} processed, interest accrued {summary.loanInterestAccrued}, penalties{" "}
           {summary.penaltiesCharged}, {summary.loansInArrears} in arrears, {summary.loansClosed} closed (credit applied{" "}
-          {summary.creditApplied}). Savings interest accrued:{" "}
+          {summary.creditApplied}).
+          {(summary.reconciliationDifferences ?? 0) > 0 && <> {summary.reconciliationDifferences} control account(s) did not reconcile.</>} Savings interest accrued:{" "}
           {summary.interestAccrued} on {summary.accountsAccrued} account(s).
           {(summary.accountsCredited ?? 0) > 0 && <> Interest credited: {summary.interestCredited} to {summary.accountsCredited} account(s), tax withheld {summary.taxWithheld}.</>}
         </p>

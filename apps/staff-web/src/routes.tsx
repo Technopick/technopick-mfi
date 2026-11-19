@@ -8,6 +8,7 @@ import { AccountActivityPage, JournalEntryPage, TrialBalancePage } from "./pages
 import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
+import { ReconciliationPage } from "./pages/ReconciliationPage";
 import { WriteOffsPage } from "./pages/WriteOffsPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
 import { SuspensePage } from "./pages/SuspensePage";
@@ -33,6 +34,7 @@ export const routes: RouteObject[] = [
       { path: "end-of-day", element: <EndOfDayPage /> },
       { path: "portfolio", element: <PortfolioPage /> },
       { path: "ledger", element: <TrialBalancePage /> },
+      { path: "ledger/reconciliation", element: <ReconciliationPage /> },
       { path: "ledger/accounts/:code", element: <AccountActivityPage /> },
       { path: "ledger/entries/:id", element: <JournalEntryPage /> },
       { path: "write-offs", element: <WriteOffsPage /> },

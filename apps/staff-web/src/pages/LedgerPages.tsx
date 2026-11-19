@@ -23,6 +23,7 @@ export function TrialBalancePage() {
   return (
     <>
       <h1>General ledger</h1>
+      <p><Link to="/ledger/reconciliation">Reconciliation of control accounts</Link></p>
       <form className="search" onSubmit={(e) => {
         e.preventDefault();
         const next = new URLSearchParams();

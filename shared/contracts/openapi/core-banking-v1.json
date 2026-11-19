@@ -430,6 +430,36 @@
         },
         "type": "object"
       },
+      "CheckResult": {
+        "properties": {
+          "accountCode": {
+            "type": "string"
+          },
+          "checkCode": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "difference": {
+            "type": "string"
+          },
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ledgerBalance": {
+            "type": "string"
+          },
+          "reconciled": {
+            "type": "boolean"
+          },
+          "subledgerBalance": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ClosedWithCredit": {
         "properties": {
           "branchCode": {
@@ -1133,6 +1163,10 @@
           "penaltiesCharged": {
             "type": "string"
           },
+          "reconciliationDifferences": {
+            "format": "int32",
+            "type": "integer"
+          },
           "taxWithheld": {
             "type": "string"
           }
@@ -1701,6 +1735,32 @@
           },
           "total": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Reconciliation": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "checkedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "differences": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "recorded": {
+            "type": "boolean"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -2690,6 +2750,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EntryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ledger-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/reconciliation": {
+      "get": {
+        "operationId": "Ledger_reconciliation",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "businessDate",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reconciliation"
                 }
               }
             },

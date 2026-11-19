@@ -88,4 +88,6 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await finance.goto("/ledger");
   await expect(finance.getByRole("status").first()).toContainText("balanced.");
   await expect(finance.getByRole("link", { name: "1001-TILL-NBO01-01" })).toBeVisible();
+  await finance.getByRole("link", { name: "Reconciliation of control accounts" }).click();
+  await expect(finance.getByRole("heading", { level: 1, name: "Reconciliation" })).toBeVisible();
 });

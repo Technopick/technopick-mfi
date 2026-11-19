@@ -52,6 +52,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_reconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/trial-balance": {
         parameters: {
             query?: never;
@@ -1234,6 +1250,17 @@ export interface components {
             /** Format: uuid */
             transferId?: string;
         };
+        CheckResult: {
+            accountCode?: string;
+            checkCode?: string;
+            currency?: string;
+            difference?: string;
+            /** Format: int32 */
+            items?: number;
+            ledgerBalance?: string;
+            reconciled?: boolean;
+            subledgerBalance?: string;
+        };
         ClosedWithCredit: {
             branchCode?: string;
             /** Format: date */
@@ -1459,6 +1486,8 @@ export interface components {
             /** Format: date */
             newBusinessDate?: string;
             penaltiesCharged?: string;
+            /** Format: int32 */
+            reconciliationDifferences?: number;
             taxWithheld?: string;
         };
         EntryLine: {
@@ -1652,6 +1681,16 @@ export interface components {
             number?: number;
             principal?: string;
             total?: string;
+        };
+        Reconciliation: {
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            checkedAt?: string;
+            /** Format: int32 */
+            differences?: number;
+            recorded?: boolean;
+            results?: components["schemas"]["CheckResult"][];
         };
         Recovery: {
             amount?: string;
@@ -2005,6 +2044,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntryView"];
+                };
+            };
+        };
+    };
+    Ledger_reconciliation: {
+        parameters: {
+            query?: {
+                businessDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reconciliation"];
                 };
             };
         };

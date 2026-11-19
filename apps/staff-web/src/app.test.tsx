@@ -268,7 +268,7 @@ describe("screens", () => {
       "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-30", activeLoans: 0, interestPostingDay: true,
         lastClosedDate: "2026-11-29", openTills: tillOpen ? [{ tillCode: "NBO01-T1", teller: "user:teller-1", status: "OPEN" }] : [] }),
       "POST /api/v1/end-of-day/run": () => ({ closedDate: "2026-11-30", newBusinessDate: "2026-12-01", loansProcessed: 1,
-        loanInterestAccrued: "5.00", penaltiesCharged: "0.00", loansInArrears: 1, loansClosed: 1, creditApplied: "2060.00",
+        loanInterestAccrued: "5.00", penaltiesCharged: "0.00", loansInArrears: 1, loansClosed: 1, creditApplied: "2060.00", reconciliationDifferences: 0,
         accountsAccrued: 2,
         interestAccrued: "8.25", accountsCredited: 2, interestCredited: "21.03", taxWithheld: "3.71" }),
     });
@@ -362,5 +362,20 @@ describe("screens", () => {
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger"]);
+  });
+
+  it("flags control accounts that do not match their records", async () => {
+    const { api } = fakeApi({
+      "GET /api/v1/accounting/reconciliation": () => ({ recorded: false, checkedAt: "2026-12-01T09:00:00+03:00", differences: 1,
+        results: [
+          { checkCode: "LOAN_PRINCIPAL", accountCode: "1200-LOANS-PRINCIPAL", currency: "KES", ledgerBalance: "500.00",
+            subledgerBalance: "0.00", difference: "500.00", items: 2, reconciled: false },
+          { checkCode: "SAVINGS_CONTROL", accountCode: "2110-SAVINGS-CONTROL", currency: "KES", ledgerBalance: "41754.96",
+            subledgerBalance: "41754.96", difference: "0.00", items: 3, reconciled: true }] }),
+    });
+    renderAt("/ledger/reconciliation", session("fin-1", "FINANCE"), api);
+    expect((await screen.findByRole("status")).textContent).toContain("1 control account(s) do not match");
+    expect(screen.getByText("Loan principal")).toBeTruthy();
+    expect(screen.getAllByText("500.00")).toHaveLength(2);
   });
 });
