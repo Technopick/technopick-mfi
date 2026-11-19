@@ -1254,4 +1254,112 @@ class AuthorizationApiIntegrationTest {
         assertEquals("CLOSED", JsonPath.read(tillPost("/till-sessions/" + JsonPath.read(again, "$.sessionId") + "/close",
                 "{\"countedAmount\":\"79850.00\"}", teller, ok), "$.status"));
     }
+
+    static JwtRequestPostProcessor staffB(String subject, String role) {
+        return jwt().jwt(j -> j.subject(subject).claim("tenant_id", TENANT_B)).authorities(new SimpleGrantedAuthority("ROLE_" + role));
+    }
+
+    String eodRun(JwtRequestPostProcessor who, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        var result = mvc.perform(post("/api/v1/end-of-day/run").with(who)).andReturn();
+        String response = result.getResponse().getContentAsString();
+        try {
+            expected.match(result);
+        } catch (AssertionError e) {
+            throw new AssertionError(e.getMessage() + " - response: " + response, e);
+        }
+        return response;
+    }
+
+    /**
+     * End of day with savings interest, in tenant B so moving its business date cannot disturb other
+     * tests: tills must be closed, three days accrue (cumulative rounding), month end credits interest
+     * less 15% withholding tax.
+     */
+    @Test
+    void endOfDayAccruesAndCreditsSavingsInterest() throws Exception {
+        var ok = status().isOk();
+        owner().execute("""
+            INSERT INTO tenancy.branch (tenant_id, branch_code, name) VALUES ('%1$s', 'NBO01', 'Nairobi (B)');
+            INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+              ('%1$s', '2110-SAVINGS-CONTROL', 'Savings control', 'LIABILITY', 'KES', true),
+              ('%1$s', '1000-VAULT-CASH', 'Vault cash', 'ASSET', 'KES', false),
+              ('%1$s', '1001-TILL-NBO01-01', 'Till 1', 'ASSET', 'KES', false),
+              ('%1$s', '5300-SAVINGS-INTEREST', 'Interest on savings', 'EXPENSE', 'KES', false),
+              ('%1$s', '2120-INTEREST-PAYABLE', 'Savings interest payable', 'LIABILITY', 'KES', false),
+              ('%1$s', '2960-WHT-PAYABLE', 'Withholding tax payable', 'LIABILITY', 'KES', false);
+            INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date) VALUES
+              ('%1$s', '2026-11', '2026-11-01', '2026-11-30'), ('%1$s', '2026-12', '2026-12-01', '2026-12-31');
+            INSERT INTO tenancy.business_date (tenant_id, current_date_) VALUES ('%1$s', '2026-11-28');
+            INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account, interest_rate,
+                interest_min_balance, withholding_tax_rate, gl_interest_expense, gl_interest_payable, gl_withholding_tax)
+              VALUES ('%1$s', 'SAVB', 'Member savings', 'KES', '2110-SAVINGS-CONTROL', 7.3, 1000, 15,
+                      '5300-SAVINGS-INTEREST', '2120-INTEREST-PAYABLE', '2960-WHT-PAYABLE');
+            INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash) VALUES ('%1$s', 'NBO01', 'KES', '1000-VAULT-CASH');
+            INSERT INTO savings.till (tenant_id, till_id, till_code, branch_code, currency, gl_cash)
+              VALUES ('%1$s', '7e000000-0000-0000-0000-0000000000b1', 'B-T1', 'NBO01', 'KES', '1001-TILL-NBO01-01');
+            INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above)
+              VALUES ('%1$s', 'KES', 50000, 1000000);
+            """.formatted(TENANT_B));
+        var teller = staffB("teller-b", "TELLER");
+        var ops = staffB("ops-b", "OPERATIONS");
+        String[] accounts = new String[3];
+        String[] deposits = {"40000", "1234.56", "500"};
+        for (int i = 0; i < 3; i++) {
+            String number = JsonPath.read(mvc.perform(post("/api/v1/customers").with(staffB("officer-b", "LOAN_OFFICER"))
+                    .contentType(MediaType.APPLICATION_JSON).content(customerJson("eod-c" + i, "6677889" + i, "1985-03-01", true)))
+                .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.customerNumber");
+            mvc.perform(post("/api/v1/customers/" + number + "/verify").with(staffB("manager-b", "BRANCH_MANAGER"))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"National ID sighted\"}")).andExpect(ok);
+            accounts[i] = JsonPath.read(mvc.perform(post("/api/v1/savings/accounts").with(teller).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"idempotencyKey\":\"eod-a" + i + "\",\"customerNumber\":\"" + number + "\",\"productCode\":\"SAVB\",\"branchCode\":\"NBO01\"}"))
+                .andExpect(ok).andReturn().getResponse().getContentAsString(), "$.accountNumber");
+            if (i == 0) {
+                tillPost("/till-sessions", "{\"tillCode\":\"B-T1\"}", teller, ok);
+            }
+            cashTxn(cash("eod-d" + i, accounts[i], "DEPOSIT", deposits[i]), teller, ok);
+        }
+
+        // An open till blocks the day; tenant A cannot close either (loan end of day not built yet).
+        String status = mvc.perform(get("/api/v1/end-of-day").with(ops)).andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("2026-11-28", JsonPath.read(status, "$.businessDate"));
+        assertEquals(List.of("B-T1"), JsonPath.read(status, "$.openTills[*].tillCode"));
+        assertEquals(Boolean.TRUE, eodRun(ops, status().isConflict()).contains("B-T1"));
+        assertEquals(Boolean.TRUE, eodRun(staff("ops-a", "OPERATIONS"), status().isConflict()).contains("loan end of day"));
+        eodRun(teller, status().isForbidden());
+        String session = JsonPath.read(mvc.perform(get("/api/v1/savings/till-sessions/mine").with(teller)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString(), "$.sessionId");
+        assertEquals("CLOSED", JsonPath.read(tillPost("/till-sessions/" + session + "/close",
+                "{\"countedAmount\":\"41734.56\"}", teller, ok), "$.status"));
+
+        // 40,000 earns exactly 8.00 a day; 1,234.56 earns 0.246912 (posted 0.25, 0.24, 0.25); 500 is below the minimum.
+        String day1 = eodRun(ops, ok);
+        assertEquals("2026-11-29", JsonPath.read(day1, "$.newBusinessDate"));
+        assertEquals(2, (Integer) JsonPath.read(day1, "$.accountsAccrued"));
+        assertEquals("8.25", JsonPath.read(day1, "$.interestAccrued"));
+        assertEquals(0, (Integer) JsonPath.read(day1, "$.accountsCredited"));
+        assertEquals("8.24", JsonPath.read(eodRun(ops, ok), "$.interestAccrued"));
+        String monthEnd = eodRun(ops, ok);
+        assertEquals("2026-12-01", JsonPath.read(monthEnd, "$.newBusinessDate"));
+        assertEquals("8.25", JsonPath.read(monthEnd, "$.interestAccrued"));
+        assertEquals(2, (Integer) JsonPath.read(monthEnd, "$.accountsCredited"));
+        assertEquals("21.03", JsonPath.read(monthEnd, "$.interestCredited")); // 20.40 + 0.63
+        assertEquals("3.71", JsonPath.read(monthEnd, "$.taxWithheld"));     // 3.60 + 0.11
+
+        String statement = mvc.perform(get("/api/v1/savings/accounts/" + accounts[0] + "/statement").param("from", "2026-11-01")
+                .param("to", "2026-12-01").with(teller)).andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("40020.40", JsonPath.read(statement, "$.closingBalance"));
+        assertEquals(Boolean.TRUE, statement.contains("Interest 28 Nov 2026 to 30 Nov 2026 (gross 24.00, tax 3.60)"), statement);
+        Long tax = owner().queryForObject("""
+                SELECT sum(CASE side WHEN 'C' THEN amount ELSE -amount END) FROM ledger.journal_line
+                 WHERE tenant_id = ? AND account_code = '2960-WHT-PAYABLE'
+                """, java.math.BigDecimal.class, java.util.UUID.fromString(TENANT_B)).multiply(java.math.BigDecimal.valueOf(100)).longValueExact();
+        assertEquals(371L, tax);
+        Long payable = owner().queryForObject("""
+                SELECT sum(CASE side WHEN 'C' THEN amount ELSE -amount END) FROM ledger.journal_line
+                 WHERE tenant_id = ? AND account_code = '2120-INTEREST-PAYABLE'
+                """, java.math.BigDecimal.class, java.util.UUID.fromString(TENANT_B)).longValueExact();
+        assertEquals(0L, payable); // everything accrued has been paid out
+        String after = mvc.perform(get("/api/v1/end-of-day").with(ops)).andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("2026-11-30", JsonPath.read(after, "$.lastClosedDate"));
+    }
 }

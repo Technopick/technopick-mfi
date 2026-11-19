@@ -171,7 +171,7 @@ public class SavingsAccountService {
         BigDecimal[] totals = {BigDecimal.ZERO, BigDecimal.ZERO};
         List<StatementLine> lines = new ArrayList<>(jdbc.sql("""
                 SELECT e.business_date, e.posted_at, e.entry_id, l.side, l.amount,
-                       COALESCE(t.narrative,
+                       COALESCE(t.narrative, l.narrative,
                                 CASE e.source WHEN 'MPESA' THEN 'M-Pesa ' || coalesce(e.switch_reference, '')
                                               ELSE initcap(e.source) || coalesce(' ' || e.switch_reference, '') END)
                            AS description

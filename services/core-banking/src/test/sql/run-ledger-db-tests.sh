@@ -78,9 +78,14 @@ INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, cur
  ('00000000-0000-0000-0000-0000000000a1', '1002-TEST-TILL-1', 'TEST till 1', 'ASSET', 'KES', false),
  ('00000000-0000-0000-0000-0000000000a1', '1003-TEST-TILL-2', 'TEST till 2', 'ASSET', 'KES', false),
  ('00000000-0000-0000-0000-0000000000a1', '5200-TEST-SHORTAGE', 'TEST teller shortages', 'EXPENSE', 'KES', false),
- ('00000000-0000-0000-0000-0000000000a1', '2950-TEST-OVERAGE', 'TEST teller overages', 'LIABILITY', 'KES', false);
-INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account) VALUES
- ('00000000-0000-0000-0000-0000000000a1', 'SAVT', 'TEST savings', 'KES', '2111-TEST-SAVINGS');
+ ('00000000-0000-0000-0000-0000000000a1', '2950-TEST-OVERAGE', 'TEST teller overages', 'LIABILITY', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '5300-TEST-INT-EXP', 'TEST savings interest expense', 'EXPENSE', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '2120-TEST-INT-PAY', 'TEST savings interest payable', 'LIABILITY', 'KES', false),
+ ('00000000-0000-0000-0000-0000000000a1', '2960-TEST-WHT', 'TEST withholding tax payable', 'LIABILITY', 'KES', false);
+INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account, interest_rate,
+    interest_min_balance, withholding_tax_rate, gl_interest_expense, gl_interest_payable, gl_withholding_tax) VALUES
+ ('00000000-0000-0000-0000-0000000000a1', 'SAVT', 'TEST savings', 'KES', '2111-TEST-SAVINGS', 7.3, 1000, 15,
+  '5300-TEST-INT-EXP', '2120-TEST-INT-PAY', '2960-TEST-WHT');
 INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash) VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'NBO01', 'KES', '1001-TEST-CASH');
 UPDATE savings.branch_cash_account SET gl_shortage = '5200-TEST-SHORTAGE', gl_overage = '2950-TEST-OVERAGE';
@@ -96,6 +101,9 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 
 echo "== teller till tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/till_test.sql"
+
+echo "== savings interest tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/savings_interest_test.sql"
 
 echo "== Loan origination tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/loan_origination_test.sql"
