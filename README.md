@@ -65,10 +65,11 @@ GitHub Actions on `main`: all four jobs green.
 | Teller tills: one open till per teller, vault transfers approved by another person, closing count against the ledger, shortages/overages posted only after supervisor approval | core: 1 end-to-end test; database: W2-W7; UI: 2 tests; browser: savings journey | ubuntu |
 | End of day with savings interest: OPERATIONS closes the day only with every till balanced; daily ACT/365 accrual with cumulative rounding; month-end credit less withholding tax; business date moves forward | core: 1 end-to-end test, 4 unit tests; database: I2-I7; UI: 2 tests | ubuntu |
 | Loan end of day: interest accrual with catch-up, penalties within the product rule, arrears snapshots and PAR; interest paid before accrual not recognised twice | core: end-of-day API test, planner unit tests; database: N2-N4, E3-E9 | ubuntu |
+| Loan closure and credit: loans close when fully repaid; money paid ahead pays installments as they fall due; credit left on closed loans is held and reported; portfolio-at-risk report and screen | core: end-of-day API test; database: P1-P6; UI: 1 test | ubuntu |
 | Staff web app (worklist, applications, disbursements, M-Pesa close-out, suspense, schedule): money as text, four-eyes hints, role-based navigation, API types match contract, runtime deps audited | 11 UI tests; typecheck; production build | ubuntu and windows |
 | Whole platform in containers (PostgreSQL, RabbitMQ, Keycloak, core, integration, TEST-ONLY Daraja simulator, staff web behind nginx): a browser signs in as officer, manager, supervisor and teller: loan from KYC to M-Pesa disbursement to ACTIVE, and savings from account opening to cash with approval to statement | Playwright (Chromium), 2 journeys | ubuntu (Docker Compose, `infrastructure/e2e`) |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
-| Ledger, savings, teller, lending, origination, customers, EOD, STK, B2C and close-out database rules | 103/103 checks | PostgreSQL 17 service container |
+| Ledger, savings, teller, lending, origination, customers, EOD, STK, B2C and close-out database rules | 105/105 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
