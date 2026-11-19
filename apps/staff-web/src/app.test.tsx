@@ -334,4 +334,33 @@ describe("screens", () => {
     expect((await screen.findByRole("status")).textContent).toContain("LN-X00001 written off: 6240.00 KES");
     expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/v1/lending/write-offs/w-1/approve"]);
   });
+
+  it("shows a balanced trial balance and drills into an account and an entry", async () => {
+    const { api } = fakeApi({
+      "GET /api/v1/accounting/trial-balance": () => ({ asOf: "2026-12-01",
+        accounts: [{ accountCode: "2960-WHT-PAYABLE", name: "Withholding tax payable", accountClass: "LIABILITY", currency: "KES",
+          debit: "0.00", credit: "3.71", balance: "3.71" },
+          { accountCode: "5300-SAVINGS-INTEREST", name: "Interest on savings", accountClass: "EXPENSE", currency: "KES",
+          debit: "3.71", credit: "0.00", balance: "3.71" }],
+        totals: [{ currency: "KES", debit: "3.71", credit: "3.71", difference: "0.00", balanced: true }] }),
+      "GET /api/v1/accounting/gl-accounts/2960-WHT-PAYABLE/activity?from=2026-12-01&to=2026-12-01": () => ({
+        account: { accountCode: "2960-WHT-PAYABLE", name: "Withholding tax payable", accountClass: "LIABILITY" },
+        from: "2026-12-01", to: "2026-12-01", openingBalance: "0.00", totalDebit: "0.00", totalCredit: "3.71", closingBalance: "3.71",
+        lines: [{ businessDate: "2026-11-30", entryId: "e-1", source: "EOD", reference: "savings-interest:x:2026-11-30",
+          branchCode: "NBO01", credit: "3.71", balance: "3.71" }], truncated: false }),
+      "GET /api/v1/accounting/journal-entries/e-1": () => ({ entryId: "e-1", businessDate: "2026-11-30", source: "EOD",
+        reference: "savings-interest:x:2026-11-30", actor: "user:ops-b", lines: [
+          { lineNo: 1, accountCode: "2120-INTEREST-PAYABLE", accountName: "Payable", side: "DEBIT", amount: "24.00", branchCode: "NBO01" },
+          { lineNo: 2, accountCode: "2110-SAVINGS-CONTROL", accountName: "Savings", side: "CREDIT", amount: "20.40", branchCode: "NBO01", depositAccount: "2000000014" },
+          { lineNo: 3, accountCode: "2960-WHT-PAYABLE", accountName: "WHT", side: "CREDIT", amount: "3.60", branchCode: "NBO01" }] }),
+    });
+    renderAt("/ledger", session("fin-1", "FINANCE"), api);
+    expect((await screen.findByRole("status")).textContent).toContain("KES: debits 3.71, credits 3.71 - balanced.");
+    await userEvent.click(screen.getByRole("link", { name: "2960-WHT-PAYABLE" }));
+    expect(await screen.findByText("savings-interest:x:2026-11-30")).toBeTruthy();
+    await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
+    expect(await screen.findByText("2000000014")).toBeTruthy();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger"]);
+  });
 });

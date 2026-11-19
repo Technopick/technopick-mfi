@@ -1,6 +1,87 @@
 {
   "components": {
     "schemas": {
+      "AccountActivity": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/GlAccount"
+          },
+          "branchCode": {
+            "type": "string"
+          },
+          "closingBalance": {
+            "type": "string"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityLine"
+            },
+            "type": "array"
+          },
+          "openingBalance": {
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          },
+          "totalCredit": {
+            "type": "string"
+          },
+          "totalDebit": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ActivityLine": {
+        "properties": {
+          "balance": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string"
+          },
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "debit": {
+            "type": "string"
+          },
+          "depositAccount": {
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "narrative": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApplyRequest": {
         "properties": {
           "amount": {
@@ -473,6 +554,26 @@
               "COMPLETED",
               "FAILED"
             ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CurrencyTotal": {
+        "properties": {
+          "balanced": {
+            "type": "boolean"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "debit": {
+            "type": "string"
+          },
+          "difference": {
             "type": "string"
           }
         },
@@ -1034,6 +1135,111 @@
           },
           "taxWithheld": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EntryLine": {
+        "properties": {
+          "accountCode": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "depositAccount": {
+            "type": "string"
+          },
+          "lineNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "narrative": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EntryView": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/EntryLine"
+            },
+            "type": "array"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "reversedByEntryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reversesEntryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "switchReference": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GlAccount": {
+        "properties": {
+          "accountClass": {
+            "type": "string"
+          },
+          "accountCode": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "postable": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subledger": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -2128,6 +2334,56 @@
         },
         "type": "object"
       },
+      "TrialBalance": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/TrialBalanceLine"
+            },
+            "type": "array"
+          },
+          "asOf": {
+            "format": "date",
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/CurrencyTotal"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TrialBalanceLine": {
+        "properties": {
+          "accountClass": {
+            "type": "string"
+          },
+          "accountCode": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "debit": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ValidateRequest": {
         "properties": {
           "amount": {
@@ -2335,6 +2591,155 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/accounting/gl-accounts": {
+      "get": {
+        "operationId": "Ledger_accounts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GlAccount"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ledger-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/gl-accounts/{accountCode}/activity": {
+      "get": {
+        "operationId": "Ledger_activity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "accountCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountActivity"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ledger-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/journal-entries/{entryId}": {
+      "get": {
+        "operationId": "Ledger_entry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ledger-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/trial-balance": {
+      "get": {
+        "operationId": "Ledger_trialBalance",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBalance"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ledger-controller"
+        ]
+      }
+    },
     "/api/v1/accounts/{accountNumber}/balance": {
       "get": {
         "operationId": "Account_balance",

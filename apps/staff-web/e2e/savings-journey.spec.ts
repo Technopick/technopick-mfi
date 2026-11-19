@@ -82,4 +82,10 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(supervisor.getByRole("heading", { level: 1, name: "Portfolio at risk" })).toBeVisible();
   await supervisor.goto("/write-offs");
   await expect(supervisor.getByRole("heading", { level: 1, name: "Loan write-offs" })).toBeVisible();
+
+  // Finance sees the ledger the day's work produced, and it balances.
+  const finance = await signIn(browser, "finance");
+  await finance.goto("/ledger");
+  await expect(finance.getByRole("status").first()).toContainText("balanced.");
+  await expect(finance.getByRole("link", { name: "1001-TILL-NBO01-01" })).toBeVisible();
 });

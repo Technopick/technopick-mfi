@@ -14,7 +14,7 @@ docker compose -f infrastructure/e2e/docker-compose.yml up -d --build --wait
 docker compose -f infrastructure/e2e/docker-compose.yml --profile seed run --rm seed
 ```
 Open http://localhost:8088. Test users (password `e2e-only-<user>`): `officer` (LOAN_OFFICER),
-`manager` (BRANCH_MANAGER), `supervisor` (SUPERVISOR), `ops` (OPERATIONS), `teller` (TELLER). Loan product `BIASHARA`, savings
+`manager` (BRANCH_MANAGER), `supervisor` (SUPERVISOR), `ops` (OPERATIONS), `teller` (TELLER), `finance` (FINANCE). Loan product `BIASHARA`, savings
 product `SAV01`, branch `NBO01`; cash above KES 50,000 out / 1,000,000 in needs approval. Stop with `docker compose -f infrastructure/e2e/docker-compose.yml down -v`.
 
 Browser test: `cd apps/staff-web && npx playwright install chromium && npm run e2e`.

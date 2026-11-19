@@ -4,6 +4,70 @@
  */
 
 export interface paths {
+    "/api/v1/accounting/gl-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/gl-accounts/{accountCode}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/journal-entries/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_entry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_trialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounts/{accountNumber}/balance": {
         parameters: {
             query?: never;
@@ -1032,6 +1096,36 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountActivity: {
+            account?: components["schemas"]["GlAccount"];
+            branchCode?: string;
+            closingBalance?: string;
+            /** Format: date */
+            from?: string;
+            lines?: components["schemas"]["ActivityLine"][];
+            openingBalance?: string;
+            /** Format: date */
+            to?: string;
+            totalCredit?: string;
+            totalDebit?: string;
+            truncated?: boolean;
+        };
+        ActivityLine: {
+            balance?: string;
+            branchCode?: string;
+            /** Format: date */
+            businessDate?: string;
+            credit?: string;
+            debit?: string;
+            depositAccount?: string;
+            /** Format: uuid */
+            entryId?: string;
+            narrative?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            reference?: string;
+            source?: string;
+        };
         ApplyRequest: {
             amount: string;
             billRef?: string;
@@ -1177,6 +1271,13 @@ export interface components {
             requestId?: string;
             /** @enum {string} */
             status?: "PENDING" | "DISPATCHED" | "SUBMITTED" | "COMPLETED" | "FAILED";
+        };
+        CurrencyTotal: {
+            balanced?: boolean;
+            credit?: string;
+            currency?: string;
+            debit?: string;
+            difference?: string;
         };
         CustomerDetail: {
             branchCode?: string;
@@ -1359,6 +1460,45 @@ export interface components {
             newBusinessDate?: string;
             penaltiesCharged?: string;
             taxWithheld?: string;
+        };
+        EntryLine: {
+            accountCode?: string;
+            accountName?: string;
+            amount?: string;
+            branchCode?: string;
+            currency?: string;
+            depositAccount?: string;
+            /** Format: int32 */
+            lineNo?: number;
+            narrative?: string;
+            side?: string;
+        };
+        EntryView: {
+            actor?: string;
+            /** Format: date */
+            businessDate?: string;
+            correlationId?: string;
+            /** Format: uuid */
+            entryId?: string;
+            lines?: components["schemas"]["EntryLine"][];
+            /** Format: date-time */
+            postedAt?: string;
+            reference?: string;
+            /** Format: uuid */
+            reversedByEntryId?: string;
+            /** Format: uuid */
+            reversesEntryId?: string;
+            source?: string;
+            switchReference?: string;
+        };
+        GlAccount: {
+            accountClass?: string;
+            accountCode?: string;
+            currency?: string;
+            name?: string;
+            postable?: boolean;
+            status?: string;
+            subledger?: boolean;
         };
         LoanApplicationRequest: {
             branchCode: string;
@@ -1715,6 +1855,22 @@ export interface components {
             sessionStatus?: string;
             tillCode?: string;
         };
+        TrialBalance: {
+            accounts?: components["schemas"]["TrialBalanceLine"][];
+            /** Format: date */
+            asOf?: string;
+            branchCode?: string;
+            totals?: components["schemas"]["CurrencyTotal"][];
+        };
+        TrialBalanceLine: {
+            accountClass?: string;
+            accountCode?: string;
+            balance?: string;
+            credit?: string;
+            currency?: string;
+            debit?: string;
+            name?: string;
+        };
         ValidateRequest: {
             amount: string;
             billRef?: string;
@@ -1785,6 +1941,97 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    Ledger_accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccount"][];
+                };
+            };
+        };
+    };
+    Ledger_activity: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                branchCode?: string;
+            };
+            header?: never;
+            path: {
+                accountCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountActivity"];
+                };
+            };
+        };
+    };
+    Ledger_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryView"];
+                };
+            };
+        };
+    };
+    Ledger_trialBalance: {
+        parameters: {
+            query?: {
+                asOf?: string;
+                branchCode?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBalance"];
+                };
+            };
+        };
+    };
     Account_balance: {
         parameters: {
             query?: never;

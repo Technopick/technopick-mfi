@@ -6,6 +6,7 @@ export const USERS = {
   manager: "e2e-only-manager",
   supervisor: "e2e-only-supervisor",
   teller: "e2e-only-teller",
+  finance: "e2e-only-finance",
 } as const;
 
 export async function signIn(browser: Browser, user: keyof typeof USERS): Promise<Page> {

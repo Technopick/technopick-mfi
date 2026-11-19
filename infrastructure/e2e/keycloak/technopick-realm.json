@@ -22,6 +22,9 @@
         "name": "TELLER"
       },
       {
+        "name": "FINANCE"
+      },
+      {
         "name": "INTEGRATION"
       }
     ]
@@ -185,6 +188,24 @@
         {
           "type": "password",
           "value": "e2e-only-teller",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "finance",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Fatuma",
+      "lastName": "Finance (TEST)",
+      "email": "finance@e2e.invalid",
+      "realmRoles": [
+        "FINANCE"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "e2e-only-finance",
           "temporary": false
         }
       ]

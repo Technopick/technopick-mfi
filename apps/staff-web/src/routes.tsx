@@ -4,6 +4,7 @@ import { ApplicationPage, ApplicationsPage, NewApplicationPage } from "./pages/A
 import { CustomerPage, CustomersPage, NewCustomerPage } from "./pages/CustomersPage";
 import { DisbursementsPage } from "./pages/DisbursementsPage";
 import { EndOfDayPage } from "./pages/EndOfDayPage";
+import { AccountActivityPage, JournalEntryPage, TrialBalancePage } from "./pages/LedgerPages";
 import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -31,6 +32,9 @@ export const routes: RouteObject[] = [
       { path: "suspense", element: <SuspensePage /> },
       { path: "end-of-day", element: <EndOfDayPage /> },
       { path: "portfolio", element: <PortfolioPage /> },
+      { path: "ledger", element: <TrialBalancePage /> },
+      { path: "ledger/accounts/:code", element: <AccountActivityPage /> },
+      { path: "ledger/entries/:id", element: <JournalEntryPage /> },
       { path: "write-offs", element: <WriteOffsPage /> },
       { path: "loans", element: <LoanSchedulePage /> },
       { path: "loans/:number", element: <LoanSchedulePage /> },
