@@ -1534,5 +1534,33 @@ class AuthorizationApiIntegrationTest {
             .andReturn().getResponse().getContentAsString();
         assertEquals("2000.00", JsonPath.read(afterRecovery, "$.recovered"));
         assertEquals(List.of("RCVB000001"), JsonPath.read(afterRecovery, "$.recoveries[*].providerRef"));
+        // The general ledger of the closed days, as finance sees it.
+        var finance = staffB("finance-b", "FINANCE");
+        String tb = mvc.perform(get("/api/v1/accounting/trial-balance").param("asOf", "2026-12-01").with(finance)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString();
+        assertEquals(List.of(Boolean.TRUE), JsonPath.read(tb, "$.totals[*].balanced"));
+        assertEquals(List.of("3.71"), JsonPath.read(tb, "$.accounts[?(@.accountCode == '2960-WHT-PAYABLE')].balance"));
+        assertEquals(List.of("10530.00"), JsonPath.read(tb, "$.accounts[?(@.accountCode == '5100-LOAN-WRITE-OFFS')].balance"));
+        assertEquals(List.of("2000.00"), JsonPath.read(tb, "$.accounts[?(@.accountCode == '4900-WRITE-OFF-RECOVERIES')].balance"));
+        assertEquals(List.of(), JsonPath.read(tb, "$.accounts[?(@.accountCode == '2120-INTEREST-PAYABLE')]")); // nets to zero
+        String activity = mvc.perform(get("/api/v1/accounting/gl-accounts/2120-INTEREST-PAYABLE/activity")
+                .param("from", "2026-11-28").param("to", "2026-11-30").with(finance)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString();
+        assertEquals("0.00", JsonPath.read(activity, "$.openingBalance"));
+        assertEquals("24.74", JsonPath.read(activity, "$.totalCredit"));  // 8.25 + 8.24 + 8.25 accrued
+        assertEquals("24.74", JsonPath.read(activity, "$.totalDebit"));   // paid out at month end
+        assertEquals("0.00", JsonPath.read(activity, "$.closingBalance"));
+        assertEquals("8.25", JsonPath.read(activity, "$.lines[0].balance"));
+        String firstEntry = JsonPath.read(activity, "$.lines[0].entryId");
+        String entry = mvc.perform(get("/api/v1/accounting/journal-entries/" + firstEntry).with(finance)).andExpect(ok)
+            .andReturn().getResponse().getContentAsString();
+        assertEquals("EOD", JsonPath.read(entry, "$.source"));
+        assertEquals(List.of("DEBIT", "CREDIT"), JsonPath.read(entry, "$.lines[*].side"));
+        mvc.perform(get("/api/v1/accounting/trial-balance").with(teller)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/accounting/gl-accounts/2120-INTEREST-PAYABLE/activity").param("from", "2026-01-01")
+                .param("to", "2027-12-31").with(finance)).andExpect(status().isBadRequest());
+        // Tenant B's finance user cannot open tenant A's entries.
+        mvc.perform(get("/api/v1/accounting/journal-entries/44444444-0000-0000-0000-000000000001").with(finance))
+            .andExpect(status().isNotFound());
     }
 }
