@@ -135,7 +135,7 @@ public class EndOfDayService {
                 session.bind(tenantId);
                 jdbc.sql("UPDATE ledger.eod_run SET status = 'COMPLETED' WHERE business_date = :d").param("d", date).update();
                 jdbc.sql("UPDATE tenancy.business_date SET current_date_ = current_date_ + 1").update();
-                outbox.record(tenantId, "BusinessDayClosed", "business_date", tenantId.toString(),
+                outbox.record(tenantId, "BusinessDayClosed", "eod_run", tenantId + ":" + date,
                         "{\"closedDate\":\"%s\",\"newBusinessDate\":\"%s\",\"interestAccrued\":\"%s\",\"interestCredited\":\"%s\"}"
                                 .formatted(date, date.plusDays(1), accruedTotal.toPlainString(), creditedNet.toPlainString()),
                         "eod:" + date);

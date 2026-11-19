@@ -968,8 +968,11 @@ class AuthorizationApiIntegrationTest {
         assertEquals(1, ((List<?>) JsonPath.read(mvc.perform(get("/api/v1/customers").param("q", "otieno achieng").with(officer))
             .andReturn().getResponse().getContentAsString(), "$[?(@.customerNumber == '" + number + "')]")).size());
         mvc.perform(get("/api/v1/customers").param("q", "ab").with(officer)).andExpect(status().isBadRequest());
-        mvc.perform(get("/api/v1/customers/" + number).with(jwt().jwt(j -> j.subject("x").claim("tenant_id", TENANT_B))
-                .authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))).andExpect(status().isNotFound());
+        // Tenant B numbers its own customers, possibly with the same number, but never sees tenant A's customer.
+        var crossTenant = mvc.perform(get("/api/v1/customers/" + number).with(jwt().jwt(j -> j.subject("x").claim("tenant_id", TENANT_B))
+                .authorities(new SimpleGrantedAuthority("ROLE_BRANCH_MANAGER")))).andReturn().getResponse();
+        assertEquals(Boolean.TRUE, crossTenant.getStatus() == 404 || !crossTenant.getContentAsString().contains("*****457"),
+                crossTenant.getContentAsString());
     }
 
     String apply(String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,

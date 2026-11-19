@@ -209,7 +209,7 @@ public class SavingsInterestService {
             .param("tenant", tenantId).param("id", UUID.randomUUID()).param("account", accountId).param("start", start)
             .param("end", date).param("gross", gross).param("tax", tax).param("net", net).param("rate", a.taxRate())
             .param("entry", entryId).update();
-        outbox.record(tenantId, "SavingsInterestPosted", "deposit_account", accountId.toString(),
+        outbox.record(tenantId, "SavingsInterestPosted", "interest_posting", accountId + ":" + date,
                 "{\"accountNumber\":\"%s\",\"periodStart\":\"%s\",\"periodEnd\":\"%s\",\"gross\":\"%s\",\"tax\":\"%s\",\"net\":\"%s\",\"currency\":\"%s\"}"
                         .formatted(a.number(), start, date, gross.toPlainString(), tax.toPlainString(), net.toPlainString(),
                                 a.currency()),
