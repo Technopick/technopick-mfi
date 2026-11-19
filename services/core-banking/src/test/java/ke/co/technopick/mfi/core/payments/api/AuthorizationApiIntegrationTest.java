@@ -1055,8 +1055,15 @@ class AuthorizationApiIntegrationTest {
 
     String cashTxn(String body, org.springframework.test.web.servlet.request.RequestPostProcessor who,
                   org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
-        return mvc.perform(post("/api/v1/savings/teller/transactions").with(who).contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(expected).andReturn().getResponse().getContentAsString();
+        var result = mvc.perform(post("/api/v1/savings/teller/transactions").with(who).contentType(MediaType.APPLICATION_JSON)
+                .content(body)).andReturn();
+        String response = result.getResponse().getContentAsString();
+        try {
+            expected.match(result);
+        } catch (AssertionError e) {
+            throw new AssertionError(e.getMessage() + " - response: " + response, e);
+        }
+        return response;
     }
 
     static String cash(String key, String account, String kind, String amount) {
