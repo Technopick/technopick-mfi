@@ -172,6 +172,24 @@
       ]
     },
     {
+      "username": "teller",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Tina",
+      "lastName": "Teller",
+      "email": "teller@e2e.invalid",
+      "realmRoles": [
+        "TELLER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "e2e-only-teller",
+          "temporary": false
+        }
+      ]
+    },
+    {
       "username": "service-account-mfi-integration",
       "enabled": true,
       "serviceAccountClientId": "mfi-integration",

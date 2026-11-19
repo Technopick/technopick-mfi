@@ -644,6 +644,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/savings/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavingsAccount_ofCustomer"];
+        put?: never;
+        post: operations["SavingsAccount_open"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/accounts/{accountNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavingsAccount_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/accounts/{accountNumber}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavingsAccount_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/teller/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Teller_pending"];
+        put?: never;
+        post: operations["Teller_transact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/teller/transactions/{txnId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Teller_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/teller/transactions/{txnId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Teller_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1059,6 +1155,45 @@ export interface components {
             /** Format: uuid */
             reversalEntryId?: string;
         };
+        SavingsAccountOpened: {
+            accountNumber?: string;
+            replayed?: boolean;
+            status?: string;
+        };
+        SavingsAccountOpening: {
+            branchCode: string;
+            customerNumber: string;
+            idempotencyKey: string;
+            productCode: string;
+        };
+        SavingsAccountView: {
+            accountNumber?: string;
+            availableBalance?: string;
+            branchCode?: string;
+            currency?: string;
+            customerName?: string;
+            customerNumber?: string;
+            heldAmount?: string;
+            ledgerBalance?: string;
+            /** Format: date */
+            openedOn?: string;
+            productCode?: string;
+            productName?: string;
+            status?: string;
+        };
+        SavingsStatement: {
+            accountNumber?: string;
+            closingBalance?: string;
+            currency?: string;
+            /** Format: date */
+            from?: string;
+            lines?: components["schemas"]["StatementLine"][];
+            openingBalance?: string;
+            /** Format: date */
+            to?: string;
+            totalCredits?: string;
+            totalDebits?: string;
+        };
         SendFailure: {
             code: string;
             description?: string;
@@ -1086,11 +1221,56 @@ export interface components {
             /** Format: uuid */
             tenantId: string;
         };
+        StatementLine: {
+            balance?: string;
+            credit?: string;
+            /** Format: date */
+            date?: string;
+            debit?: string;
+            description?: string;
+            /** Format: uuid */
+            entryId?: string;
+            /** Format: date-time */
+            postedAt?: string;
+        };
         Submitted: {
             checkoutRequestId: string;
             merchantRequestId?: string;
             /** Format: uuid */
             tenantId: string;
+        };
+        TellerDecision: {
+            reason?: string;
+        };
+        TellerTransactionRequest: {
+            accountNumber: string;
+            amount: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            kind: "DEPOSIT" | "WITHDRAWAL";
+            narrative?: string;
+            requestApproval?: boolean;
+        };
+        TellerTransactionView: {
+            accountNumber?: string;
+            amount?: string;
+            currency?: string;
+            customerNumber?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: uuid */
+            journalEntryId?: string;
+            /** @enum {string} */
+            kind?: "DEPOSIT" | "WITHDRAWAL";
+            narrative?: string;
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            requiresApproval?: boolean;
+            status?: string;
+            /** Format: uuid */
+            txnId?: string;
         };
         TenantOnly: {
             /** Format: uuid */
@@ -2171,6 +2351,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Decision"];
+                };
+            };
+        };
+    };
+    SavingsAccount_ofCustomer: {
+        parameters: {
+            query: {
+                customerNumber: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavingsAccountView"][];
+                };
+            };
+        };
+    };
+    SavingsAccount_open: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavingsAccountOpening"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavingsAccountOpened"];
+                };
+            };
+        };
+    };
+    SavingsAccount_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavingsAccountView"];
+                };
+            };
+        };
+    };
+    SavingsAccount_statement: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                accountNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavingsStatement"];
+                };
+            };
+        };
+    };
+    Teller_pending: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TellerTransactionView"][];
+                };
+            };
+        };
+    };
+    Teller_transact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TellerTransactionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TellerTransactionView"];
+                };
+            };
+        };
+    };
+    Teller_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TellerDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TellerTransactionView"];
+                };
+            };
+        };
+    };
+    Teller_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TellerDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TellerTransactionView"];
                 };
             };
         };

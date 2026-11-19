@@ -99,7 +99,7 @@ describe("screens", () => {
     const { api } = fakeApi({});
     renderAt("/", session("teller-1", "TELLER"), api);
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Loan schedule"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Loan schedule"]);
   });
 
   it("validates the amount locally and sends it as a string with an idempotency key", async () => {
@@ -156,6 +156,7 @@ describe("screens", () => {
     const { api, calls } = fakeApi({
       "GET /api/v1/customers/CU26-0000001": () => customer,
       "POST /api/v1/customers/CU26-0000001/verify": () => ({ ...customer, status: "ACTIVE" }),
+      "GET /api/v1/savings/accounts?customerNumber=CU26-0000001": () => [],
     });
     renderAt("/customers/CU26-0000001", session("manager-1", "BRANCH_MANAGER"), api);
     const verify = await screen.findByRole("button", { name: /verify identity/i });
@@ -163,5 +164,35 @@ describe("screens", () => {
     await userEvent.type(screen.getByLabelText(/what was checked/i), "National ID sighted at branch");
     await userEvent.click(verify);
     await waitFor(() => expect(calls.some((c) => c.path.endsWith("/verify"))).toBe(true));
+  });
+
+  it("tells the teller not to hand over cash while a large withdrawal waits for approval", async () => {
+    const account = { accountNumber: "2000000014", customerNumber: "CU26-0000001", customerName: "Achieng Otieno",
+      productName: "Savings", currency: "KES", status: "ACTIVE", ledgerBalance: "100000.00", heldAmount: "0.00",
+      availableBalance: "100000.00" };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/savings/accounts/2000000014": () => account,
+      "GET /api/v1/savings/accounts/2000000014/statement": () => ({ from: "2026-10-20", to: "2026-11-19", currency: "KES",
+        openingBalance: "0.00", closingBalance: "100000.00", totalDebits: "0.00", totalCredits: "100000.00", lines: [] }),
+      "POST /api/v1/savings/teller/transactions": (body) => ({ ...(body as object), status: "PENDING_APPROVAL", currency: "KES" }),
+    });
+    renderAt("/accounts/2000000014", session("teller-1", "TELLER"), api);
+    await userEvent.selectOptions(await screen.findByLabelText("Transaction"), "WITHDRAWAL");
+    await userEvent.type(screen.getByLabelText(/amount \(KES\)/i), "60000");
+    await userEvent.click(screen.getByRole("button", { name: "Post" }));
+    expect((await screen.findByRole("status")).textContent).toMatch(/do not pay out/i);
+    const post = calls.find((c) => c.method === "POST");
+    expect((post?.body as Record<string, unknown>).amount).toBe("60000");
+  });
+
+  it("hides approval of a cash transaction from the teller who captured it", async () => {
+    const { api } = fakeApi({
+      "GET /api/v1/savings/teller/transactions": () => [{ txnId: "t-1", accountNumber: "2000000014", kind: "WITHDRAWAL",
+        amount: "60000.00", currency: "KES", narrative: "Cash withdrawal", status: "PENDING_APPROVAL",
+        requestedBy: "user:sup-teller" }],
+    });
+    renderAt("/teller", session("sup-teller", "TELLER", "SUPERVISOR"), api);
+    expect(await screen.findByText(/a colleague must decide/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   });
 });

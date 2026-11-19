@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { signIn, verifiedCustomer } from "./helpers";
 
 /**
  * A loan's life through the real stack, as different staff members, each in their own browser
@@ -7,47 +8,10 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
  * M-Pesa B2C disbursement -> supervisor approves and sends -> integration -> TEST-ONLY Daraja
  * simulator -> result callback -> core posts and activates the loan, which the manager sees ACTIVE.
  */
-const USERS = {
-  officer: "e2e-only-officer",
-  manager: "e2e-only-manager",
-  supervisor: "e2e-only-supervisor",
-} as const;
-
-async function signIn(browser: Browser, user: keyof typeof USERS): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.locator("#username").fill(user);
-  await page.locator("#password").fill(USERS[user]);
-  await page.locator("#kc-login").click();
-  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
-  return page;
-}
-
 test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser }) => {
-  const idNumber = String(Date.now()).slice(-8);
-
   const officer = await signIn(browser, "officer");
-  await officer.goto("/customers/new");
-  await officer.getByLabel("First name").fill("Achieng");
-  await officer.getByLabel("Last name").fill("Otieno");
-  await officer.getByLabel("Date of birth").fill("1990-05-01");
-  await officer.getByLabel("ID number").fill(idNumber);
-  await officer.getByLabel("M-Pesa number").fill("0712345678");
-  await officer.getByLabel("Branch code").fill("NBO01");
-  await officer.getByRole("checkbox").check();
-  await officer.getByRole("button", { name: /^Register/ }).click();
-  const customerHeading = officer.getByRole("heading", { level: 2, name: /^CU\d{2}-\d{7}$/ });
-  await expect(customerHeading).toBeVisible();
-  const customer = (await customerHeading.textContent())!.trim();
-  await expect(officer.getByText(/a colleague must decide/i)).toHaveCount(0); // officers cannot verify at all
-
   const manager = await signIn(browser, "manager");
-  await manager.goto(`/customers/${customer}`);
-  await manager.getByLabel(/what was checked/i).fill("National ID sighted at branch (e2e)");
-  await manager.getByRole("button", { name: "Verify identity" }).click();
-  await expect(manager.getByText("ACTIVE", { exact: true })).toBeVisible();
+  const customer = await verifiedCustomer(officer, manager);
 
   await officer.goto("/applications/new");
   await officer.getByLabel("Customer number").fill(customer);

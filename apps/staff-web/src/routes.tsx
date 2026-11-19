@@ -5,6 +5,7 @@ import { CustomerPage, CustomersPage, NewCustomerPage } from "./pages/CustomersP
 import { DisbursementsPage } from "./pages/DisbursementsPage";
 import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
+import { AccountPage, TellerPage } from "./pages/SavingsPages";
 import { SuspensePage } from "./pages/SuspensePage";
 import { WorklistPage } from "./pages/WorklistPage";
 
@@ -17,6 +18,8 @@ export const routes: RouteObject[] = [
       { path: "customers", element: <CustomersPage /> },
       { path: "customers/new", element: <NewCustomerPage /> },
       { path: "customers/:number", element: <CustomerPage /> },
+      { path: "accounts/:number", element: <AccountPage /> },
+      { path: "teller", element: <TellerPage /> },
       { path: "applications", element: <ApplicationsPage /> },
       { path: "applications/new", element: <NewApplicationPage /> },
       { path: "applications/:id", element: <ApplicationPage /> },

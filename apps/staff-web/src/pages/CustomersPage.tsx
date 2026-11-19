@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { actorOf, hasAnyRole } from "../auth/session";
 import { Empty, Loading, OwnItemNote, ProblemBox, Section, Status, when } from "../components/ui";
 import { useAction, useLoad } from "../hooks";
+import { CustomerAccounts } from "./SavingsPages";
 
 type Summary = Schemas["CustomerSummary"];
 type Detail = Schemas["CustomerDetail"];
@@ -174,6 +175,9 @@ export function CustomerPage() {
         ))}
         <ProblemBox problem={action.error} />
       </Section>
+      {data.customerNumber && (
+        <CustomerAccounts customerNumber={data.customerNumber} branchCode={data.branchCode ?? ""} active={data.status === "ACTIVE"} />
+      )}
     </>
   );
 }
