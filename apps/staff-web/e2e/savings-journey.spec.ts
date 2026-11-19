@@ -80,4 +80,6 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(supervisor.getByText("All tills are closed and balanced.")).toBeVisible();
   await supervisor.goto("/portfolio");
   await expect(supervisor.getByRole("heading", { level: 1, name: "Portfolio at risk" })).toBeVisible();
+  await supervisor.goto("/write-offs");
+  await expect(supervisor.getByRole("heading", { level: 1, name: "Loan write-offs" })).toBeVisible();
 });

@@ -315,4 +315,23 @@ describe("screens", () => {
     expect(await screen.findByText("No loan is in arrears.")).toBeTruthy();
     expect(calls.some((c) => c.path.endsWith("asOf=2026-11-29"))).toBe(true);
   });
+
+  it("lets a supervisor approve another person's write-off but not their own", async () => {
+    const base = { currency: "KES", status: "PENDING", daysPastDue: 185, principalOutstanding: "6000.00",
+      interestOutstanding: "240.00", penaltyOutstanding: "0.00", reason: "Customer unreachable since May", recovered: "0.00" };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/lending/write-offs?status=PENDING": () => [
+        { ...base, writeOffId: "w-1", loanNumber: "LN-X00001", requestedBy: "user:manager-1" },
+        { ...base, writeOffId: "w-2", loanNumber: "LN-X00002", requestedBy: "user:sup-1" }],
+      "GET /api/v1/lending/write-offs?status=APPROVED": () => [],
+      "POST /api/v1/lending/write-offs/w-1/approve": () => ({ ...base, writeOffId: "w-1", loanNumber: "LN-X00001",
+        status: "APPROVED", writtenOff: "6240.00" }),
+    });
+    renderAt("/write-offs", session("sup-1", "SUPERVISOR"), api);
+    expect(await screen.findAllByRole("button", { name: "Approve write-off" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Request write-off" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Approve write-off" }));
+    expect((await screen.findByRole("status")).textContent).toContain("LN-X00001 written off: 6240.00 KES");
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/v1/lending/write-offs/w-1/approve"]);
+  });
 });

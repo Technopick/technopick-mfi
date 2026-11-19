@@ -228,6 +228,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lending/loans/{loanNumber}/write-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanWriteOff_ofLoan"];
+        put?: never;
+        post: operations["LoanWriteOff_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/write-offs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanWriteOff_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/write-offs/{writeOffId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanWriteOff_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/write-offs/{writeOffId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanWriteOff_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/mpesa/b2c/disbursements": {
         parameters: {
             query?: never;
@@ -1449,6 +1513,13 @@ export interface components {
             principal?: string;
             total?: string;
         };
+        Recovery: {
+            amount?: string;
+            channel?: string;
+            providerRef?: string;
+            /** Format: date-time */
+            recordedAt?: string;
+        };
         ResolutionCreated: {
             /** Format: uuid */
             resolutionId?: string;
@@ -1674,6 +1745,36 @@ export interface components {
             /** @enum {string} */
             status?: "PENDING" | "DISPATCHED" | "SUBMITTED" | "COMPLETED" | "FAILED";
             targetReference?: string;
+        };
+        WriteOffDecision: {
+            reason?: string;
+        };
+        WriteOffRequest: {
+            idempotencyKey: string;
+            reason: string;
+        };
+        WriteOffView: {
+            branchCode?: string;
+            currency?: string;
+            /** Format: int32 */
+            daysPastDue?: number;
+            decidedBy?: string;
+            decisionReason?: string;
+            interestOutstanding?: string;
+            loanNumber?: string;
+            penaltyOutstanding?: string;
+            principalOutstanding?: string;
+            reason?: string;
+            recovered?: string;
+            recoveries?: components["schemas"]["Recovery"][];
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
+            /** Format: uuid */
+            writeOffId?: string;
+            writtenOff?: string;
         };
     };
     responses: never;
@@ -2053,6 +2154,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoanScheduleView"];
+                };
+            };
+        };
+    };
+    LoanWriteOff_ofLoan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    LoanWriteOff_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteOffRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    LoanWriteOff_list: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffView"][];
+                };
+            };
+        };
+    };
+    LoanWriteOff_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                writeOffId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WriteOffDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    LoanWriteOff_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                writeOffId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteOffDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffView"];
                 };
             };
         };
