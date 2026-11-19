@@ -80,7 +80,7 @@ export function MyTill({ onChange }: { onChange?: () => void }) {
       {!loaded ? <Loading /> : !mine ? (
         <form className="search" onSubmit={(e) => void open(e)}>
           <label>Till
-            <select value={tillCode} onChange={(e) => setTillCode(e.target.value)} required>
+            <select aria-label="Till" value={tillCode} onChange={(e) => setTillCode(e.target.value)} required>
               <option value="">Choose a till</option>
               {(tills.data ?? []).filter((t) => t.active && !t.openedBy).map((t) => (
                 <option key={t.tillCode} value={t.tillCode}>{t.tillCode} ({t.branchCode})</option>
