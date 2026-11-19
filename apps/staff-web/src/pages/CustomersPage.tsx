@@ -142,7 +142,7 @@ export function CustomerPage() {
   const { data, error, loading, reload } = useLoad<Detail>(`/api/v1/customers/${encodeURIComponent(number ?? "")}`);
   const action = useAction();
   const [note, setNote] = useState("");
-  if (loading) return <Loading />;
+  if (loading && !data) return <Loading />;
   if (!data) return <ProblemBox problem={error} />;
   const own = session ? data.createdBy === actorOf(session) : false;
   const canVerify = data.status === "PENDING_VERIFICATION" && hasAnyRole(session, "BRANCH_MANAGER", "OPERATIONS");

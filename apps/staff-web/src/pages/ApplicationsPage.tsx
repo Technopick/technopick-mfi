@@ -132,7 +132,7 @@ export function ApplicationPage() {
   const action = useAction();
   const [reason, setReason] = useState("");
 
-  if (loading) return <Loading />;
+  if (loading && !data) return <Loading />;
   if (!data) return <ProblemBox problem={error} />;
   const own = session ? data.submittedBy === actorOf(session) : false;
   const canDecide = data.status === "SUBMITTED" && hasAnyRole(session, "BRANCH_MANAGER");

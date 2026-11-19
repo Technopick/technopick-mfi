@@ -11,10 +11,11 @@ export function session(subject: string, ...roles: string[]): Session {
 }
 
 /** A fake API: routes "METHOD path" to a handler; records every call. */
-export function fakeApi(handlers: Record<string, (body?: unknown) => unknown>) {
+export function fakeApi(handlers: Record<string, (body?: unknown) => unknown>, delayMs = 0) {
   const calls: { method: string; path: string; body?: unknown }[] = [];
   const handle = async (method: string, path: string, body?: unknown) => {
     calls.push({ method, path, body });
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
     const h = handlers[`${method} ${path}`];
     if (!h) throw new Error(`unexpected ${method} ${path}`);
     return h(body);

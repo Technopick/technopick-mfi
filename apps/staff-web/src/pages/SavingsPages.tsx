@@ -130,7 +130,7 @@ export function AccountPage() {
     `/api/v1/savings/accounts/${encodeURIComponent(number ?? "")}/statement${query.size ? `?${query}` : ""}`);
   const reloadAll = () => { account.reload(); statement.reload(); };
 
-  if (account.loading) return <Loading />;
+  if (account.loading && !account.data) return <Loading />;
   const a = account.data;
   if (!a) return <ProblemBox problem={account.error} />;
   const s = statement.data;

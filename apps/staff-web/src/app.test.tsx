@@ -175,12 +175,16 @@ describe("screens", () => {
       "GET /api/v1/savings/accounts/2000000014/statement": () => ({ from: "2026-10-20", to: "2026-11-19", currency: "KES",
         openingBalance: "0.00", closingBalance: "100000.00", totalDebits: "0.00", totalCredits: "100000.00", lines: [] }),
       "POST /api/v1/savings/teller/transactions": (body) => ({ ...(body as object), status: "PENDING_APPROVAL", currency: "KES" }),
-    });
+    }, 30); // real latency, so a refresh is visible to the UI
     renderAt("/accounts/2000000014", session("teller-1", "TELLER"), api);
     await userEvent.selectOptions(await screen.findByLabelText("Transaction"), "WITHDRAWAL");
     await userEvent.type(screen.getByLabelText(/amount \(KES\)/i), "60000");
     await userEvent.click(screen.getByRole("button", { name: "Post" }));
     expect((await screen.findByRole("status")).textContent).toMatch(/do not pay out/i);
+    // The confirmation survives the balance refresh that follows a posting.
+    await waitFor(() => expect(calls.filter((c) => c.path === "/api/v1/savings/accounts/2000000014").length).toBe(2));
+    await new Promise((r) => setTimeout(r, 100)); // let the refresh complete
+    expect(screen.getByRole("status").textContent).toMatch(/do not pay out/i);
     const post = calls.find((c) => c.method === "POST");
     expect((post?.body as Record<string, unknown>).amount).toBe("60000");
   });
