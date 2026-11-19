@@ -36,7 +36,7 @@ public class CustomerController {
                                        @NotNull CustomerService.IdType idType, @NotBlank @Size(max = 20) String idNumber,
                                        @Size(max = 11) String kraPin, @NotBlank @Size(max = 16) String phoneNumber,
                                        @Email @Size(max = 120) String email, @NotBlank @Size(max = 16) String branchCode,
-                                       boolean consentGiven) { }
+                                       Boolean consentGiven) { }
 
     public record CustomerVerification(@NotBlank @Size(min = 10, max = 300) String note) { }
 
@@ -53,7 +53,7 @@ public class CustomerController {
     public CustomerRegistered register(@Valid @RequestBody CustomerRegistration r) {
         return service.register(caller.tenantId(), new CustomerService.Registration(r.idempotencyKey(), r.firstName(),
                 r.middleName(), r.lastName(), r.dateOfBirth(), r.idType(), r.idNumber(), r.kraPin(), r.phoneNumber(),
-                r.email(), r.branchCode(), r.consentGiven()), caller.actor());
+                r.email(), r.branchCode(), Boolean.TRUE.equals(r.consentGiven())), caller.actor());
     }
 
     @GetMapping

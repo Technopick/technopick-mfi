@@ -31,7 +31,7 @@ public class TellerController {
                                            @NotBlank @Size(max = 34) String accountNumber,
                                            @NotNull TellerService.Kind kind,
                                            @NotBlank @Pattern(regexp = "^\\d{1,15}(\\.\\d{1,2})?$") String amount,
-                                           @Size(max = 140) String narrative, boolean requestApproval) { }
+                                           @Size(max = 140) String narrative, Boolean requestApproval) { }
 
     public record TellerDecision(@Size(max = 300) String reason) { }
 
@@ -47,7 +47,7 @@ public class TellerController {
     @PreAuthorize("hasRole('TELLER')")
     public TellerTransactionView transact(@Valid @RequestBody TellerTransactionRequest r) {
         return service.transact(caller.tenantId(), r.idempotencyKey(), r.accountNumber(), r.kind(),
-                new BigDecimal(r.amount()), r.narrative(), r.requestApproval(), caller.actor());
+                new BigDecimal(r.amount()), r.narrative(), Boolean.TRUE.equals(r.requestApproval()), caller.actor());
     }
 
     @GetMapping

@@ -923,6 +923,8 @@ class AuthorizationApiIntegrationTest {
             }
         };
         register.apply(customerJson("cu-0", "22334455", "1990-05-01", false), status().isBadRequest()); // no consent
+        assertEquals(Boolean.TRUE, register.apply(customerJson("cu-0b", "22334455", "1990-05-01", true).replace(",\"consentGiven\":true", ""),
+                status().isBadRequest()).contains("consent"), "omitted consent is refused with a clear reason");
         register.apply(customerJson("cu-1", "22334456", "2015-01-01", true), status().isBadRequest());  // minor
         register.apply(customerJson("cu-2", "12AB", "1990-05-01", true), status().isBadRequest()); // malformed ID
         mvc.perform(post("/api/v1/customers").with(teller(TENANT_A)).contentType(MediaType.APPLICATION_JSON)
