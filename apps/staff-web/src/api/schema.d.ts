@@ -52,6 +52,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/manual-journals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Finance_list"];
+        put?: never;
+        post: operations["Finance_propose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/manual-journals/{journalId}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Finance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/manual-journals/{journalId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Finance_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Finance_periods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Finance_openNext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{periodId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Finance_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/reconciliation": {
         parameters: {
             query?: never;
@@ -1529,6 +1625,14 @@ export interface components {
             status?: string;
             subledger?: boolean;
         };
+        JournalLineRequest: {
+            accountCode: string;
+            amount: string;
+            branchCode: string;
+            narrative?: string;
+            /** @enum {string} */
+            side: "DEBIT" | "CREDIT";
+        };
         LoanApplicationRequest: {
             branchCode: string;
             customerRef: string;
@@ -1606,6 +1710,45 @@ export interface components {
             scheduleVersion?: number;
             status?: string;
         };
+        ManualJournalDecision: {
+            reason?: string;
+        };
+        ManualJournalLine: {
+            accountCode?: string;
+            accountName?: string;
+            amount?: string;
+            branchCode?: string;
+            currency?: string;
+            /** Format: int32 */
+            lineNo?: number;
+            narrative?: string;
+            side?: string;
+        };
+        ManualJournalRequest: {
+            /** Format: date */
+            businessDate?: string;
+            idempotencyKey: string;
+            lines: components["schemas"]["JournalLineRequest"][];
+            narrative: string;
+        };
+        ManualJournalView: {
+            /** Format: date */
+            businessDate?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: uuid */
+            entryId?: string;
+            /** Format: uuid */
+            journalId?: string;
+            lines?: components["schemas"]["ManualJournalLine"][];
+            narrative?: string;
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
+            totalDebit?: string;
+        };
         MpesaResolutionCreated: {
             /** Format: uuid */
             resolutionId?: string;
@@ -1657,6 +1800,26 @@ export interface components {
             status?: string;
             teller?: string;
             tillCode?: string;
+        };
+        PeriodCloseRequest: {
+            note?: string;
+        };
+        PeriodView: {
+            closeNote?: string;
+            /** Format: date-time */
+            closedAt?: string;
+            closedBy?: string;
+            /** Format: date */
+            endDate?: string;
+            lastDayClosed?: boolean;
+            /** Format: int32 */
+            pendingJournals?: number;
+            periodId?: string;
+            /** Format: int32 */
+            reconciliationDifferences?: number;
+            /** Format: date */
+            startDate?: string;
+            status?: string;
         };
         PortfolioReport: {
             /** Format: date */
@@ -2044,6 +2207,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntryView"];
+                };
+            };
+        };
+    };
+    Finance_list: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualJournalView"][];
+                };
+            };
+        };
+    };
+    Finance_propose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualJournalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualJournalView"];
+                };
+            };
+        };
+    };
+    Finance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ManualJournalDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualJournalView"];
+                };
+            };
+        };
+    };
+    Finance_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualJournalDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualJournalView"];
+                };
+            };
+        };
+    };
+    Finance_periods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodView"][];
+                };
+            };
+        };
+    };
+    Finance_openNext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodView"];
+                };
+            };
+        };
+    };
+    Finance_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                periodId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PeriodCloseRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodView"];
                 };
             };
         };

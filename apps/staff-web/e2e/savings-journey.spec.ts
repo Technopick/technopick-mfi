@@ -92,4 +92,8 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(finance.getByRole("heading", { level: 1, name: "Reconciliation" })).toBeVisible();
   // Everything the journeys posted through the real services matches its business records.
   await expect(finance.getByRole("status")).toContainText("Every control account matches its records.");
+  await finance.goto("/ledger/periods");
+  await expect(finance.getByRole("heading", { level: 1, name: "Accounting periods" })).toBeVisible();
+  await finance.goto("/ledger/journals");
+  await expect(finance.getByRole("button", { name: "Propose journal" })).toBeVisible();
 });

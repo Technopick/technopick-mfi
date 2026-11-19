@@ -1278,6 +1278,44 @@
         },
         "type": "object"
       },
+      "JournalLineRequest": {
+        "properties": {
+          "accountCode": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "amount": {
+            "minLength": 1,
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "branchCode": {
+            "maxLength": 16,
+            "minLength": 0,
+            "type": "string"
+          },
+          "narrative": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountCode",
+          "amount",
+          "branchCode",
+          "side"
+        ],
+        "type": "object"
+      },
       "LoanApplicationRequest": {
         "properties": {
           "branchCode": {
@@ -1510,6 +1548,126 @@
         },
         "type": "object"
       },
+      "ManualJournalDecision": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ManualJournalLine": {
+        "properties": {
+          "accountCode": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "lineNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "narrative": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ManualJournalRequest": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/JournalLineRequest"
+            },
+            "maxItems": 50,
+            "minItems": 2,
+            "type": "array"
+          },
+          "narrative": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "lines",
+          "narrative"
+        ],
+        "type": "object"
+      },
+      "ManualJournalView": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journalId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ManualJournalLine"
+            },
+            "type": "array"
+          },
+          "narrative": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "totalDebit": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MpesaResolutionCreated": {
         "properties": {
           "resolutionId": {
@@ -1654,6 +1812,56 @@
             "type": "string"
           },
           "tillCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PeriodCloseRequest": {
+        "properties": {
+          "note": {
+            "maxLength": 500,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PeriodView": {
+        "properties": {
+          "closeNote": {
+            "type": "string"
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "closedBy": {
+            "type": "string"
+          },
+          "endDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "lastDayClosed": {
+            "type": "boolean"
+          },
+          "pendingJournals": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodId": {
+            "type": "string"
+          },
+          "reconciliationDifferences": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "status": {
             "type": "string"
           }
         },
@@ -2758,6 +2966,232 @@
         },
         "tags": [
           "ledger-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/manual-journals": {
+      "get": {
+        "operationId": "Finance_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "pattern": "PENDING|POSTED|REJECTED",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManualJournalView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
+        ]
+      },
+      "post": {
+        "operationId": "Finance_propose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualJournalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualJournalView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/manual-journals/{journalId}/post": {
+      "post": {
+        "operationId": "Finance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "journalId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualJournalDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualJournalView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/manual-journals/{journalId}/reject": {
+      "post": {
+        "operationId": "Finance_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "journalId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualJournalDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualJournalView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/periods": {
+      "get": {
+        "operationId": "Finance_periods",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PeriodView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/periods/next": {
+      "post": {
+        "operationId": "Finance_openNext",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
+        ]
+      }
+    },
+    "/api/v1/accounting/periods/{periodId}/close": {
+      "post": {
+        "operationId": "Finance_close",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "periodId",
+            "required": true,
+            "schema": {
+              "pattern": "\\d{4}-\\d{2}",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeriodCloseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "finance-controller"
         ]
       }
     },

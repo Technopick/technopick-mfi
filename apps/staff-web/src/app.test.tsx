@@ -378,4 +378,35 @@ describe("screens", () => {
     expect(screen.getByText("Loan principal")).toBeTruthy();
     expect(screen.getAllByText("500.00")).toHaveLength(2);
   });
+
+  it("proposes a balanced manual journal and keeps the proposer from posting it", async () => {
+    const journal = { journalId: "j-1", businessDate: "2026-12-01", narrative: "Reclassify a fee booked to clearing", status: "PENDING",
+      requestedBy: "user:fin-1", totalDebit: "250.00", lines: [
+        { lineNo: 1, accountCode: "1120-MPESA-C2B-CLEARING", side: "DEBIT", amount: "250.00", branchCode: "NBO01" },
+        { lineNo: 2, accountCode: "4200-FEE-WITHDRAWAL", side: "CREDIT", amount: "250.00", branchCode: "NBO01" }] };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/accounting/manual-journals?status=PENDING": () => [journal],
+      "GET /api/v1/accounting/manual-journals?status=POSTED": () => [],
+      "POST /api/v1/accounting/manual-journals": () => journal,
+    });
+    renderAt("/ledger/journals", session("fin-1", "FINANCE"), api);
+    expect(await screen.findByText("Your own request - a colleague must decide.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Post journal" })).toBeNull();
+    await userEvent.type(screen.getByLabelText("Narrative"), "Reclassify a fee booked to clearing");
+    await userEvent.type(screen.getByLabelText("Account 1"), "1120-MPESA-C2B-CLEARING");
+    await userEvent.type(screen.getByLabelText("Amount 1"), "250");
+    await userEvent.type(screen.getByLabelText("Branch 1"), "NBO01");
+    await userEvent.type(screen.getByLabelText("Account 2"), "4200-FEE-WITHDRAWAL");
+    await userEvent.type(screen.getByLabelText("Amount 2"), "200");
+    await userEvent.type(screen.getByLabelText("Branch 2"), "NBO01");
+    const propose = screen.getByRole("button", { name: "Propose journal" });
+    expect((propose as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/out by 50.00/)).toBeTruthy();
+    await userEvent.clear(screen.getByLabelText("Amount 2"));
+    await userEvent.type(screen.getByLabelText("Amount 2"), "250");
+    await userEvent.click(propose);
+    expect((await screen.findByRole("status")).textContent).toContain("Journal for 250.00 proposed");
+    expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ narrative: "Reclassify a fee booked to clearing",
+      lines: [{ accountCode: "1120-MPESA-C2B-CLEARING", side: "DEBIT", amount: "250" }, { accountCode: "4200-FEE-WITHDRAWAL", side: "CREDIT", amount: "250" }] });
+  });
 });
