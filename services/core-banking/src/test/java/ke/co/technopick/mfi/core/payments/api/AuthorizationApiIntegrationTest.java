@@ -1342,6 +1342,27 @@ class AuthorizationApiIntegrationTest {
               ('%1$s', '77777777-0000-0000-0000-0000000000b1', 2, '1110-MPESA-B2C-CLEARING', 'C', 10000, 'KES', 'NBO01');
             UPDATE lending.loan SET status = 'ACTIVE', disbursement_entry_id = '77777777-0000-0000-0000-0000000000b1'
              WHERE loan_id = 'bbbbbbbb-0000-0000-0000-0000000000b1';
+            INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency,
+                principal, term_months, created_by, approved_by) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-0000000000b2', 'LN-B00002', 'CB2', 'cccccccc-0000-0000-0000-0000000000b1',
+               'NBO01', 'KES', 2000, 1, 'test:officer', 'test:manager');
+            INSERT INTO lending.schedule_installment (tenant_id, loan_id, schedule_version, installment_no, due_date, principal, interest) VALUES
+              ('%1$s', 'bbbbbbbb-0000-0000-0000-0000000000b2', 1, 1, '2026-11-29', 2000, 60);
+            INSERT INTO ledger.journal_entry (tenant_id, entry_id, idempotency_key, business_date, source, correlation_id, actor) VALUES
+              ('%1$s', '77777777-0000-0000-0000-0000000000b2', 'loan:bbbbbbbb-0000-0000-0000-0000000000b2:DISBURSE:SEED', '2026-10-30', 'LOAN', 'seed', 'test'),
+              ('%1$s', '77777777-0000-0000-0000-0000000000b3', 'loan:bbbbbbbb-0000-0000-0000-0000000000b2:REPAY:B2-RCPT', '2026-11-28', 'LOAN', 'seed', 'test');
+            INSERT INTO ledger.journal_line (tenant_id, entry_id, line_no, account_code, side, amount, currency, branch_code) VALUES
+              ('%1$s', '77777777-0000-0000-0000-0000000000b2', 1, '1200-LOANS-PRINCIPAL', 'D', 2000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-0000000000b2', 2, '1110-MPESA-B2C-CLEARING', 'C', 2000, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-0000000000b3', 1, '1110-MPESA-B2C-CLEARING', 'D', 2100, 'KES', 'NBO01'),
+              ('%1$s', '77777777-0000-0000-0000-0000000000b3', 2, '2400-LOAN-OVERPAYMENTS', 'C', 2100, 'KES', 'NBO01');
+            UPDATE lending.loan SET status = 'ACTIVE', disbursement_entry_id = '77777777-0000-0000-0000-0000000000b2'
+             WHERE loan_id = 'bbbbbbbb-0000-0000-0000-0000000000b2';
+            -- Paid 2,100 the day before its only installment (2,060) falls due: all held as credit.
+            INSERT INTO lending.repayment (tenant_id, repayment_id, loan_id, amount, unallocated, currency, channel, provider_ref,
+                journal_entry_id, received_at)
+              VALUES ('%1$s', 'dddddddd-0000-0000-0000-0000000000b2', 'bbbbbbbb-0000-0000-0000-0000000000b2', 2100, 2100, 'KES',
+                      'MPESA_C2B', 'B2-RCPT', '77777777-0000-0000-0000-0000000000b3', now());
             COMMIT;
             """.formatted(TENANT_B));
         var teller = staffB("teller-b", "TELLER");
@@ -1382,14 +1403,27 @@ class AuthorizationApiIntegrationTest {
         assertEquals(0, (Integer) JsonPath.read(day1, "$.accountsCredited"));
         // Loan LN-B00001: installment 1 (due 24 Nov, interest 300) catches up in full; installment 2
         // accrues 4/30 of 150 = 20.00; 4 days late is past the 3 grace days, so the flat 200 penalty.
-        assertEquals(1, (Integer) JsonPath.read(day1, "$.loansProcessed"));
-        assertEquals("320.00", JsonPath.read(day1, "$.loanInterestAccrued"));
+        // LN-B00002 (2,060 due 29 Nov, 2,100 paid ahead) accrues 29/30 of 60 = 58.00.
+        assertEquals(2, (Integer) JsonPath.read(day1, "$.loansProcessed"));
+        assertEquals("378.00", JsonPath.read(day1, "$.loanInterestAccrued"));
         assertEquals("200.00", JsonPath.read(day1, "$.penaltiesCharged"));
         assertEquals(1, (Integer) JsonPath.read(day1, "$.loansInArrears"));
         String day2 = eodRun(ops, ok);
         assertEquals("8.24", JsonPath.read(day2, "$.interestAccrued"));
         assertEquals("5.00", JsonPath.read(day2, "$.loanInterestAccrued"));
         assertEquals("0.00", JsonPath.read(day2, "$.penaltiesCharged")); // the flat penalty is charged once
+        // 29 Nov: LN-B00002 falls due; its credit pays the 2,060 and the loan closes holding 40.00.
+        assertEquals("2060.00", JsonPath.read(day2, "$.creditApplied"));
+        assertEquals(1, (Integer) JsonPath.read(day2, "$.loansClosed"));
+        assertEquals(1, (Integer) JsonPath.read(day2, "$.loansProcessed"));
+        assertEquals("CLOSED", owner().queryForObject("SELECT status FROM lending.loan WHERE loan_number = 'LN-B00002'", String.class));
+        java.math.BigDecimal income = owner().queryForObject("""
+                SELECT sum(CASE side WHEN 'C' THEN amount ELSE -amount END) FROM ledger.journal_line l
+                  JOIN ledger.journal_entry e ON e.tenant_id = l.tenant_id AND e.entry_id = l.entry_id
+                 WHERE l.tenant_id = ? AND l.account_code = '4000-INTEREST-INCOME'
+                   AND e.idempotency_key LIKE 'loan:bbbbbbbb-0000-0000-0000-0000000000b2:%'
+                """, java.math.BigDecimal.class, java.util.UUID.fromString(TENANT_B));
+        assertEquals(0, new java.math.BigDecimal("60.00").compareTo(income)); // 58 accrued + 2 at repayment, once
         String monthEnd = eodRun(ops, ok);
         assertEquals("2026-12-01", JsonPath.read(monthEnd, "$.newBusinessDate"));
         assertEquals("8.25", JsonPath.read(monthEnd, "$.interestAccrued"));
@@ -1427,6 +1461,16 @@ class AuthorizationApiIntegrationTest {
         assertEquals(1, owner().queryForObject(
                 "SELECT loans_processed FROM ledger.eod_run WHERE tenant_id = ? AND business_date = '2026-11-30'",
                 Integer.class, java.util.UUID.fromString(TENANT_B)));
+        String par = mvc.perform(get("/api/v1/reports/portfolio-at-risk").with(staffB("manager-b", "BRANCH_MANAGER")))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        assertEquals("2026-11-30", JsonPath.read(par, "$.asOf"));
+        assertEquals(1, (Integer) JsonPath.read(par, "$.branches[0].loans"));
+        assertEquals("10000.00", JsonPath.read(par, "$.branches[0].portfolio"));
+        assertEquals("100.00", JsonPath.read(par, "$.branches[0].par1"));
+        assertEquals("0.00", JsonPath.read(par, "$.branches[0].par30"));
+        assertEquals(List.of("LN-B00001"), JsonPath.read(par, "$.loansInArrears[*].loanNumber"));
+        assertEquals(List.of("40.00"), JsonPath.read(par, "$.closedWithCredit[?(@.loanNumber == 'LN-B00002')].creditBalance"));
+        mvc.perform(get("/api/v1/reports/portfolio-at-risk").with(teller)).andExpect(status().isForbidden());
         String after = mvc.perform(get("/api/v1/end-of-day").with(ops)).andExpect(ok).andReturn().getResponse().getContentAsString();
         assertEquals("2026-11-30", JsonPath.read(after, "$.lastClosedDate"));
     }

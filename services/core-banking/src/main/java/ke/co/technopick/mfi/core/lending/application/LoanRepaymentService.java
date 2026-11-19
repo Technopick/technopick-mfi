@@ -48,8 +48,10 @@ public class LoanRepaymentService {
     private final JdbcClient jdbc;
     private final JournalPosting journal;
     private final Outbox outbox;
+    private final LoanClosureService closure;
 
-    public LoanRepaymentService(JdbcClient jdbc, JournalPosting journal, Outbox outbox) {
+    public LoanRepaymentService(JdbcClient jdbc, JournalPosting journal, Outbox outbox, LoanClosureService closure) {
+        this.closure = closure;
         this.jdbc = jdbc;
         this.journal = journal;
         this.outbox = outbox;
@@ -126,8 +128,31 @@ public class LoanRepaymentService {
                         .formatted(repaymentId, loanId, payment.amount().toPlainString(),
                                 allocation.unallocated().amount().toPlainString(), ccy.getCurrencyCode()),
                 correlationId);
+        closure.closeIfRepaid(tenantId, loanId, businessDate, actor);
         return new Result(repaymentId, loanId, loan.loanNumber(), entry.entryId(), allocation.totalAllocated(ccy),
                 allocation.unallocated());
+    }
+
+    /** Principal, interest and penalties due on or before the date and still unpaid. */
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public Money amountDue(UUID loanId, LocalDate businessDate, Currency ccy) {
+        Money total = Money.zero(ccy);
+        for (InstallmentDue d : dues(loanId, businessDate, ccy)) {
+            for (DueComponent c : List.of(DueComponent.PRINCIPAL, DueComponent.INTEREST, DueComponent.PENALTY)) {
+                Money m = d.outstanding(c, ccy);
+                if (m.isPositive()) {
+                    total = total.plus(m);
+                }
+            }
+        }
+        return total;
+    }
+
+    /** Overpaid money the loan holds for the customer (V20 lending.loan_credit). */
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public BigDecimal credit(UUID loanId) {
+        return jdbc.sql("SELECT lending.loan_credit(tenant_id, loan_id) FROM lending.loan WHERE loan_id = :loan")
+            .param("loan", loanId).query(BigDecimal.class).single();
     }
 
     record Loaded(String loanNumber, String status, String branchCode, BigDecimal principal, LoanProductVersion product) { }

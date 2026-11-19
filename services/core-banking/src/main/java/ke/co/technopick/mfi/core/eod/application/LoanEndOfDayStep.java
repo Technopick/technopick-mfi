@@ -15,6 +15,7 @@ import ke.co.technopick.mfi.core.accounting.domain.JournalEntry;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDayPlanner;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDayPlanner.InstallmentState;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDayPlanner.Plan;
+import ke.co.technopick.mfi.core.lending.application.LoanClosureService;
 import ke.co.technopick.mfi.core.lending.application.LoanRepaymentService;
 import ke.co.technopick.mfi.core.lending.domain.DueComponent;
 import ke.co.technopick.mfi.core.lending.domain.InstallmentDue;
@@ -37,17 +38,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class LoanEndOfDayStep {
 
-    public record LoanResult(boolean processed, Money interestAccrued, Money penalties, long daysPastDue) { }
+    public record LoanResult(boolean processed, Money interestAccrued, Money penalties, long daysPastDue, Money creditApplied,
+                             boolean closed) { }
 
     private record Installment(int no, LocalDate due, BigDecimal principal, BigDecimal interest, BigDecimal paidPrincipal,
                                BigDecimal paidInterest, BigDecimal paidPenalty, BigDecimal penalties, BigDecimal accrued) { }
 
     private final JdbcClient jdbc;
     private final JournalPosting journal;
+    private final LoanRepaymentService repayments;
+    private final LoanClosureService closure;
 
-    public LoanEndOfDayStep(JdbcClient jdbc, JournalPosting journal) {
+    public LoanEndOfDayStep(JdbcClient jdbc, JournalPosting journal, LoanRepaymentService repayments,
+                            LoanClosureService closure) {
         this.jdbc = jdbc;
         this.journal = journal;
+        this.repayments = repayments;
+        this.closure = closure;
     }
 
     @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
@@ -64,6 +71,13 @@ public class LoanEndOfDayStep {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public LoanResult process(UUID tenantId, UUID loanId, LocalDate date, String actor) {
+        Money creditApplied = applyCredit(tenantId, loanId, date, actor);
+        if (closure.closeIfRepaid(tenantId, loanId, date, actor).isPresent()
+                || !"ACTIVE".equals(jdbc.sql("SELECT status FROM lending.loan WHERE loan_id = :loan").param("loan", loanId)
+                        .query(String.class).single())) {
+            Money zero = Money.zero(creditApplied.currency());
+            return new LoanResult(true, zero, zero, 0, creditApplied, true);
+        }
         record Loan(String status, String branch, BigDecimal principal, LoanProductVersion product, LocalDate disbursedOn,
                     PenaltyRule penalty, BigDecimal tolerance) { }
         Loan loan = jdbc.sql("""
@@ -90,7 +104,7 @@ public class LoanEndOfDayStep {
             .param("loan", loanId).param("d", date).query(Integer.class).single() > 0;
         Currency ccy = loan.product().currency();
         if (!"ACTIVE".equals(loan.status()) || done) {
-            return new LoanResult(false, Money.zero(ccy), Money.zero(ccy), 0);
+            return new LoanResult(false, Money.zero(ccy), Money.zero(ccy), 0, creditApplied, false);
         }
 
         List<Installment> rows = jdbc.sql("""
@@ -180,7 +194,35 @@ public class LoanEndOfDayStep {
             .param("bucket", arrears.bucket().name()).param("class", arrears.classification().name())
             .param("arrears", arrears.arrearsAmount().amount()).param("principal", loan.principal().subtract(principalRepaid))
             .update();
-        return new LoanResult(true, accrued, penalties, arrears.daysPastDue());
+        return new LoanResult(true, accrued, penalties, arrears.daysPastDue(), creditApplied, false);
+    }
+
+    /**
+     * Money the customer overpaid earlier pays installments as they fall due: an INTERNAL
+     * repayment from the overpayment account, allocated like any other payment (ADR-0021).
+     */
+    private Money applyCredit(UUID tenantId, UUID loanId, LocalDate date, String actor) {
+        record L(String number, String currency, String overpaymentGl) { }
+        L l = jdbc.sql("""
+                SELECT l.loan_number, l.currency, v.gl_overpayment FROM lending.loan l
+                  JOIN lending.loan_product_version v ON v.tenant_id = l.tenant_id AND v.version_id = l.product_version_id
+                 WHERE l.loan_id = :loan
+                """)
+            .param("loan", loanId)
+            .query((rs, i) -> new L(rs.getString(1), rs.getString(2), rs.getString(3))).single();
+        Currency ccy = Currency.getInstance(l.currency());
+        Money credit = money(repayments.credit(loanId), ccy);
+        if (!credit.isPositive()) {
+            return Money.zero(ccy);
+        }
+        Money due = repayments.amountDue(loanId, date, ccy);
+        if (!due.isPositive()) {
+            return Money.zero(ccy);
+        }
+        Money pay = credit.compareTo(due) <= 0 ? credit : due;
+        repayments.apply(tenantId, loanId, pay, "INTERNAL", "CREDIT:" + l.number() + ":" + date, l.overpaymentGl(), date,
+                "eod:" + date, actor);
+        return pay;
     }
 
     private static Money money(BigDecimal value, Currency c) {

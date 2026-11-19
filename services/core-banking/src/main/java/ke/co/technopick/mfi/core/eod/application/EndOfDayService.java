@@ -40,6 +40,7 @@ public class EndOfDayService {
 
     public record EndOfDaySummary(LocalDate closedDate, LocalDate newBusinessDate, int loansProcessed,
                                   String loanInterestAccrued, String penaltiesCharged, int loansInArrears,
+                                  int loansClosed, String creditApplied,
                                   int accountsAccrued,
                                   String interestAccrued, int accountsCredited, String interestCredited,
                                   String taxWithheld) { }
@@ -94,6 +95,8 @@ public class EndOfDayService {
         try {
             int loansDone = 0;
             int inArrears = 0;
+            int closedLoans = 0;
+            BigDecimal credit = BigDecimal.ZERO.setScale(2);
             BigDecimal loanInterest = BigDecimal.ZERO.setScale(2);
             BigDecimal penalties = BigDecimal.ZERO.setScale(2);
             List<UUID> loanIds = tx.execute(s -> {
@@ -105,7 +108,9 @@ public class EndOfDayService {
                     session.bind(tenantId);
                     return loans.process(tenantId, loanId, date, actor);
                 });
-                if (r.processed()) {
+                credit = credit.add(r.creditApplied().amount());
+                closedLoans += r.closed() ? 1 : 0;
+                if (r.processed() && !r.closed()) {
                     loansDone++;
                     loanInterest = loanInterest.add(r.interestAccrued().amount());
                     penalties = penalties.add(r.penalties().amount());
@@ -145,6 +150,8 @@ public class EndOfDayService {
                 }
             }
             int loanCount = loansDone;
+            int closedCount = closedLoans;
+            BigDecimal creditTotal = credit;
             int arrearsCount = inArrears;
             BigDecimal loanInterestTotal = loanInterest;
             BigDecimal penaltyTotal = penalties;
@@ -166,7 +173,8 @@ public class EndOfDayService {
                                         penaltyTotal.toPlainString(), accruedTotal.toPlainString(), creditedNet.toPlainString()),
                         "eod:" + date);
                 return new EndOfDaySummary(date, date.plusDays(1), loanCount, loanInterestTotal.toPlainString(),
-                        penaltyTotal.toPlainString(), arrearsCount, accruedAccounts, accruedTotal.toPlainString(),
+                        penaltyTotal.toPlainString(), arrearsCount, closedCount, creditTotal.toPlainString(),
+                        accruedAccounts, accruedTotal.toPlainString(),
                         creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString());
             });
         } catch (RuntimeException e) {
