@@ -20,7 +20,11 @@ INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, cur
   (:t, '4300-PENALTY-INCOME', 'Penalty income', 'INCOME', 'KES', false),
   (:t, '2400-LOAN-OVERPAYMENTS', 'Loan overpayments', 'LIABILITY', 'KES', false),
   (:t, '5100-LOAN-WRITE-OFFS', 'Loan write-offs', 'EXPENSE', 'KES', false),
-  (:t, '1000-CASH-NBO01', 'Branch cash - Nairobi (test)', 'ASSET', 'KES', false);
+  (:t, '1000-CASH-NBO01', 'Branch cash - Nairobi (test)', 'ASSET', 'KES', false),
+  (:t, '1001-TILL-NBO01-01', 'Till NBO01-T1 (test)', 'ASSET', 'KES', false),
+  (:t, '1002-TILL-NBO01-02', 'Till NBO01-T2 (test)', 'ASSET', 'KES', false),
+  (:t, '5200-TELLER-SHORTAGES', 'Teller shortages (test)', 'EXPENSE', 'KES', false),
+  (:t, '2950-TELLER-OVERAGES', 'Teller overages (test)', 'LIABILITY', 'KES', false);
 INSERT INTO ledger.accounting_period (tenant_id, period_id, start_date, end_date)
 SELECT :t, to_char(m, 'YYYY-MM'), m::date, (m + interval '1 month - 1 day')::date
   FROM generate_series(date_trunc('month', current_date) - interval '1 month',
@@ -43,7 +47,11 @@ UPDATE lending.loan_product_version SET status = 'ACTIVE', approved_by = 'seed:c
  WHERE version_id = '0e2e0000-0000-0000-0000-0000000000c1';
 INSERT INTO savings.deposit_product (tenant_id, product_code, name, currency, gl_control_account)
 VALUES (:t, 'SAV01', 'Ordinary savings (test)', 'KES', '2110-SAVINGS-CONTROL');
-INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash) VALUES (:t, 'NBO01', 'KES', '1000-CASH-NBO01');
+INSERT INTO savings.branch_cash_account (tenant_id, branch_code, currency, gl_cash, gl_shortage, gl_overage)
+  VALUES (:t, 'NBO01', 'KES', '1000-CASH-NBO01', '5200-TELLER-SHORTAGES', '2950-TELLER-OVERAGES');
+INSERT INTO savings.till (tenant_id, till_id, till_code, branch_code, currency, gl_cash) VALUES
+  (:t, '0e2e7e00-0000-0000-0000-000000000001', 'NBO01-T1', 'NBO01', 'KES', '1001-TILL-NBO01-01'),
+  (:t, '0e2e7e00-0000-0000-0000-000000000002', 'NBO01-T2', 'NBO01', 'KES', '1002-TILL-NBO01-02');
 INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above)
 VALUES (:t, 'KES', 50000, 1000000);
 \echo TEST-ONLY seed loaded

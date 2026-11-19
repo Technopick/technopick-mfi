@@ -7,6 +7,7 @@ import { actorOf, hasAnyRole } from "../auth/session";
 import { Empty, Loading, Money, OwnItemNote, ProblemBox, Section, Status, when } from "../components/ui";
 import { useAction, useLoad } from "../hooks";
 import { formatMoney, isAmount } from "../money";
+import { MyTill, TillApprovals } from "./TillPanels";
 
 type Account = Schemas["SavingsAccountView"];
 type Txn = Schemas["TellerTransactionView"];
@@ -201,6 +202,7 @@ export function TellerPage() {
   return (
     <>
       <h1>Teller</h1>
+      {hasAnyRole(session, "TELLER") && <MyTill onChange={pending.reload} />}
       {hasAnyRole(session, "TELLER") && (
         <form className="search" onSubmit={(e) => { e.preventDefault(); if (accountNumber.trim()) navigate(`/accounts/${accountNumber.trim()}`); }}>
           <label>Account number<input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="2000000014" /></label>
@@ -234,6 +236,7 @@ export function TellerPage() {
           </table>
         )}
       </Section>
+      {canDecide && <TillApprovals />}
     </>
   );
 }

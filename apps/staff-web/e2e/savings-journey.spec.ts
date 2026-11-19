@@ -2,16 +2,22 @@ import { expect, test } from "@playwright/test";
 import { signIn, verifiedCustomer } from "./helpers";
 
 /**
- * Savings through the real stack: verified customer -> teller opens an account -> cash deposit ->
- * large withdrawal waits for a supervisor (the teller cannot approve it) -> approved -> the
- * statement shows both movements with running balances.
+ * Savings through the real stack: teller opens their till -> verified customer -> teller opens an
+ * account -> cash deposit -> large withdrawal waits for a supervisor (the teller cannot approve it)
+ * -> approved -> the statement shows both movements -> vault cash in (approved) -> end-of-day count
+ * with a 100 shortage, accepted by the supervisor.
  */
-test("open a savings account, deposit, and withdraw above the limit with approval", async ({ browser }) => {
+test("a teller day: till, deposit, approved withdrawal, vault transfer and closing count", async ({ browser }) => {
   const officer = await signIn(browser, "officer");
   const manager = await signIn(browser, "manager");
   const customer = await verifiedCustomer(officer, manager, "Wanjiru");
 
   const teller = await signIn(browser, "teller");
+  await teller.goto("/teller");
+  await teller.getByLabel("Till", { exact: true }).selectOption("NBO01-T1");
+  await teller.getByRole("button", { name: "Open till" }).click();
+  await expect(teller.getByRole("status")).toContainText("Till NBO01-T1 is open");
+
   await teller.goto(`/customers/${customer}`);
   await teller.getByRole("button", { name: "Open savings account" }).click();
   const heading = teller.getByRole("heading", { level: 1, name: /^Account 2\d{9}$/ });
@@ -42,4 +48,29 @@ test("open a savings account, deposit, and withdraw above the limit with approva
   await expect(rows.nth(0)).toContainText("KES 100,000.00");
   await expect(rows.nth(1)).toContainText("KES 60,000.00");
   await expect(rows.nth(1)).toContainText("KES 40,000.00");
+
+  // Vault cash into the till, approved by the supervisor.
+  await teller.goto("/teller");
+  await teller.getByLabel("Transfer amount").fill("20000");
+  await teller.getByRole("button", { name: "Request transfer" }).click();
+  await expect(teller.getByRole("status")).toContainText("waiting for a supervisor");
+  await supervisor.goto("/teller");
+  const transfer = supervisor.getByRole("row", { name: /NBO01-T1.*Vault to till/ });
+  await transfer.getByRole("button", { name: "Approve" }).click();
+  await expect(transfer).toHaveCount(0);
+
+  // 100,000 in, 60,000 out, 20,000 from the vault: 60,000 expected. The teller counts 59,900.
+  await teller.goto("/teller");
+  await expect(teller.getByText("KES 60,000.00")).toBeVisible();
+  await teller.getByLabel("Counted cash").fill("59900");
+  await teller.getByRole("button", { name: "Count and close till" }).click();
+  await expect(teller.getByRole("status")).toContainText("Count differs by -100.00");
+
+  await supervisor.goto("/teller");
+  const count = supervisor.getByRole("row", { name: /NBO01-T1/ });
+  await count.getByLabel("Note for till NBO01-T1").fill("Shortage of 100 accepted; teller notified");
+  await count.getByRole("button", { name: "Accept difference" }).click();
+  await expect(count).toHaveCount(0);
+  await teller.goto("/teller");
+  await expect(teller.getByRole("button", { name: "Open till" })).toBeVisible();
 });

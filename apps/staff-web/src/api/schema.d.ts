@@ -692,6 +692,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/savings/cash-transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Till_pendingTransfers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/cash-transfers/{transferId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_approveTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/cash-transfers/{transferId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_rejectTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/savings/teller/transactions": {
         parameters: {
             query?: never;
@@ -734,6 +782,134 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Teller_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_open"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions/closing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Till_closing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Till_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions/{sessionId}/approve-variance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_approveVariance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions/{sessionId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions/{sessionId}/recount": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_recount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/till-sessions/{sessionId}/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Till_requestTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/savings/tills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Till_tills"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -813,6 +989,31 @@ export interface components {
             activeHolds?: string;
             availableBalance?: string;
             ledgerBalance?: string;
+        };
+        CashTransferRequest: {
+            amount: string;
+            /** @enum {string} */
+            direction: "VAULT_TO_TILL" | "TILL_TO_VAULT";
+            idempotencyKey: string;
+        };
+        CashTransferView: {
+            amount?: string;
+            currency?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** @enum {string} */
+            direction?: "VAULT_TO_TILL" | "TILL_TO_VAULT";
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            /** Format: uuid */
+            sessionId?: string;
+            status?: string;
+            teller?: string;
+            tillCode?: string;
+            /** Format: uuid */
+            transferId?: string;
         };
         CompleteRequest: {
             amount: string;
@@ -1239,6 +1440,9 @@ export interface components {
             /** Format: uuid */
             tenantId: string;
         };
+        SupervisorNote: {
+            reason?: string;
+        };
         TellerDecision: {
             reason?: string;
         };
@@ -1275,6 +1479,42 @@ export interface components {
         TenantOnly: {
             /** Format: uuid */
             tenantId: string;
+        };
+        TillCount: {
+            countedAmount: string;
+        };
+        TillOpening: {
+            tillCode: string;
+        };
+        TillSessionView: {
+            branchCode?: string;
+            /** Format: date */
+            businessDate?: string;
+            countedAmount?: string;
+            currency?: string;
+            expectedCash?: string;
+            /** Format: date-time */
+            openedAt?: string;
+            /** Format: int32 */
+            pendingTransactions?: number;
+            /** Format: int32 */
+            pendingTransfers?: number;
+            /** Format: uuid */
+            sessionId?: string;
+            status?: string;
+            teller?: string;
+            tillCode?: string;
+            variance?: string;
+            varianceApprovedBy?: string;
+            varianceReason?: string;
+        };
+        TillView: {
+            active?: boolean;
+            branchCode?: string;
+            currency?: string;
+            openedBy?: string;
+            sessionStatus?: string;
+            tillCode?: string;
         };
         ValidateRequest: {
             amount: string;
@@ -2448,6 +2688,78 @@ export interface operations {
             };
         };
     };
+    Till_pendingTransfers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferView"][];
+                };
+            };
+        };
+    };
+    Till_approveTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SupervisorNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferView"];
+                };
+            };
+        };
+    };
+    Till_rejectTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupervisorNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferView"];
+                };
+            };
+        };
+    };
     Teller_pending: {
         parameters: {
             query?: never;
@@ -2540,6 +2852,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TellerTransactionView"];
+                };
+            };
+        };
+    };
+    Till_open: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TillOpening"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillSessionView"];
+                };
+            };
+        };
+    };
+    Till_closing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillSessionView"][];
+                };
+            };
+        };
+    };
+    Till_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillSessionView"];
+                };
+            };
+        };
+    };
+    Till_approveVariance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupervisorNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillSessionView"];
+                };
+            };
+        };
+    };
+    Till_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TillCount"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillSessionView"];
+                };
+            };
+        };
+    };
+    Till_recount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupervisorNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillSessionView"];
+                };
+            };
+        };
+    };
+    Till_requestTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashTransferView"];
+                };
+            };
+        };
+    };
+    Till_tills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillView"][];
                 };
             };
         };

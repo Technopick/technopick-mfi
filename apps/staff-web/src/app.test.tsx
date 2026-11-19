@@ -23,6 +23,13 @@ const application = {
   },
 };
 
+const noTill = {
+  "GET /api/v1/savings/till-sessions/mine": () => {
+    throw new ApiError({ status: 404, title: "Not Found", detail: "no till open" });
+  },
+  "GET /api/v1/savings/tills": () => [],
+};
+
 describe("money", () => {
   it("formats decimal strings without floating point", () => {
     expect(formatAmount("1234567.5")).toBe("1,234,567.50");
@@ -194,9 +201,64 @@ describe("screens", () => {
       "GET /api/v1/savings/teller/transactions": () => [{ txnId: "t-1", accountNumber: "2000000014", kind: "WITHDRAWAL",
         amount: "60000.00", currency: "KES", narrative: "Cash withdrawal", status: "PENDING_APPROVAL",
         requestedBy: "user:sup-teller" }],
+      ...noTill,
+      "GET /api/v1/savings/cash-transfers": () => [],
+      "GET /api/v1/savings/till-sessions/closing": () => [],
     });
     renderAt("/teller", session("sup-teller", "TELLER", "SUPERVISOR"), api);
     expect(await screen.findByText(/a colleague must decide/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  });
+
+  it("lets a teller open a till, ask the vault for cash and count out with a difference", async () => {
+    let state: "none" | "open" | "closing" = "none";
+    const open = { sessionId: "s-1", tillCode: "NBO01-T1", branchCode: "NBO01", currency: "KES", teller: "user:teller-1",
+      businessDate: "2026-11-19", status: "OPEN", expectedCash: "50000.00", pendingTransactions: 0, pendingTransfers: 0 };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/savings/teller/transactions": () => [],
+      "GET /api/v1/savings/till-sessions/mine": () => {
+        if (state === "none") throw new ApiError({ status: 404, title: "Not Found", detail: "no till open" });
+        return state === "open" ? open : { ...open, status: "CLOSING", countedAmount: "49900.00", variance: "-100.00" };
+      },
+      "GET /api/v1/savings/tills": () => [{ tillCode: "NBO01-T1", branchCode: "NBO01", currency: "KES", active: true },
+        { tillCode: "NBO01-T2", branchCode: "NBO01", currency: "KES", active: true, openedBy: "user:other", sessionStatus: "OPEN" }],
+      "POST /api/v1/savings/till-sessions": () => { state = "open"; return open; },
+      "POST /api/v1/savings/till-sessions/s-1/transfers": (body) => ({ ...(body as object), transferId: "x-1", currency: "KES",
+        status: "PENDING", amount: "50000.00" }),
+      "POST /api/v1/savings/till-sessions/s-1/close": () => { state = "closing"; return { ...open, status: "CLOSING", variance: "-100.00" }; },
+    });
+    renderAt("/teller", session("teller-1", "TELLER"), api);
+    const till = await screen.findByLabelText("Till");
+    await waitFor(() => expect(within(till).getAllByRole("option").map((o) => o.textContent)).toEqual(["Choose a till", "NBO01-T1 (NBO01)"]));
+    await userEvent.selectOptions(till, "NBO01-T1");
+    await userEvent.click(screen.getByRole("button", { name: "Open till" }));
+    expect(await screen.findByText(/Till NBO01-T1 is open/)).toBeTruthy();
+    await userEvent.type(await screen.findByLabelText("Transfer amount"), "50000");
+    await userEvent.click(screen.getByRole("button", { name: "Request transfer" }));
+    expect(await screen.findByText(/waiting for a supervisor/)).toBeTruthy();
+    const transfer = calls.find((c) => c.path.endsWith("/transfers"));
+    expect(transfer?.body).toMatchObject({ direction: "VAULT_TO_TILL", amount: "50000" });
+    await userEvent.type(screen.getByLabelText("Counted cash"), "49900");
+    await userEvent.click(screen.getByRole("button", { name: "Count and close till" }));
+    expect(await screen.findByText(/Count differs by -100.00/)).toBeTruthy();
+    expect(calls.find((c) => c.path.endsWith("/close"))?.body).toEqual({ countedAmount: "49900" });
+    // While a supervisor decides, the teller can neither transfer nor count again.
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Count and close till" })).toBeNull());
+  });
+
+  it("asks a supervisor for a note before accepting a till difference", async () => {
+    const { api, calls } = fakeApi({
+      "GET /api/v1/savings/teller/transactions": () => [],
+      "GET /api/v1/savings/cash-transfers": () => [],
+      "GET /api/v1/savings/till-sessions/closing": () => [{ sessionId: "s-9", tillCode: "NBO01-T2", teller: "user:teller-2",
+        currency: "KES", status: "CLOSING", expectedCash: "79900.00", countedAmount: "79850.00", variance: "-50.00" }],
+      "POST /api/v1/savings/till-sessions/s-9/approve-variance": () => ({ sessionId: "s-9", status: "CLOSED" }),
+    });
+    renderAt("/teller", session("sup-1", "SUPERVISOR"), api);
+    const accept = await screen.findByRole("button", { name: "Accept difference" });
+    expect((accept as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText("Note for till NBO01-T2"), "Shortage accepted");
+    await userEvent.click(accept);
+    await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toEqual({ reason: "Shortage accepted" }));
   });
 });
