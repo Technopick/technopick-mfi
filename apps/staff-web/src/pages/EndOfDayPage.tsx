@@ -20,7 +20,7 @@ export function EndOfDayPage() {
   const canRun = hasAnyRole(session, "OPERATIONS");
   const s = status.data;
   const tills = s?.openTills ?? [];
-  const blocked = tills.length > 0 || (s?.activeLoans ?? 0) > 0 || (s?.runStatus === "RUNNING");
+  const blocked = tills.length > 0 || s?.runStatus === "RUNNING";
 
   async function run() {
     const r = await action.run(() => api.post<EodSummary>(`${EOD}/run`));
@@ -34,7 +34,9 @@ export function EndOfDayPage() {
       <ProblemBox problem={status.error ?? action.error} />
       {summary && (
         <p className="ok" role="status">
-          Business day {summary.closedDate} closed; the business date is now {summary.newBusinessDate}. Interest accrued:{" "}
+          Business day {summary.closedDate} closed; the business date is now {summary.newBusinessDate}.
+          {" "}Loans: {summary.loansProcessed} processed, interest accrued {summary.loanInterestAccrued}, penalties{" "}
+          {summary.penaltiesCharged}, {summary.loansInArrears} in arrears. Savings interest accrued:{" "}
           {summary.interestAccrued} on {summary.accountsAccrued} account(s).
           {(summary.accountsCredited ?? 0) > 0 && <> Interest credited: {summary.interestCredited} to {summary.accountsCredited} account(s), tax withheld {summary.taxWithheld}.</>}
         </p>
@@ -44,6 +46,7 @@ export function EndOfDayPage() {
           <dl className="facts">
             <dt>Last closed day</dt><dd>{s.lastClosedDate ?? "none yet"}</dd>
             <dt>This day's run</dt><dd>{s.runStatus ? <Status value={s.runStatus} /> : "not started"}{s.runStartedAt && <> - {when(s.runStartedAt)}</>}</dd>
+            <dt>Loans</dt><dd>{s.activeLoans ?? 0} active: interest accrual, penalties and arrears</dd>
             <dt>Savings interest</dt><dd>{s.interestPostingDay ? "accrued, then credited to accounts (month end)" : "accrued"}</dd>
           </dl>
           {s.runStatus === "FAILED" && s.failureReason && <p className="problem">Last attempt failed: {s.failureReason}. Fix the cause and run again; finished steps are not repeated.</p>}
@@ -53,9 +56,6 @@ export function EndOfDayPage() {
               <thead><tr><th>Till</th><th>Teller</th><th>Status</th></tr></thead>
               <tbody>{tills.map((t) => <tr key={t.tillCode}><td>{t.tillCode}</td><td>{t.teller}</td><td><Status value={t.status} /></td></tr>)}</tbody>
             </table>
-          )}
-          {(s.activeLoans ?? 0) > 0 && (
-            <p className="problem">This tenant has {s.activeLoans} active loan(s). Loan end of day (accrual, penalties, arrears) is not built yet, so the day cannot be closed.</p>
           )}
           {canRun && (
             <button type="button" disabled={action.busy || blocked} onClick={() => void run()}>

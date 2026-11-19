@@ -1246,8 +1246,14 @@ export interface components {
             closedDate?: string;
             interestAccrued?: string;
             interestCredited?: string;
+            loanInterestAccrued?: string;
+            /** Format: int32 */
+            loansInArrears?: number;
+            /** Format: int32 */
+            loansProcessed?: number;
             /** Format: date */
             newBusinessDate?: string;
+            penaltiesCharged?: string;
             taxWithheld?: string;
         };
         LoanApplicationRequest: {

@@ -950,8 +950,22 @@
           "interestCredited": {
             "type": "string"
           },
+          "loanInterestAccrued": {
+            "type": "string"
+          },
+          "loansInArrears": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "loansProcessed": {
+            "format": "int32",
+            "type": "integer"
+          },
           "newBusinessDate": {
             "format": "date",
+            "type": "string"
+          },
+          "penaltiesCharged": {
             "type": "string"
           },
           "taxWithheld": {

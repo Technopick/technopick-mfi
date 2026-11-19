@@ -267,7 +267,8 @@ describe("screens", () => {
     const { api, calls } = fakeApi({
       "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-30", activeLoans: 0, interestPostingDay: true,
         lastClosedDate: "2026-11-29", openTills: tillOpen ? [{ tillCode: "NBO01-T1", teller: "user:teller-1", status: "OPEN" }] : [] }),
-      "POST /api/v1/end-of-day/run": () => ({ closedDate: "2026-11-30", newBusinessDate: "2026-12-01", accountsAccrued: 2,
+      "POST /api/v1/end-of-day/run": () => ({ closedDate: "2026-11-30", newBusinessDate: "2026-12-01", loansProcessed: 1,
+        loanInterestAccrued: "5.00", penaltiesCharged: "0.00", loansInArrears: 1, accountsAccrued: 2,
         interestAccrued: "8.25", accountsCredited: 2, interestCredited: "21.03", taxWithheld: "3.71" }),
     });
     const view = renderAt("/end-of-day", session("ops-1", "OPERATIONS"), api);
@@ -280,7 +281,7 @@ describe("screens", () => {
     const ready = await screen.findByRole("button", { name: "Close business day 2026-11-30" });
     await waitFor(() => expect((ready as HTMLButtonElement).disabled).toBe(false));
     await userEvent.click(ready);
-    expect((await screen.findByRole("status")).textContent).toMatch(/now 2026-12-01.*credited: 21.03 to 2 account\(s\), tax withheld 3.71/);
+    expect((await screen.findByRole("status")).textContent).toMatch(/now 2026-12-01.*Loans: 1 processed, interest accrued 5.00.*credited: 21.03 to 2 account\(s\), tax withheld 3.71/);
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
   });
 
@@ -289,7 +290,7 @@ describe("screens", () => {
       "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-20", activeLoans: 3, interestPostingDay: false, openTills: [] }),
     });
     renderAt("/end-of-day", session("manager-1", "BRANCH_MANAGER"), api);
-    expect(await screen.findByText(/3 active loan\(s\)/)).toBeTruthy();
+    expect(await screen.findByText(/3 active: interest accrual, penalties and arrears/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /close business day/i })).toBeNull();
   });
 });
