@@ -676,6 +676,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/portfolio-at-risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortfolioReport_portfolioAtRisk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/savings/accounts": {
         parameters: {
             query?: never;
@@ -1022,6 +1038,19 @@ export interface components {
             availableBalance?: string;
             ledgerBalance?: string;
         };
+        BranchPar: {
+            atRisk1?: string;
+            atRisk30?: string;
+            atRisk90?: string;
+            branchCode?: string;
+            currency?: string;
+            /** Format: int32 */
+            loans?: number;
+            par1?: string;
+            par30?: string;
+            par90?: string;
+            portfolio?: string;
+        };
         CashTransferRequest: {
             amount: string;
             /** @enum {string} */
@@ -1046,6 +1075,14 @@ export interface components {
             tillCode?: string;
             /** Format: uuid */
             transferId?: string;
+        };
+        ClosedWithCredit: {
+            branchCode?: string;
+            /** Format: date */
+            closedOn?: string;
+            creditBalance?: string;
+            customerNumber?: string;
+            loanNumber?: string;
         };
         CompleteRequest: {
             amount: string;
@@ -1244,9 +1281,12 @@ export interface components {
             accountsCredited?: number;
             /** Format: date */
             closedDate?: string;
+            creditApplied?: string;
             interestAccrued?: string;
             interestCredited?: string;
             loanInterestAccrued?: string;
+            /** Format: int32 */
+            loansClosed?: number;
             /** Format: int32 */
             loansInArrears?: number;
             /** Format: int32 */
@@ -1299,6 +1339,17 @@ export interface components {
         };
         LoanDecisionRequest: {
             reason?: string;
+        };
+        LoanInArrears: {
+            arrearsAmount?: string;
+            branchCode?: string;
+            bucket?: string;
+            classification?: string;
+            customerNumber?: string;
+            /** Format: int32 */
+            daysPastDue?: number;
+            loanNumber?: string;
+            outstandingPrincipal?: string;
         };
         LoanQuote: {
             annualRate?: string;
@@ -1373,6 +1424,13 @@ export interface components {
             status?: string;
             teller?: string;
             tillCode?: string;
+        };
+        PortfolioReport: {
+            /** Format: date */
+            asOf?: string;
+            branches?: components["schemas"]["BranchPar"][];
+            closedWithCredit?: components["schemas"]["ClosedWithCredit"][];
+            loansInArrears?: components["schemas"]["LoanInArrears"][];
         };
         QueryResult: {
             checkoutRequestId: string;
@@ -2701,6 +2759,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Decision"];
+                };
+            };
+        };
+    };
+    PortfolioReport_portfolioAtRisk: {
+        parameters: {
+            query?: {
+                asOf?: string;
+                branchCode?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioReport"];
                 };
             };
         };

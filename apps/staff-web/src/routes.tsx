@@ -6,6 +6,7 @@ import { DisbursementsPage } from "./pages/DisbursementsPage";
 import { EndOfDayPage } from "./pages/EndOfDayPage";
 import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
+import { PortfolioPage } from "./pages/PortfolioPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
 import { SuspensePage } from "./pages/SuspensePage";
 import { WorklistPage } from "./pages/WorklistPage";
@@ -28,6 +29,7 @@ export const routes: RouteObject[] = [
       { path: "mpesa", element: <MpesaPage /> },
       { path: "suspense", element: <SuspensePage /> },
       { path: "end-of-day", element: <EndOfDayPage /> },
+      { path: "portfolio", element: <PortfolioPage /> },
       { path: "loans", element: <LoanSchedulePage /> },
       { path: "loans/:number", element: <LoanSchedulePage /> },
       { path: "*", element: <p className="empty">Page not found.</p> },

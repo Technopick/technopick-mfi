@@ -12,6 +12,7 @@ export const NAV: { to: string; label: string; roles: string[] }[] = [
   { to: "/mpesa", label: "M-Pesa close-out", roles: ["OPERATIONS", "SUPERVISOR"] },
   { to: "/suspense", label: "Suspense", roles: ["OPERATIONS", "SUPERVISOR"] },
   { to: "/loans", label: "Loan schedule", roles: ["LOAN_OFFICER", "BRANCH_MANAGER", "TELLER", "OPERATIONS"] },
+  { to: "/portfolio", label: "Portfolio at risk", roles: ["BRANCH_MANAGER", "SUPERVISOR", "OPERATIONS", "LOAN_OFFICER"] },
   { to: "/end-of-day", label: "End of day", roles: ["OPERATIONS", "BRANCH_MANAGER", "SUPERVISOR"] },
 ];
 

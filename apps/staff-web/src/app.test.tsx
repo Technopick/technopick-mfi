@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ApiError, createApi } from "./api/client";
 import { sessionFromToken } from "./auth/session";
@@ -268,7 +268,8 @@ describe("screens", () => {
       "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-30", activeLoans: 0, interestPostingDay: true,
         lastClosedDate: "2026-11-29", openTills: tillOpen ? [{ tillCode: "NBO01-T1", teller: "user:teller-1", status: "OPEN" }] : [] }),
       "POST /api/v1/end-of-day/run": () => ({ closedDate: "2026-11-30", newBusinessDate: "2026-12-01", loansProcessed: 1,
-        loanInterestAccrued: "5.00", penaltiesCharged: "0.00", loansInArrears: 1, accountsAccrued: 2,
+        loanInterestAccrued: "5.00", penaltiesCharged: "0.00", loansInArrears: 1, loansClosed: 1, creditApplied: "2060.00",
+        accountsAccrued: 2,
         interestAccrued: "8.25", accountsCredited: 2, interestCredited: "21.03", taxWithheld: "3.71" }),
     });
     const view = renderAt("/end-of-day", session("ops-1", "OPERATIONS"), api);
@@ -292,5 +293,26 @@ describe("screens", () => {
     renderAt("/end-of-day", session("manager-1", "BRANCH_MANAGER"), api);
     expect(await screen.findByText(/3 active: interest accrual, penalties and arrears/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /close business day/i })).toBeNull();
+  });
+
+  it("shows portfolio at risk by branch, loans in arrears and closed loans holding credit", async () => {
+    const { api, calls } = fakeApi({
+      "GET /api/v1/reports/portfolio-at-risk": () => ({ asOf: "2026-11-30",
+        branches: [{ branchCode: "NBO01", currency: "KES", loans: 1, portfolio: "10000.00", atRisk1: "10000.00", atRisk30: "0.00",
+          atRisk90: "0.00", par1: "100.00", par30: "0.00", par90: "0.00" }],
+        loansInArrears: [{ loanNumber: "LN-B00001", branchCode: "NBO01", daysPastDue: 6, bucket: "DPD_1_30", classification: "WATCH",
+          arrearsAmount: "5300.00", outstandingPrincipal: "10000.00" }],
+        closedWithCredit: [{ loanNumber: "LN-B00002", branchCode: "NBO01", closedOn: "2026-11-29", creditBalance: "40.00" }] }),
+      "GET /api/v1/reports/portfolio-at-risk?asOf=2026-11-29": () => ({ asOf: "2026-11-29", branches: [], loansInArrears: [], closedWithCredit: [] }),
+    });
+    renderAt("/portfolio", session("manager-1", "BRANCH_MANAGER"), api);
+    expect(await screen.findByText("By branch, as of 2026-11-30")).toBeTruthy();
+    expect(screen.getByText("100.00%")).toBeTruthy();
+    expect(screen.getByText("LN-B00001")).toBeTruthy();
+    expect(screen.getByText("LN-B00002")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("As of"), { target: { value: "2026-11-29" } });
+    await userEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(await screen.findByText("No loan is in arrears.")).toBeTruthy();
+    expect(calls.some((c) => c.path.endsWith("asOf=2026-11-29"))).toBe(true);
   });
 });

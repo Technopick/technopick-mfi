@@ -36,7 +36,8 @@ export function EndOfDayPage() {
         <p className="ok" role="status">
           Business day {summary.closedDate} closed; the business date is now {summary.newBusinessDate}.
           {" "}Loans: {summary.loansProcessed} processed, interest accrued {summary.loanInterestAccrued}, penalties{" "}
-          {summary.penaltiesCharged}, {summary.loansInArrears} in arrears. Savings interest accrued:{" "}
+          {summary.penaltiesCharged}, {summary.loansInArrears} in arrears, {summary.loansClosed} closed (credit applied{" "}
+          {summary.creditApplied}). Savings interest accrued:{" "}
           {summary.interestAccrued} on {summary.accountsAccrued} account(s).
           {(summary.accountsCredited ?? 0) > 0 && <> Interest credited: {summary.interestCredited} to {summary.accountsCredited} account(s), tax withheld {summary.taxWithheld}.</>}
         </p>
