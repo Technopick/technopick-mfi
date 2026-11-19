@@ -90,4 +90,6 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(finance.getByRole("link", { name: "1001-TILL-NBO01-01" })).toBeVisible();
   await finance.getByRole("link", { name: "Reconciliation of control accounts" }).click();
   await expect(finance.getByRole("heading", { level: 1, name: "Reconciliation" })).toBeVisible();
+  // Everything the journeys posted through the real services matches its business records.
+  await expect(finance.getByRole("status")).toContainText("Every control account matches its records.");
 });
