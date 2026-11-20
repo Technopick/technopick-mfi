@@ -409,4 +409,22 @@ describe("screens", () => {
     expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ narrative: "Reclassify a fee booked to clearing",
       lines: [{ accountCode: "1120-MPESA-C2B-CLEARING", side: "DEBIT", amount: "250" }, { accountCode: "4200-FEE-WITHDRAWAL", side: "CREDIT", amount: "250" }] });
   });
+
+  it("shows the income statement and a balance sheet that balances, with CSV downloads", async () => {
+    const { api } = fakeApi({
+      "GET /api/v1/accounting/income-statement": () => ({ from: "2026-11-01", to: "2026-11-30",
+        income: [{ accountCode: "4000-INTEREST-INCOME", name: "Interest income", accountClass: "INCOME", currency: "KES", amount: "390.00" }],
+        expenses: [{ accountCode: "5300-SAVINGS-INTEREST", name: "Interest on savings", accountClass: "EXPENSE", currency: "KES", amount: "24.74" }],
+        totals: [{ currency: "KES", totalIncome: "390.00", totalExpenses: "24.74", netProfit: "365.26" }] }),
+      "GET /api/v1/accounting/balance-sheet": () => ({ asOf: "2026-12-01",
+        assets: [{ accountCode: "1200-LOANS-PRINCIPAL", name: "Loans", accountClass: "ASSET", currency: "KES", amount: "1000.00" }],
+        liabilities: [{ accountCode: "2110-SAVINGS-CONTROL", name: "Savings", accountClass: "LIABILITY", currency: "KES", amount: "634.74" }],
+        equity: [], totals: [{ currency: "KES", totalAssets: "1000.00", totalLiabilities: "634.74", totalEquity: "0.00",
+          unclosedEarnings: "365.26", liabilitiesAndEquity: "1000.00", balanced: true }] }),
+    });
+    renderAt("/ledger/statements", session("fin-1", "FINANCE"), api);
+    const statuses = await screen.findAllByRole("status");
+    expect(statuses.map((s) => s.textContent).join(" ")).toMatch(/net profit 365.26.*balances\./s);
+    expect(screen.getAllByRole("button", { name: "Download CSV" })).toHaveLength(2);
+  });
 });

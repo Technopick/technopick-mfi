@@ -10,6 +10,7 @@ import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
+import { StatementsPage } from "./pages/StatementsPage";
 import { WriteOffsPage } from "./pages/WriteOffsPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
 import { SuspensePage } from "./pages/SuspensePage";
@@ -38,6 +39,7 @@ export const routes: RouteObject[] = [
       { path: "ledger/reconciliation", element: <ReconciliationPage /> },
       { path: "ledger/journals", element: <ManualJournalsPage /> },
       { path: "ledger/periods", element: <PeriodsPage /> },
+      { path: "ledger/statements", element: <StatementsPage /> },
       { path: "ledger/accounts/:code", element: <AccountActivityPage /> },
       { path: "ledger/entries/:id", element: <JournalEntryPage /> },
       { path: "write-offs", element: <WriteOffsPage /> },

@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/v1/accounting/balance-sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_balanceSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/gl-accounts": {
         parameters: {
             query?: never;
@@ -28,6 +44,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["Ledger_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/income-statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ledger_incomeStatement"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1308,6 +1340,24 @@ export interface components {
             availableBalance?: string;
             ledgerBalance?: string;
         };
+        BalanceSheet: {
+            /** Format: date */
+            asOf?: string;
+            assets?: components["schemas"]["FinancialStatementLine"][];
+            branchCode?: string;
+            equity?: components["schemas"]["FinancialStatementLine"][];
+            liabilities?: components["schemas"]["FinancialStatementLine"][];
+            totals?: components["schemas"]["BalanceSheetTotal"][];
+        };
+        BalanceSheetTotal: {
+            balanced?: boolean;
+            currency?: string;
+            liabilitiesAndEquity?: string;
+            totalAssets?: string;
+            totalEquity?: string;
+            totalLiabilities?: string;
+            unclosedEarnings?: string;
+        };
         BranchPar: {
             atRisk1?: string;
             atRisk30?: string;
@@ -1616,6 +1666,13 @@ export interface components {
             source?: string;
             switchReference?: string;
         };
+        FinancialStatementLine: {
+            accountClass?: string;
+            accountCode?: string;
+            amount?: string;
+            currency?: string;
+            name?: string;
+        };
         GlAccount: {
             accountClass?: string;
             accountCode?: string;
@@ -1624,6 +1681,22 @@ export interface components {
             postable?: boolean;
             status?: string;
             subledger?: boolean;
+        };
+        IncomeStatement: {
+            branchCode?: string;
+            expenses?: components["schemas"]["FinancialStatementLine"][];
+            /** Format: date */
+            from?: string;
+            income?: components["schemas"]["FinancialStatementLine"][];
+            /** Format: date */
+            to?: string;
+            totals?: components["schemas"]["IncomeStatementTotal"][];
+        };
+        IncomeStatementTotal: {
+            currency?: string;
+            netProfit?: string;
+            totalExpenses?: string;
+            totalIncome?: string;
         };
         JournalLineRequest: {
             accountCode: string;
@@ -2143,6 +2216,29 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    Ledger_balanceSheet: {
+        parameters: {
+            query?: {
+                asOf?: string;
+                branchCode?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceSheet"];
+                };
+            };
+        };
+    };
     Ledger_accounts: {
         parameters: {
             query?: never;
@@ -2185,6 +2281,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountActivity"];
+                };
+            };
+        };
+    };
+    Ledger_incomeStatement: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                branchCode?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncomeStatement"];
                 };
             };
         };

@@ -96,4 +96,22 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(finance.getByRole("heading", { level: 1, name: "Accounting periods" })).toBeVisible();
   await finance.goto("/ledger/journals");
   await expect(finance.getByRole("button", { name: "Propose journal" })).toBeVisible();
+  await finance.goto("/ledger/statements");
+  await expect(finance.getByText(/ - balances\./)).toBeVisible();
+  await finance.goto("/ledger");
+  const [download] = await Promise.all([
+    finance.waitForEvent("download"),
+    finance.getByRole("button", { name: "Download CSV" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^trial-balance-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = await new Promise<string>((resolve, reject) => {
+    download.createReadStream().then((stream) => {
+      let text = "";
+      stream.on("data", (chunk: Buffer) => { text += chunk.toString("utf8"); });
+      stream.on("end", () => resolve(text));
+      stream.on("error", reject);
+    }, reject);
+  });
+  expect(csv.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe("Account,Name,Class,Currency,Debit,Credit");
+  expect(csv).toContain("1001-TILL-NBO01-01");
 });

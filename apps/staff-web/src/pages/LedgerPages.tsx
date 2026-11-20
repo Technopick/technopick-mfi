@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import type { Schemas } from "../api/client";
+import { downloadCsv } from "../csv";
 import { Empty, Loading, ProblemBox, Section, when } from "../components/ui";
 import { useLoad } from "../hooks";
 
@@ -24,7 +25,7 @@ export function TrialBalancePage() {
     <>
       <h1>General ledger</h1>
       <p><Link to="/ledger/reconciliation">Reconciliation of control accounts</Link> · <Link to="/ledger/journals">Manual journals</Link>
-        {" "}· <Link to="/ledger/periods">Accounting periods</Link></p>
+        {" "}· <Link to="/ledger/periods">Accounting periods</Link> · <Link to="/ledger/statements">Financial statements</Link></p>
       <form className="search" onSubmit={(e) => {
         e.preventDefault();
         const next = new URLSearchParams();
@@ -39,6 +40,11 @@ export function TrialBalancePage() {
       <ProblemBox problem={tb.error} />
       {tb.loading && !t ? <Loading /> : t && (
         <Section title={`Trial balance as of ${t.asOf}${t.branchCode ? `, branch ${t.branchCode}` : ""}`}>
+          <p><button type="button" className="secondary" onClick={() => downloadCsv(
+            `trial-balance-${t.asOf}${t.branchCode ? `-${t.branchCode}` : ""}.csv`,
+            [["Account", "Name", "Class", "Currency", "Debit", "Credit"],
+              ...(t.accounts ?? []).map((a) => [a.accountCode, a.name, a.accountClass, a.currency, a.debit, a.credit])])}>
+            Download CSV</button></p>
           {(t.totals ?? []).map((c) => (
             <p key={c.currency} className={c.balanced ? "ok" : "problem"} role="status">
               {c.currency}: debits {amount(c.debit)}, credits {amount(c.credit)}
