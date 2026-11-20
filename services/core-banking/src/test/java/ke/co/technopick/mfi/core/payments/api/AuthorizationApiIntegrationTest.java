@@ -1654,4 +1654,42 @@ class AuthorizationApiIntegrationTest {
         assertEquals("2027-01", JsonPath.read(mvc.perform(post("/api/v1/accounting/periods/next").with(finance)).andExpect(ok)
                 .andReturn().getResponse().getContentAsString(), "$.periodId"));
     }
+
+    /** Staff actions land in a tamper-evident audit trail, refused ones included, without bodies or identifying query values. */
+    @Test
+    void staffActionsAreAudited() throws Exception {
+        var ok = status().isOk();
+        var officer = staff("audit-officer", "LOAN_OFFICER");
+        var sup = staff("audit-sup", "SUPERVISOR");
+        String number = JsonPath.read(mvc.perform(post("/api/v1/customers").with(officer).contentType(MediaType.APPLICATION_JSON)
+                .content(customerJson("audit-c1", "77665544", "1990-01-01", true))).andExpect(ok).andReturn().getResponse()
+                .getContentAsString(), "$.customerNumber");
+        mvc.perform(get("/api/v1/customers/" + number).with(officer)).andExpect(ok);
+        mvc.perform(get("/api/v1/customers").param("q", "77665544").with(officer)).andExpect(ok);
+        mvc.perform(post("/api/v1/lending/write-offs/" + java.util.UUID.randomUUID() + "/approve").with(officer))
+            .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/end-of-day").with(officer)); // routine read: not audited
+
+        String rows = mvc.perform(get("/api/v1/audit/staff-actions").param("actor", "user:audit-officer").with(sup))
+            .andExpect(ok).andReturn().getResponse().getContentAsString();
+        // Four audited requests, newest first: refused approval, search, customer view, registration.
+        assertEquals(List.of("POST", "GET", "GET", "POST"), JsonPath.read(rows, "$[*].method"));
+        assertEquals(List.of(403), JsonPath.read(rows, "$[?(@.route == '/api/v1/lending/write-offs/{writeOffId}/approve')].status"));
+        assertEquals(List.of("/api/v1/customers/" + number),
+                JsonPath.read(rows, "$[?(@.route == '/api/v1/customers/{customerNumber}')].path"));
+        assertEquals(List.of("q=***"), JsonPath.read(rows, "$[?(@.route == '/api/v1/customers' && @.method == 'GET')].query"));
+        assertEquals(Boolean.FALSE, rows.contains("77665544"), "no identity number in the audit trail");
+        assertEquals(List.of("LOAN_OFFICER"), JsonPath.read(rows, "$[?(@.method == 'POST' && @.status == 200)].roles"));
+        assertEquals(List.of(), JsonPath.read(rows, "$[?(@.route == '/api/v1/end-of-day')]"));
+        assertEquals(1, ((List<?>) JsonPath.read(mvc.perform(get("/api/v1/audit/staff-actions").param("actor", "user:audit-officer")
+                .param("refusedOnly", "true").with(sup)).andExpect(ok).andReturn().getResponse().getContentAsString(), "$")).size());
+
+        String verify = mvc.perform(get("/api/v1/audit/staff-actions/verify").with(sup)).andExpect(ok).andReturn().getResponse()
+            .getContentAsString();
+        assertEquals(Boolean.TRUE, JsonPath.read(verify, "$.intact"));
+        mvc.perform(get("/api/v1/audit/staff-actions").with(officer)).andExpect(status().isForbidden());
+        // Tenant B's supervisor sees none of tenant A's trail.
+        assertEquals(List.of(), JsonPath.read(mvc.perform(get("/api/v1/audit/staff-actions").param("actor", "user:audit-officer")
+                .with(staffB("audit-sup-b", "SUPERVISOR"))).andExpect(ok).andReturn().getResponse().getContentAsString(), "$"));
+    }
 }
