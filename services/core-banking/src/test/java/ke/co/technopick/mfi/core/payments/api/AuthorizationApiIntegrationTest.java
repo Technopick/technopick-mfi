@@ -1565,6 +1565,20 @@ class AuthorizationApiIntegrationTest {
         // Tenant B's finance user cannot open tenant A's entries.
         mvc.perform(get("/api/v1/accounting/journal-entries/44444444-0000-0000-0000-000000000001").with(finance))
             .andExpect(status().isNotFound());
+        // Financial statements: November income and expenses, and the balance sheet that balances.
+        String is = mvc.perform(get("/api/v1/accounting/income-statement").param("from", "2026-11-01").param("to", "2026-11-30")
+                .with(finance)).andExpect(ok).andReturn().getResponse().getContentAsString();
+        // Income: loan interest 330 + 60 (LN-B00002), penalty 200. Expenses: savings interest 24.74.
+        assertEquals(List.of("390.00"), JsonPath.read(is, "$.income[?(@.accountCode == '4000-INTEREST-INCOME')].amount"));
+        assertEquals(List.of("200.00"), JsonPath.read(is, "$.income[?(@.accountCode == '4300-PENALTY-INCOME')].amount"));
+        assertEquals(List.of("24.74"), JsonPath.read(is, "$.expenses[?(@.accountCode == '5300-SAVINGS-INTEREST')].amount"));
+        assertEquals(List.of("565.26"), JsonPath.read(is, "$.totals[?(@.currency == 'KES')].netProfit"));
+        String bs = mvc.perform(get("/api/v1/accounting/balance-sheet").with(finance)).andExpect(ok).andReturn().getResponse()
+            .getContentAsString();
+        assertEquals(List.of(Boolean.TRUE), JsonPath.read(bs, "$.totals[*].balanced"));
+        mvc.perform(get("/api/v1/accounting/income-statement").param("from", "2025-01-01").param("to", "2026-11-30").with(finance))
+            .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/accounting/balance-sheet").with(teller)).andExpect(status().isForbidden());
         // Reconciliation: every closed day matched, and a posting without its business record is caught.
         String recorded = mvc.perform(get("/api/v1/accounting/reconciliation").param("businessDate", "2026-11-30").with(finance))
             .andExpect(ok).andReturn().getResponse().getContentAsString();

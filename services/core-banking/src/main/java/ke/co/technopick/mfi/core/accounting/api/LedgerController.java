@@ -3,6 +3,9 @@ package ke.co.technopick.mfi.core.accounting.api;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import ke.co.technopick.mfi.core.accounting.application.FinancialStatementService;
+import ke.co.technopick.mfi.core.accounting.application.FinancialStatementService.BalanceSheet;
+import ke.co.technopick.mfi.core.accounting.application.FinancialStatementService.IncomeStatement;
 import ke.co.technopick.mfi.core.accounting.application.LedgerReportService;
 import ke.co.technopick.mfi.core.accounting.application.LedgerReportService.AccountActivity;
 import ke.co.technopick.mfi.core.accounting.application.LedgerReportService.EntryView;
@@ -27,9 +30,12 @@ public class LedgerController {
 
     private final LedgerReportService service;
     private final ReconciliationService reconciliation;
+    private final FinancialStatementService statements;
     private final CurrentCaller caller;
 
-    public LedgerController(LedgerReportService service, ReconciliationService reconciliation, CurrentCaller caller) {
+    public LedgerController(LedgerReportService service, ReconciliationService reconciliation,
+                            FinancialStatementService statements, CurrentCaller caller) {
+        this.statements = statements;
         this.service = service;
         this.reconciliation = reconciliation;
         this.caller = caller;
@@ -65,5 +71,20 @@ public class LedgerController {
     public Reconciliation reconciliation(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate businessDate) {
         return reconciliation.view(caller.tenantId(), businessDate);
+    }
+
+    @GetMapping("/income-statement")
+    public IncomeStatement incomeStatement(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String branchCode) {
+        return statements.incomeStatement(caller.tenantId(), from, to, branchCode);
+    }
+
+    @GetMapping("/balance-sheet")
+    public BalanceSheet balanceSheet(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+            @RequestParam(required = false) String branchCode) {
+        return statements.balanceSheet(caller.tenantId(), asOf, branchCode);
     }
 }
