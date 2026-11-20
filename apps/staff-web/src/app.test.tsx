@@ -427,4 +427,20 @@ describe("screens", () => {
     expect(statuses.map((s) => s.textContent).join(" ")).toMatch(/net profit 365.26.*balances\./s);
     expect(screen.getAllByRole("button", { name: "Download CSV" })).toHaveLength(2);
   });
+
+  it("shows the audit trail with refused actions highlighted and the chain status", async () => {
+    const { api } = fakeApi({
+      "GET /api/v1/audit/staff-actions": () => [
+        { chainNo: 2, occurredAt: "2026-11-20T09:02:00+03:00", actor: "user:teller-1", roles: "TELLER", method: "POST",
+          route: "/api/v1/lending/write-offs/{writeOffId}/approve", path: "/api/v1/lending/write-offs/x/approve", status: 403,
+          durationMs: 3, requestId: "r-2" },
+        { chainNo: 1, occurredAt: "2026-11-20T09:01:00+03:00", actor: "user:officer-1", roles: "LOAN_OFFICER", method: "GET",
+          route: "/api/v1/customers", path: "/api/v1/customers", query: "q=***", status: 200, durationMs: 5, requestId: "r-1" }],
+      "GET /api/v1/audit/staff-actions/verify": () => ({ intact: false, firstBrokenChainNo: 2, rows: 2 }),
+    });
+    renderAt("/audit", session("sup-1", "SUPERVISOR"), api);
+    expect((await screen.findByRole("status")).textContent).toContain("Trail broken at record 2");
+    expect(await screen.findByText("/api/v1/customers?q=***")).toBeTruthy();
+    expect(screen.getByText("403").closest("tr")?.className).toBe("attention");
+  });
 });

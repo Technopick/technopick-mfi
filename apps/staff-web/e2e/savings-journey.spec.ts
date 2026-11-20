@@ -114,4 +114,9 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   });
   expect(csv.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe("Account,Name,Class,Currency,Debit,Credit");
   expect(csv).toContain("1001-TILL-NBO01-01");
+
+  // The supervisor's audit trail shows the day's staff actions and verifies.
+  await supervisor.goto("/audit");
+  await expect(supervisor.getByRole("status")).toContainText("Trail intact");
+  await expect(supervisor.getByText("/api/v1/savings/teller/transactions", { exact: false }).first()).toBeVisible();
 });

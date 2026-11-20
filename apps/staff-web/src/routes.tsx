@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from "./pages/ApplicationsPage";
 import { CustomerPage, CustomersPage, NewCustomerPage } from "./pages/CustomersPage";
 import { DisbursementsPage } from "./pages/DisbursementsPage";
+import { AuditPage } from "./pages/AuditPage";
 import { EndOfDayPage } from "./pages/EndOfDayPage";
 import { ManualJournalsPage, PeriodsPage } from "./pages/FinancePages";
 import { AccountActivityPage, JournalEntryPage, TrialBalancePage } from "./pages/LedgerPages";
@@ -35,6 +36,7 @@ export const routes: RouteObject[] = [
       { path: "suspense", element: <SuspensePage /> },
       { path: "end-of-day", element: <EndOfDayPage /> },
       { path: "portfolio", element: <PortfolioPage /> },
+      { path: "audit", element: <AuditPage /> },
       { path: "ledger", element: <TrialBalancePage /> },
       { path: "ledger/reconciliation", element: <ReconciliationPage /> },
       { path: "ledger/journals", element: <ManualJournalsPage /> },

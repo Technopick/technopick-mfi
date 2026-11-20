@@ -228,6 +228,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/staff-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Audit_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit/staff-actions/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Audit_verify"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/authorizations": {
         parameters: {
             query?: never;
@@ -1396,6 +1428,13 @@ export interface components {
             /** Format: uuid */
             transferId?: string;
         };
+        ChainStatus: {
+            /** Format: int64 */
+            firstBrokenChainNo?: number;
+            intact?: boolean;
+            /** Format: int64 */
+            rows?: number;
+        };
         CheckResult: {
             accountCode?: string;
             checkCode?: string;
@@ -2015,6 +2054,24 @@ export interface components {
             /** Format: uuid */
             tenantId: string;
         };
+        StaffAction: {
+            actor?: string;
+            /** Format: int64 */
+            chainNo?: number;
+            clientIp?: string;
+            /** Format: int32 */
+            durationMs?: number;
+            method?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+            path?: string;
+            query?: string;
+            requestId?: string;
+            roles?: string;
+            route?: string;
+            /** Format: int32 */
+            status?: number;
+        };
         StaleItem: {
             /** Format: int32 */
             checkCount?: number;
@@ -2558,6 +2615,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BalanceResponse"];
+                };
+            };
+        };
+    };
+    Audit_search: {
+        parameters: {
+            query?: {
+                actor?: string;
+                from?: string;
+                to?: string;
+                method?: string;
+                pathContains?: string;
+                refusedOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAction"][];
+                };
+            };
+        };
+    };
+    Audit_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainStatus"];
                 };
             };
         };

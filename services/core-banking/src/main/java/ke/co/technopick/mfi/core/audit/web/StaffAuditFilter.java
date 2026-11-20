@@ -108,7 +108,7 @@ public class StaffAuditFilter extends OncePerRequestFilter implements Authentica
     }
 
     private static String query(HttpServletRequest request) {
-        if (request.getQueryString() == null) {
+        if (request.getParameterMap().isEmpty()) { // JSON APIs: parameters come from the query string only
             return null;
         }
         return request.getParameterMap().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey())
