@@ -71,10 +71,11 @@ GitHub Actions on `main`: all four jobs green.
 | Subledger-to-control reconciliation: six checks recorded at every end of day and available live; differences reported, not hidden | core: end-of-day API test (incl. a deliberate difference); database: G1-G3; UI: 1 test; browser: real flows reconcile | ubuntu |
 | Manual journals and period close: maker-checker journals on non-control accounts; calendar-month periods opened in order and closed only when the last day is closed and nothing is pending | core: API test; database: Q1-Q4, Y1-Y2; UI: 1 test | ubuntu |
 | Financial statements: income statement and balance sheet from the ledger; CSV export of trial balance and statements | core: API test; UI: 3 tests; browser: CSV download checked | ubuntu |
+| Staff audit trail: every change and every read of customer, account, loan or audit data, refused attempts included, no bodies; SHA-256 chained by the database with tamper check | core: API test; database: S1-S5; UI: 1 test; browser: supervisor sees an intact trail | ubuntu |
 | Staff web app (worklist, applications, disbursements, M-Pesa close-out, suspense, schedule): money as text, four-eyes hints, role-based navigation, API types match contract, runtime deps audited | 11 UI tests; typecheck; production build | ubuntu and windows |
 | Whole platform in containers (PostgreSQL, RabbitMQ, Keycloak, core, integration, TEST-ONLY Daraja simulator, staff web behind nginx): a browser signs in as officer, manager, supervisor and teller: loan from KYC to M-Pesa disbursement to ACTIVE, and savings from account opening to cash with approval to statement | Playwright (Chromium), 2 journeys | ubuntu (Docker Compose, `infrastructure/e2e`) |
 | Camel integration runtime: transactional outbox relay to RabbitMQ (exactly-once publish per event, broker failure and retry, relay role cannot rewrite events) | 2 integration tests pass | ubuntu (PostgreSQL 17 + RabbitMQ 4.1 Testcontainers) |
-| Ledger, savings, teller, lending, origination, customers, EOD, STK, B2C and close-out database rules | 112/112 checks | PostgreSQL 17 service container |
+| Ledger, savings, teller, lending, origination, customers, EOD, STK, B2C and close-out database rules | 114/114 checks | PostgreSQL 17 service container |
 | PowerShell install/uninstall scripts | parse cleanly | windows-latest |
 | Mutation runs (4 safeguards removed) | each makes its test fail | local PostgreSQL 16 |
 
