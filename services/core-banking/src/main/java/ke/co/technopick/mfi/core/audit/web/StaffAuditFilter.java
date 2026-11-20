@@ -12,10 +12,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import ke.co.technopick.mfi.core.audit.application.AuditTrailService;
 import ke.co.technopick.mfi.core.audit.application.AuditTrailService.AuditRecord;
+import ke.co.technopick.mfi.core.identity.api.AuthenticatedRequestFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -26,14 +26,14 @@ import org.springframework.web.servlet.HandlerMapping;
 /**
  * Records staff API requests in the audit trail (ADR-0027): every change (POST, PUT, PATCH,
  * DELETE) and every read of customer, account, loan or audit data, whatever the outcome
- * (refused and failed requests included). Runs inside the security filter chain so the caller is
- * known. Only requests whose token names a tenant are recorded; integration callbacks have their
+ * (refused and failed requests included). Runs inside the security filter chain, after
+ * authorization, so the caller is known (it is added there by the security configuration and is
+ * not registered as a plain servlet filter). Only requests whose token names a tenant are recorded; integration callbacks have their
  * own stored record (provider_callback). Request bodies are never recorded; query values are kept
  * only for non-identifying parameters (dates, status, branch).
  */
 @Component
-@Order(-90) // after Spring Security's filter chain (-100) has authenticated the request
-public class StaffAuditFilter extends OncePerRequestFilter {
+public class StaffAuditFilter extends OncePerRequestFilter implements AuthenticatedRequestFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(StaffAuditFilter.class);
     private static final Set<String> READ_AUDITED = Set.of("/api/v1/customers", "/api/v1/savings/accounts",

@@ -26,8 +26,11 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain api(HttpSecurity http, Converter<Jwt, AbstractAuthenticationToken> jwtConverter)
-            throws Exception {
+    SecurityFilterChain api(HttpSecurity http, Converter<Jwt, AbstractAuthenticationToken> jwtConverter,
+                            java.util.List<AuthenticatedRequestFilter> authenticatedFilters) throws Exception {
+        for (AuthenticatedRequestFilter f : authenticatedFilters) {
+            http.addFilterAfter(f, org.springframework.security.web.access.intercept.AuthorizationFilter.class);
+        }
         http
             .csrf(csrf -> csrf.disable()) // bearer tokens only, no cookies or browser sessions
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
