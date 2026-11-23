@@ -180,7 +180,7 @@ class PrudentialReturnIntegrationTest {
 
         // Finance maps the accounts; a mapping that would turn deposits into capital is refused.
         mvc.perform(put(P + "/mapping").with(FINANCE).contentType(MediaType.APPLICATION_JSON)
-                .content(mapping("2110-SAVINGS-CONTROL", "SHARE_CAPITAL"))).andExpect(status().isUnprocessableEntity())
+                .content(mapping("2110-SAVINGS-CONTROL", "SHARE_CAPITAL"))).andExpect(status().is(422))
             .andExpect(jsonPath("$.code").value("MAPPING_CLASS_MISMATCH"));
         mvc.perform(put(P + "/mapping").with(FINANCE).contentType(MediaType.APPLICATION_JSON)
                 .content(mapping("9999-NOPE", "CASH"))).andExpect(status().isBadRequest());
