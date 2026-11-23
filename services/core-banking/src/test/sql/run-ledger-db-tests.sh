@@ -150,4 +150,7 @@ psql -d "$DB" -f "$HERE/audit_tamper_test.sql"
 echo "== end-of-day schedule and attempt tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/eod_schedule_test.sql"
 
+echo "== prudential settings and regulatory mapping tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/prudential_test.sql"
+
 echo "== done"

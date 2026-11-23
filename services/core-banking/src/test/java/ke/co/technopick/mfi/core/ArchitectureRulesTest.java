@@ -30,12 +30,12 @@ class ArchitectureRulesTest {
 
     @Test
     void noBinaryFloatingPointInMoneyCode() {
-        noClasses().that().resideInAnyPackage("..accounting..", "..lending..", "..savings..", "..canonical..")
+        noClasses().that().resideInAnyPackage("..accounting..", "..lending..", "..savings..", "..canonical..", "..regulatory..")
                 .should().dependOnClassesThat().haveFullyQualifiedName("java.lang.Double")
                 .orShould().dependOnClassesThat().haveFullyQualifiedName("java.lang.Float")
                 .check(CORE);
         noFields().that().areDeclaredInClassesThat()
-                .resideInAnyPackage("..accounting..", "..lending..", "..savings..", "..canonical..")
+                .resideInAnyPackage("..accounting..", "..lending..", "..savings..", "..canonical..", "..regulatory..")
                 .should().haveRawType(double.class)
                 .orShould().haveRawType(float.class)
                 .check(CORE);
