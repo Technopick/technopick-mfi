@@ -23,6 +23,7 @@ export function fakeApi(handlers: Record<string, (body?: unknown) => unknown>, d
   const api: Api = {
     get: <T,>(path: string) => handle("GET", path) as Promise<T>,
     post: <T,>(path: string, body?: unknown) => handle("POST", path, body) as Promise<T>,
+    put: <T,>(path: string, body?: unknown) => handle("PUT", path, body) as Promise<T>,
   };
   return { api, calls };
 }

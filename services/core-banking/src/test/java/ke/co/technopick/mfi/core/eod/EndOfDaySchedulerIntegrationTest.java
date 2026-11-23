@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import ke.co.technopick.mfi.core.eod.application.EndOfDayScheduler;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDaySchedulePolicy.Action;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +49,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * Scheduled end of day (increment 29, ADR-0029) through the real application and PostgreSQL 17,
  * with the application clock set by the test so every schedule path is exercised deterministically.
  */
+@Tag("integration")
 @Testcontainers
 @SpringBootTest
 class EndOfDaySchedulerIntegrationTest {
@@ -225,8 +227,13 @@ class EndOfDaySchedulerIntegrationTest {
         // 3. A failure is retried every 15 minutes, three times, then left for a person (critical alert).
         owner().execute("""
             CREATE FUNCTION ledger.sched_test_fail() RETURNS trigger LANGUAGE plpgsql AS $$
-            BEGIN RAISE EXCEPTION 'SCHED_TEST_INJECTED: reconciliation store unavailable'; END $$;
-            CREATE TRIGGER sched_test_fail BEFORE INSERT ON ledger.reconciliation_result
+            BEGIN
+              IF NEW.status = 'COMPLETED' THEN
+                RAISE EXCEPTION 'SCHED_TEST_INJECTED: storage unavailable while completing the day';
+              END IF;
+              RETURN NEW;
+            END $$;
+            CREATE TRIGGER sched_test_fail BEFORE UPDATE ON ledger.eod_run
               FOR EACH ROW EXECUTE FUNCTION ledger.sched_test_fail();
             """);
         assertEquals(Action.RUN, tick("2026-12-01T21:00"));
@@ -249,7 +256,7 @@ class EndOfDaySchedulerIntegrationTest {
         assertEquals("2026-12-01", businessDate());
 
         // The cause is fixed; operations runs end of day and it resumes and completes.
-        owner().execute("DROP TRIGGER sched_test_fail ON ledger.reconciliation_result; DROP FUNCTION ledger.sched_test_fail()");
+        owner().execute("DROP TRIGGER sched_test_fail ON ledger.eod_run; DROP FUNCTION ledger.sched_test_fail()");
         mvc.perform(post("/api/v1/end-of-day/run").with(ops())).andExpect(status().isOk())
             .andExpect(jsonPath("$.closedDate").value("2026-12-01"));
         expectLatestAttempt("MANUAL", "COMPLETED", "user:ops-1");

@@ -372,6 +372,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/end-of-day/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EndOfDay_alerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/end-of-day/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EndOfDay_attempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/end-of-day/run": {
         parameters: {
             query?: never;
@@ -382,6 +414,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["EndOfDay_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/end-of-day/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EndOfDay_schedule"];
+        put: operations["EndOfDay_updateSchedule"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1637,6 +1685,55 @@ export interface components {
             requestId?: string;
             shortCode?: string;
         };
+        EndOfDayAlert: {
+            code?: string;
+            message?: string;
+            severity?: string;
+        };
+        EndOfDayAttempt: {
+            actor?: string;
+            /** Format: int64 */
+            attemptId?: number;
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            outcome?: string;
+            reason?: string;
+            /** Format: date-time */
+            startedAt?: string;
+            trigger?: string;
+        };
+        EndOfDaySchedule: {
+            enabled?: boolean;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: int32 */
+            maxCatchUpDays?: number;
+            /** Format: date-time */
+            nextCutOff?: string;
+            /** Format: int32 */
+            overrunMinutes?: number;
+            /** Format: int32 */
+            retryMinutes?: number;
+            runAt?: string;
+            timeZone?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        EndOfDayScheduleRequest: {
+            enabled?: boolean;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: int32 */
+            maxCatchUpDays?: number;
+            /** Format: int32 */
+            overrunMinutes?: number;
+            /** Format: int32 */
+            retryMinutes?: number;
+            runAt?: string;
+        };
         EndOfDayStatus: {
             /** Format: int32 */
             activeLoans?: number;
@@ -1647,6 +1744,7 @@ export interface components {
             /** Format: date */
             lastClosedDate?: string;
             openTills?: components["schemas"]["OpenTill"][];
+            runInProgress?: boolean;
             /** Format: date-time */
             runStartedAt?: string;
             runStatus?: string;
@@ -2870,6 +2968,48 @@ export interface operations {
             };
         };
     };
+    EndOfDay_alerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDayAlert"][];
+                };
+            };
+        };
+    };
+    EndOfDay_attempts: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDayAttempt"][];
+                };
+            };
+        };
+    };
     EndOfDay_run: {
         parameters: {
             query?: never;
@@ -2886,6 +3026,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EndOfDaySummary"];
+                };
+            };
+        };
+    };
+    EndOfDay_schedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDaySchedule"];
+                };
+            };
+        };
+    };
+    EndOfDay_updateSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndOfDayScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDaySchedule"];
                 };
             };
         };

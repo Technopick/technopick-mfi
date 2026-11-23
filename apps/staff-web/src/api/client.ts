@@ -19,6 +19,7 @@ export class ApiError extends Error {
 export interface Api {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  put<T>(path: string, body?: unknown): Promise<T>;
 }
 
 /** Minimal JSON client: bearer token, problem-details errors, no retries (writes are idempotent by key). */
@@ -49,6 +50,7 @@ export function createApi(baseUrl: string, token: () => string | null, fetchFn: 
   return {
     get: (path) => call("GET", path),
     post: (path, body) => call("POST", path, body),
+    put: (path, body) => call("PUT", path, body),
   };
 }
 

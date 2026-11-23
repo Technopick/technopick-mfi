@@ -30,6 +30,10 @@ const noTill = {
   "GET /api/v1/savings/tills": () => [],
 };
 
+const SCHEDULE_OFF = { enabled: false, runAt: "21:00", timeZone: "Africa/Nairobi", overrunMinutes: 60, maxAttempts: 3,
+  retryMinutes: 15, maxCatchUpDays: 3, nextCutOff: "2026-11-28T21:00:00+03:00" };
+const SCHEDULE_ON = { ...SCHEDULE_OFF, enabled: true, updatedBy: "user:sup-1", updatedAt: "2026-11-20T09:00:00Z" };
+
 describe("money", () => {
   it("formats decimal strings without floating point", () => {
     expect(formatAmount("1234567.5")).toBe("1,234,567.50");
@@ -267,6 +271,9 @@ describe("screens", () => {
     const { api, calls } = fakeApi({
       "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-30", activeLoans: 0, interestPostingDay: true,
         lastClosedDate: "2026-11-29", openTills: tillOpen ? [{ tillCode: "NBO01-T1", teller: "user:teller-1", status: "OPEN" }] : [] }),
+      "GET /api/v1/end-of-day/alerts": () => [],
+      "GET /api/v1/end-of-day/attempts?limit=10": () => [],
+      "GET /api/v1/end-of-day/schedule": () => SCHEDULE_OFF,
       "POST /api/v1/end-of-day/run": () => ({ closedDate: "2026-11-30", newBusinessDate: "2026-12-01", loansProcessed: 1,
         loanInterestAccrued: "5.00", penaltiesCharged: "0.00", loansInArrears: 1, loansClosed: 1, creditApplied: "2060.00", reconciliationDifferences: 0,
         accountsAccrued: 2,
@@ -289,10 +296,72 @@ describe("screens", () => {
   it("shows the end-of-day state to a branch manager without the close button", async () => {
     const { api } = fakeApi({
       "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-20", activeLoans: 3, interestPostingDay: false, openTills: [] }),
+      "GET /api/v1/end-of-day/alerts": () => [],
+      "GET /api/v1/end-of-day/attempts?limit=10": () => [],
+      "GET /api/v1/end-of-day/schedule": () => SCHEDULE_OFF,
     });
     renderAt("/end-of-day", session("manager-1", "BRANCH_MANAGER"), api);
     expect(await screen.findByText(/3 active: interest accrual, penalties and arrears/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /close business day/i })).toBeNull();
+  });
+
+  it("shows end-of-day alerts, the attempts and an interrupted run that operations can resume", async () => {
+    const { api, calls } = fakeApi({
+      "GET /api/v1/end-of-day": () => ({ businessDate: "2026-12-02", activeLoans: 0, interestPostingDay: false, openTills: [],
+        runStatus: "RUNNING", runInProgress: false }),
+      "GET /api/v1/end-of-day/alerts": () => [
+        { code: "EOD_INTERRUPTED", severity: "CRITICAL", message: "End of day for 2026-12-02 stopped part-way because the process running it ended." },
+        { code: "EOD_LATE", severity: "WARNING", message: "2026-12-02 was due to close at 2 Dec 2026 21:00 (Africa/Nairobi) and is still open." }],
+      "GET /api/v1/end-of-day/attempts?limit=10": () => [
+        { attemptId: 7, businessDate: "2026-12-02", trigger: "SCHEDULED", actor: "system:eod-scheduler", startedAt: "2026-12-02T18:00:00Z", outcome: "RUNNING" },
+        { attemptId: 6, businessDate: "2026-12-01", trigger: "MANUAL", actor: "user:ops-1", startedAt: "2026-12-01T20:50:00Z",
+          finishedAt: "2026-12-01T20:51:00Z", outcome: "COMPLETED" },
+        { attemptId: 5, businessDate: "2026-12-01", trigger: "SCHEDULED", actor: "system:eod-scheduler", startedAt: "2026-12-01T18:30:00Z",
+          finishedAt: "2026-12-01T18:31:00Z", outcome: "FAILED", reason: "SCHED_TEST_INJECTED: reconciliation store unavailable" }],
+      "GET /api/v1/end-of-day/schedule": () => SCHEDULE_ON,
+      "POST /api/v1/end-of-day/run": () => ({ closedDate: "2026-12-02", newBusinessDate: "2026-12-03", loansProcessed: 0,
+        loanInterestAccrued: "0.00", penaltiesCharged: "0.00", loansInArrears: 0, loansClosed: 0, creditApplied: "0.00",
+        reconciliationDifferences: 0, accountsAccrued: 0, interestAccrued: "0.00", accountsCredited: 0, interestCredited: "0.00", taxWithheld: "0.00" }),
+    });
+    renderAt("/end-of-day", session("ops-1", "OPERATIONS"), api);
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.map((a) => a.textContent)).toEqual([
+      expect.stringMatching(/^Needs action now: End of day for 2026-12-02 stopped part-way/),
+      expect.stringMatching(/^Attention: 2026-12-02 was due to close/)]);
+    expect(await screen.findByText(/reconciliation store unavailable/)).toBeTruthy();
+    expect(screen.getByText(/yes, daily at 21:00 \(Africa\/Nairobi\)/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Change schedule" })).toBeNull();
+    const resume = await screen.findByRole("button", { name: "Resume closing business day 2026-12-02" });
+    expect((resume as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(resume);
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST")).toHaveLength(1));
+  });
+
+  it("lets a supervisor switch on the end-of-day schedule", async () => {
+    let current: Record<string, unknown> = SCHEDULE_OFF;
+    const { api, calls } = fakeApi({
+      "GET /api/v1/end-of-day": () => ({ businessDate: "2026-11-28", activeLoans: 0, interestPostingDay: false, openTills: [] }),
+      "GET /api/v1/end-of-day/alerts": () => [],
+      "GET /api/v1/end-of-day/attempts?limit=10": () => [],
+      "GET /api/v1/end-of-day/schedule": () => current,
+      "PUT /api/v1/end-of-day/schedule": (body) => {
+        current = { ...SCHEDULE_ON, ...(body as object), updatedBy: "user:sup-1", updatedAt: "2026-11-28T09:00:00Z" };
+        return current;
+      },
+    });
+    renderAt("/end-of-day", session("sup-1", "SUPERVISOR"), api);
+    expect(await screen.findByText(/no - a person closes each day/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /close business day/i })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Change schedule" }));
+    await userEvent.click(screen.getByLabelText("Close the day automatically"));
+    const time = screen.getByLabelText("Time of day (24h, tenant time zone)");
+    await userEvent.clear(time);
+    await userEvent.type(time, "22:30");
+    await userEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ enabled: true, runAt: "22:30",
+      overrunMinutes: 60, maxAttempts: 3, retryMinutes: 15, maxCatchUpDays: 3 }));
+    expect(await screen.findByText(/yes, daily at 22:30/)).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Schedule saved.");
   });
 
   it("shows portfolio at risk by branch, loans in arrears and closed loans holding credit", async () => {

@@ -78,6 +78,16 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await supervisor.goto("/end-of-day");
   await expect(supervisor.getByRole("heading", { level: 1, name: "End of day" })).toBeVisible();
   await expect(supervisor.getByText("All tills are closed and balanced.")).toBeVisible();
+  // The supervisor sets the end-of-day time (left switched off: the two journeys share one tenant).
+  await expect(supervisor.getByText("no - a person closes each day")).toBeVisible();
+  await supervisor.getByRole("button", { name: "Change schedule" }).click();
+  await supervisor.getByLabel("Time of day (24h, tenant time zone)").fill("22:30");
+  await supervisor.getByLabel("Minutes between attempts").fill("20");
+  await supervisor.getByRole("button", { name: "Save schedule" }).click();
+  await expect(supervisor.getByRole("status").filter({ hasText: "Schedule saved." })).toBeVisible();
+  await expect(supervisor.getByText("3 attempt(s), 20 minutes apart")).toBeVisible();
+  await expect(supervisor.getByText(/^user:\S+, /)).toBeVisible();
+  await expect(supervisor.getByRole("alert")).toHaveCount(0);
   await supervisor.goto("/portfolio");
   await expect(supervisor.getByRole("heading", { level: 1, name: "Portfolio at risk" })).toBeVisible();
   await supervisor.goto("/write-offs");
