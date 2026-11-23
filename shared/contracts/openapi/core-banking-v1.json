@@ -41,6 +41,20 @@
         },
         "type": "object"
       },
+      "AccountAmount": {
+        "properties": {
+          "accountCode": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ActivityLine": {
         "properties": {
           "balance": {
@@ -414,6 +428,35 @@
         },
         "type": "object"
       },
+      "CapitalAdequacy": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RatioCheck"
+            },
+            "type": "array"
+          },
+          "coreCapital": {
+            "type": "string"
+          },
+          "institutionalCapital": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnLine"
+            },
+            "type": "array"
+          },
+          "totalAssets": {
+            "type": "string"
+          },
+          "totalDeposits": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CashTransferRequest": {
         "properties": {
           "amount": {
@@ -533,6 +576,54 @@
             "type": "boolean"
           },
           "subledgerBalance": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ClassificationRow": {
+        "properties": {
+          "allowancePct": {
+            "type": "string"
+          },
+          "daysPastDue": {
+            "type": "string"
+          },
+          "loanClass": {
+            "type": "string"
+          },
+          "loans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "outstandingPrincipal": {
+            "type": "string"
+          },
+          "requiredAllowance": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ClassifiedLoan": {
+        "properties": {
+          "branchCode": {
+            "type": "string"
+          },
+          "daysPastDue": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "loanClass": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "outstandingPrincipal": {
+            "type": "string"
+          },
+          "requiredAllowance": {
             "type": "string"
           }
         },
@@ -1586,6 +1677,29 @@
         ],
         "type": "object"
       },
+      "Liquidity": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RatioCheck"
+            },
+            "type": "array"
+          },
+          "depositsAndShortTermLiabilities": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnLine"
+            },
+            "type": "array"
+          },
+          "liquidAssets": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "LoanApplicationRequest": {
         "properties": {
           "branchCode": {
@@ -1938,6 +2052,34 @@
         },
         "type": "object"
       },
+      "MappedAccount": {
+        "properties": {
+          "accountClass": {
+            "type": "string"
+          },
+          "accountCode": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MappingChange": {
+        "properties": {
+          "accountCode": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MpesaResolutionCreated": {
         "properties": {
           "resolutionId": {
@@ -2164,6 +2306,155 @@
         },
         "type": "object"
       },
+      "PrudentialReturn": {
+        "properties": {
+          "asOf": {
+            "format": "date",
+            "type": "string"
+          },
+          "capital": {
+            "$ref": "#/components/schemas/CapitalAdequacy"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/RiskClassification"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "liquidity": {
+            "$ref": "#/components/schemas/Liquidity"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "periodClosed": {
+            "type": "boolean"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PrudentialSettingsView"
+          },
+          "unmappedBalanceSheetAccounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountAmount"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "PrudentialSettingsRequest": {
+        "properties": {
+          "doubtfulMaxDpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "includeCurrentYearSurplus": {
+            "type": "boolean"
+          },
+          "minCoreCapital": {
+            "type": "string"
+          },
+          "minCoreToAssetsPct": {
+            "type": "string"
+          },
+          "minCoreToDepositsPct": {
+            "type": "string"
+          },
+          "minInstitutionalToAssetsPct": {
+            "type": "string"
+          },
+          "minLiquidityPct": {
+            "type": "string"
+          },
+          "provisionDoubtfulPct": {
+            "type": "string"
+          },
+          "provisionLossPct": {
+            "type": "string"
+          },
+          "provisionPerformingPct": {
+            "type": "string"
+          },
+          "provisionSubstandardPct": {
+            "type": "string"
+          },
+          "provisionWatchPct": {
+            "type": "string"
+          },
+          "substandardMaxDpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "watchMaxDpd": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PrudentialSettingsView": {
+        "properties": {
+          "doubtfulMaxDpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "includeCurrentYearSurplus": {
+            "type": "boolean"
+          },
+          "minCoreCapital": {
+            "type": "string"
+          },
+          "minCoreToAssetsPct": {
+            "type": "string"
+          },
+          "minCoreToDepositsPct": {
+            "type": "string"
+          },
+          "minInstitutionalToAssetsPct": {
+            "type": "string"
+          },
+          "minLiquidityPct": {
+            "type": "string"
+          },
+          "provisionDoubtfulPct": {
+            "type": "string"
+          },
+          "provisionLossPct": {
+            "type": "string"
+          },
+          "provisionPerformingPct": {
+            "type": "string"
+          },
+          "provisionSubstandardPct": {
+            "type": "string"
+          },
+          "provisionWatchPct": {
+            "type": "string"
+          },
+          "regulationDefaults": {
+            "type": "boolean"
+          },
+          "substandardMaxDpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "watchMaxDpd": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "QueryResult": {
         "properties": {
           "checkoutRequestId": {
@@ -2217,6 +2508,32 @@
         },
         "type": "object"
       },
+      "RatioCheck": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "denominator": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "met": {
+            "type": "boolean"
+          },
+          "minimum": {
+            "type": "string"
+          },
+          "numerator": {
+            "type": "string"
+          },
+          "valuePct": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Reconciliation": {
         "properties": {
           "businessDate": {
@@ -2257,6 +2574,48 @@
           "recordedAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RegulatoryLine": {
+        "properties": {
+          "accountClass": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RegulatoryMapping": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/MappedAccount"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/RegulatoryLine"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RegulatoryMappingRequest": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/MappingChange"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -2343,6 +2702,26 @@
         ],
         "type": "object"
       },
+      "ReturnLine": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountAmount"
+            },
+            "type": "array"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ReverseRequest": {
         "properties": {
           "correlationId": {
@@ -2372,6 +2751,48 @@
           },
           "reversalEntryId": {
             "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RiskClassification": {
+        "properties": {
+          "allowanceHeld": {
+            "$ref": "#/components/schemas/ReturnLine"
+          },
+          "allowanceShortfall": {
+            "type": "string"
+          },
+          "grossLoans": {
+            "type": "string"
+          },
+          "interestAccruedOnNonPerforming": {
+            "type": "string"
+          },
+          "ledgerLoanPrincipal": {
+            "type": "string"
+          },
+          "nonPerformingLoans": {
+            "type": "string"
+          },
+          "nonPerformingRatioPct": {
+            "type": "string"
+          },
+          "requiredAllowance": {
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationRow"
+            },
+            "type": "array"
+          },
+          "totalLoans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "unexplainedPrincipalDifference": {
             "type": "string"
           }
         },
@@ -5581,6 +6002,175 @@
         },
         "tags": [
           "suspense-controller"
+        ]
+      }
+    },
+    "/api/v1/regulatory/mapping": {
+      "get": {
+        "operationId": "Regulatory_mapping",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegulatoryMapping"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "regulatory-controller"
+        ]
+      },
+      "put": {
+        "operationId": "Regulatory_updateMapping",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegulatoryMappingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegulatoryMapping"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "regulatory-controller"
+        ]
+      }
+    },
+    "/api/v1/regulatory/prudential": {
+      "get": {
+        "operationId": "Regulatory_prudential",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrudentialReturn"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "regulatory-controller"
+        ]
+      }
+    },
+    "/api/v1/regulatory/prudential/loans": {
+      "get": {
+        "operationId": "Regulatory_classifiedLoans",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "loanClass",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClassifiedLoan"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "regulatory-controller"
+        ]
+      }
+    },
+    "/api/v1/regulatory/settings": {
+      "get": {
+        "operationId": "Regulatory_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrudentialSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "regulatory-controller"
+        ]
+      },
+      "put": {
+        "operationId": "Regulatory_updateSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrudentialSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrudentialSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "regulatory-controller"
         ]
       }
     },

@@ -1028,6 +1028,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/regulatory/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Regulatory_mapping"];
+        put: operations["Regulatory_updateMapping"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/regulatory/prudential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Regulatory_prudential"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/regulatory/prudential/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Regulatory_classifiedLoans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/regulatory/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Regulatory_settings"];
+        put: operations["Regulatory_updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/portfolio-at-risk": {
         parameters: {
             query?: never;
@@ -1334,6 +1398,11 @@ export interface components {
             totalDebit?: string;
             truncated?: boolean;
         };
+        AccountAmount: {
+            accountCode?: string;
+            amount?: string;
+            name?: string;
+        };
         ActivityLine: {
             balance?: string;
             branchCode?: string;
@@ -1451,6 +1520,14 @@ export interface components {
             par90?: string;
             portfolio?: string;
         };
+        CapitalAdequacy: {
+            checks?: components["schemas"]["RatioCheck"][];
+            coreCapital?: string;
+            institutionalCapital?: string;
+            lines?: components["schemas"]["ReturnLine"][];
+            totalAssets?: string;
+            totalDeposits?: string;
+        };
         CashTransferRequest: {
             amount: string;
             /** @enum {string} */
@@ -1493,6 +1570,24 @@ export interface components {
             ledgerBalance?: string;
             reconciled?: boolean;
             subledgerBalance?: string;
+        };
+        ClassificationRow: {
+            allowancePct?: string;
+            daysPastDue?: string;
+            loanClass?: string;
+            /** Format: int32 */
+            loans?: number;
+            outstandingPrincipal?: string;
+            requiredAllowance?: string;
+        };
+        ClassifiedLoan: {
+            branchCode?: string;
+            /** Format: int32 */
+            daysPastDue?: number;
+            loanClass?: string;
+            loanNumber?: string;
+            outstandingPrincipal?: string;
+            requiredAllowance?: string;
         };
         ClosedWithCredit: {
             branchCode?: string;
@@ -1844,6 +1939,12 @@ export interface components {
             /** @enum {string} */
             side: "DEBIT" | "CREDIT";
         };
+        Liquidity: {
+            checks?: components["schemas"]["RatioCheck"][];
+            depositsAndShortTermLiabilities?: string;
+            lines?: components["schemas"]["ReturnLine"][];
+            liquidAssets?: string;
+        };
         LoanApplicationRequest: {
             branchCode: string;
             customerRef: string;
@@ -1960,6 +2061,16 @@ export interface components {
             status?: string;
             totalDebit?: string;
         };
+        MappedAccount: {
+            accountClass?: string;
+            accountCode?: string;
+            line?: string;
+            name?: string;
+        };
+        MappingChange: {
+            accountCode?: string;
+            line?: string;
+        };
         MpesaResolutionCreated: {
             /** Format: uuid */
             resolutionId?: string;
@@ -2039,6 +2150,60 @@ export interface components {
             closedWithCredit?: components["schemas"]["ClosedWithCredit"][];
             loansInArrears?: components["schemas"]["LoanInArrears"][];
         };
+        PrudentialReturn: {
+            /** Format: date */
+            asOf?: string;
+            capital?: components["schemas"]["CapitalAdequacy"];
+            classification?: components["schemas"]["RiskClassification"];
+            currency?: string;
+            liquidity?: components["schemas"]["Liquidity"];
+            notes?: string[];
+            periodClosed?: boolean;
+            settings?: components["schemas"]["PrudentialSettingsView"];
+            unmappedBalanceSheetAccounts?: components["schemas"]["AccountAmount"][];
+        };
+        PrudentialSettingsRequest: {
+            /** Format: int32 */
+            doubtfulMaxDpd?: number;
+            includeCurrentYearSurplus?: boolean;
+            minCoreCapital?: string;
+            minCoreToAssetsPct?: string;
+            minCoreToDepositsPct?: string;
+            minInstitutionalToAssetsPct?: string;
+            minLiquidityPct?: string;
+            provisionDoubtfulPct?: string;
+            provisionLossPct?: string;
+            provisionPerformingPct?: string;
+            provisionSubstandardPct?: string;
+            provisionWatchPct?: string;
+            /** Format: int32 */
+            substandardMaxDpd?: number;
+            /** Format: int32 */
+            watchMaxDpd?: number;
+        };
+        PrudentialSettingsView: {
+            /** Format: int32 */
+            doubtfulMaxDpd?: number;
+            includeCurrentYearSurplus?: boolean;
+            minCoreCapital?: string;
+            minCoreToAssetsPct?: string;
+            minCoreToDepositsPct?: string;
+            minInstitutionalToAssetsPct?: string;
+            minLiquidityPct?: string;
+            provisionDoubtfulPct?: string;
+            provisionLossPct?: string;
+            provisionPerformingPct?: string;
+            provisionSubstandardPct?: string;
+            provisionWatchPct?: string;
+            regulationDefaults?: boolean;
+            /** Format: int32 */
+            substandardMaxDpd?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+            /** Format: int32 */
+            watchMaxDpd?: number;
+        };
         QueryResult: {
             checkoutRequestId: string;
             resultCode?: string;
@@ -2056,6 +2221,15 @@ export interface components {
             principal?: string;
             total?: string;
         };
+        RatioCheck: {
+            code?: string;
+            denominator?: string;
+            label?: string;
+            met?: boolean;
+            minimum?: string;
+            numerator?: string;
+            valuePct?: string;
+        };
         Reconciliation: {
             /** Format: date */
             businessDate?: string;
@@ -2072,6 +2246,18 @@ export interface components {
             providerRef?: string;
             /** Format: date-time */
             recordedAt?: string;
+        };
+        RegulatoryLine: {
+            accountClass?: string;
+            description?: string;
+            line?: string;
+        };
+        RegulatoryMapping: {
+            accounts?: components["schemas"]["MappedAccount"][];
+            lines?: components["schemas"]["RegulatoryLine"][];
+        };
+        RegulatoryMappingRequest: {
+            changes?: components["schemas"]["MappingChange"][];
         };
         ResolutionCreated: {
             /** Format: uuid */
@@ -2095,6 +2281,12 @@ export interface components {
             /** Format: date-time */
             transactionTime?: string;
         };
+        ReturnLine: {
+            accounts?: components["schemas"]["AccountAmount"][];
+            amount?: string;
+            label?: string;
+            line?: string;
+        };
         ReverseRequest: {
             correlationId?: string;
             /** Format: uuid */
@@ -2107,6 +2299,20 @@ export interface components {
             replayed?: boolean;
             /** Format: uuid */
             reversalEntryId?: string;
+        };
+        RiskClassification: {
+            allowanceHeld?: components["schemas"]["ReturnLine"];
+            allowanceShortfall?: string;
+            grossLoans?: string;
+            interestAccruedOnNonPerforming?: string;
+            ledgerLoanPrincipal?: string;
+            nonPerformingLoans?: string;
+            nonPerformingRatioPct?: string;
+            requiredAllowance?: string;
+            rows?: components["schemas"]["ClassificationRow"][];
+            /** Format: int32 */
+            totalLoans?: number;
+            unexplainedPrincipalDifference?: string;
         };
         SavingsAccountOpened: {
             accountNumber?: string;
@@ -4038,6 +4244,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Decision"];
+                };
+            };
+        };
+    };
+    Regulatory_mapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryMapping"];
+                };
+            };
+        };
+    };
+    Regulatory_updateMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegulatoryMappingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryMapping"];
+                };
+            };
+        };
+    };
+    Regulatory_prudential: {
+        parameters: {
+            query?: {
+                asOf?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrudentialReturn"];
+                };
+            };
+        };
+    };
+    Regulatory_classifiedLoans: {
+        parameters: {
+            query?: {
+                asOf?: string;
+                loanClass?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassifiedLoan"][];
+                };
+            };
+        };
+    };
+    Regulatory_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrudentialSettingsView"];
+                };
+            };
+        };
+    };
+    Regulatory_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrudentialSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrudentialSettingsView"];
                 };
             };
         };

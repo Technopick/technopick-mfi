@@ -11,6 +11,7 @@ import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
+import { PrudentialPage, RegulatorySetupPage } from "./pages/RegulatoryPages";
 import { StatementsPage } from "./pages/StatementsPage";
 import { WriteOffsPage } from "./pages/WriteOffsPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
@@ -44,6 +45,8 @@ export const routes: RouteObject[] = [
       { path: "ledger/statements", element: <StatementsPage /> },
       { path: "ledger/accounts/:code", element: <AccountActivityPage /> },
       { path: "ledger/entries/:id", element: <JournalEntryPage /> },
+      { path: "regulatory", element: <PrudentialPage /> },
+      { path: "regulatory/setup", element: <RegulatorySetupPage /> },
       { path: "write-offs", element: <WriteOffsPage /> },
       { path: "loans", element: <LoanSchedulePage /> },
       { path: "loans/:number", element: <LoanSchedulePage /> },

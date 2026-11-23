@@ -108,6 +108,16 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(finance.getByRole("button", { name: "Propose journal" })).toBeVisible();
   await finance.goto("/ledger/statements");
   await expect(finance.getByText(/ - balances\./)).toBeVisible();
+  // Prudential returns need a closed business day (none on this stack); finance maps an account for them.
+  await finance.goto("/regulatory");
+  await expect(finance.getByRole("heading", { level: 1, name: "Prudential returns" })).toBeVisible();
+  await expect(finance.getByText(/no business day has been closed yet/)).toBeVisible();
+  await finance.getByRole("link", { name: "Settings and account mapping" }).click();
+  await expect(finance.getByText(/defaults from the Deposit-taking Sacco Business Regulations, 2010/)).toBeVisible();
+  await finance.getByLabel("Return line for 1001-TILL-NBO01-01").selectOption("CASH");
+  await finance.getByRole("button", { name: "Save mapping (1 change(s))" }).click();
+  await expect(finance.getByRole("status").filter({ hasText: "Account mapping saved." })).toBeVisible();
+  await expect(finance.getByLabel("Return line for 1001-TILL-NBO01-01")).toHaveValue("CASH");
   await finance.goto("/ledger");
   const [download] = await Promise.all([
     finance.waitForEvent("download"),

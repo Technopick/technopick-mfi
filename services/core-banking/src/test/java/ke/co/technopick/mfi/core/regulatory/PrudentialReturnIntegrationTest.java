@@ -171,12 +171,19 @@ class PrudentialReturnIntegrationTest {
         mvc.perform(put(P + "/mapping").with(as("sup-1", "SUPERVISOR")).contentType(MediaType.APPLICATION_JSON)
                 .content(mapping("1300-BANK", "BANK_BALANCES"))).andExpect(status().isForbidden());
 
-        // Before mapping: regulation defaults, zero capital, a note saying why.
-        mvc.perform(get(P + "/prudential").with(FINANCE)).andExpect(status().isOk())
+        // Before mapping: regulation defaults (which count current-year earnings), so capital is only those
+        // earnings, and a note says nothing is mapped.
+        String unmapped = mvc.perform(get(P + "/prudential").with(FINANCE)).andExpect(status().isOk())
             .andExpect(jsonPath("$.asOf").value("2026-11-28"))
             .andExpect(jsonPath("$.settings.regulationDefaults").value(true))
-            .andExpect(jsonPath("$.capital.coreCapital").value("0.00"))
-            .andExpect(jsonPath("$.notes").value(hasItem(containsString("No ledger accounts are mapped"))));
+            .andExpect(jsonPath("$.settings.includeCurrentYearSurplus").value(true))
+            .andExpect(jsonPath("$.capital.totalDeposits").value("0.00"))
+            .andExpect(jsonPath("$.liquidity.liquidAssets").value("0.00"))
+            .andExpect(jsonPath("$.notes").value(hasItem(containsString("No ledger accounts are mapped"))))
+            .andReturn().getResponse().getContentAsString();
+        String earnings = JsonPath.<java.util.List<String>>read(unmapped, "$.capital.lines[?(@.line == 'CURRENT_YEAR_SURPLUS')].amount").get(0);
+        assertEquals(earnings, JsonPath.read(unmapped, "$.capital.coreCapital"));
+        assertEquals(earnings, JsonPath.read(unmapped, "$.capital.institutionalCapital"));
 
         // Finance maps the accounts; a mapping that would turn deposits into capital is refused.
         mvc.perform(put(P + "/mapping").with(FINANCE).contentType(MediaType.APPLICATION_JSON)

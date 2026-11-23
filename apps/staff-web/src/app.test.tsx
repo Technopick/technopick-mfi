@@ -364,6 +364,80 @@ describe("screens", () => {
     expect(screen.getByRole("status").textContent).toBe("Schedule saved.");
   });
 
+  it("shows the prudential returns with each requirement met or not, and the loans behind a class", async () => {
+    const line = (l: string, label: string, amount: string, accounts: { accountCode: string; name: string; amount: string }[] = []) =>
+      ({ line: l, label, amount, accounts });
+    const { api } = fakeApi({
+      "GET /api/v1/regulatory/prudential": () => ({
+        asOf: "2026-11-28", currency: "KES", periodClosed: false,
+        settings: { regulationDefaults: false, includeCurrentYearSurplus: false },
+        capital: {
+          lines: [line("SHARE_CAPITAL", "Fully paid-up members' shares", "1500000.00", [{ accountCode: "3000-MEMBER-SHARES", name: "Shares", amount: "1500000.00" }])],
+          coreCapital: "1900000.00", institutionalCapital: "400000.00", totalAssets: "2620855.00", totalDeposits: "365855.00",
+          checks: [
+            { code: "CORE_CAPITAL_MINIMUM", label: "Core capital of at least 10000000.00 (Reg 9(a))", numerator: "1900000.00", minimum: "10000000.00", met: false },
+            { code: "CORE_TO_DEPOSITS", label: "Core capital to total deposits (Reg 9(d))", numerator: "1900000.00", denominator: "365855.00",
+              valuePct: "519.33", minimum: "8.00", met: true }] },
+        liquidity: { lines: [], liquidAssets: "2365855.00", depositsAndShortTermLiabilities: "365855.00",
+          checks: [{ code: "LIQUIDITY", label: "Liquid assets to savings deposits and short-term liabilities (Reg 13)", numerator: "2365855.00",
+            denominator: "365855.00", valuePct: "646.66", minimum: "15.00", met: true }] },
+        classification: {
+          rows: [
+            { loanClass: "PERFORMING", daysPastDue: "0", loans: 6, outstandingPrincipal: "72000.00", allowancePct: "1.00", requiredAllowance: "720.00" },
+            { loanClass: "WATCH", daysPastDue: "1-30", loans: 0, outstandingPrincipal: "0.00", allowancePct: "5.00", requiredAllowance: "0.00" },
+            { loanClass: "SUBSTANDARD", daysPastDue: "31-180", loans: 4, outstandingPrincipal: "48000.00", allowancePct: "25.00", requiredAllowance: "12000.00" }],
+          totalLoans: 10, grossLoans: "120000.00", requiredAllowance: "12720.00",
+          allowanceHeld: line("LOAN_LOSS_ALLOWANCE", "Allowance held", "5000.00"), allowanceShortfall: "7720.00",
+          nonPerformingLoans: "48000.00", nonPerformingRatioPct: "40.00", interestAccruedOnNonPerforming: "1080.00",
+          ledgerLoanPrincipal: "120000.00", unexplainedPrincipalDifference: "0.00" },
+        unmappedBalanceSheetAccounts: [{ accountCode: "1200-LOANS-PRINCIPAL", name: "Loans", amount: "120000.00" }],
+        notes: ["The accounting period containing 2026-11-28 is still open: figures can change until finance closes it.",
+          "Interest of 1080.00 accrued on non-performing loans is still in income and receivables; Reg 42 requires it to be suspended. Interest suspension is not built yet."],
+      }),
+      "GET /api/v1/regulatory/prudential/loans?asOf=2026-11-28&loanClass=SUBSTANDARD": () => [
+        { loanNumber: "LN-P0000003", branchCode: "NBO01", daysPastDue: 58, loanClass: "SUBSTANDARD", outstandingPrincipal: "12000.00", requiredAllowance: "3000.00" }],
+    });
+    renderAt("/regulatory", session("sup-1", "SUPERVISOR"), api);
+    expect(await screen.findByText(/Provisional: the period is still open/)).toBeTruthy();
+    expect(screen.getByText(/Reg 42 requires it to be suspended/)).toBeTruthy();
+    const capital = screen.getByRole("heading", { name: "Capital adequacy (Regulation 9)" }).closest("section")!;
+    const rows = within(capital).getAllByRole("row").map((r) => r.textContent);
+    expect(rows).toContain("Core capital of at least 10000000.00 (Reg 9(a))1,900,000.0010,000,000.00Not met");
+    expect(rows).toContain("Core capital to total deposits (Reg 9(d))1,900,000.00 / 365,855.00519.33%8.00%Met");
+    expect(screen.getByText("7,720.00")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Settings and account mapping" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Watch" })).toBeNull(); // no loans to list
+    await userEvent.click(screen.getByRole("button", { name: "Substandard" }));
+    expect(await screen.findByRole("link", { name: "LN-P0000003" })).toBeTruthy();
+    expect(screen.getByText("3,000.00")).toBeTruthy();
+  });
+
+  it("lets finance map ledger accounts to return lines, offering only lines of the account's class", async () => {
+    const { api, calls } = fakeApi({
+      "GET /api/v1/regulatory/settings": () => ({ minCoreCapital: "10000000.00", minCoreToAssetsPct: "10.00", minInstitutionalToAssetsPct: "8.00",
+        minCoreToDepositsPct: "8.00", minLiquidityPct: "15.00", watchMaxDpd: 30, substandardMaxDpd: 180, doubtfulMaxDpd: 360,
+        provisionPerformingPct: "1.00", provisionWatchPct: "5.00", provisionSubstandardPct: "25.00", provisionDoubtfulPct: "50.00",
+        provisionLossPct: "100.00", includeCurrentYearSurplus: true, regulationDefaults: true }),
+      "GET /api/v1/regulatory/mapping": () => ({
+        lines: [{ line: "SHARE_CAPITAL", accountClass: "EQUITY", description: "Members' shares" },
+          { line: "CASH", accountClass: "ASSET", description: "Notes and coins" },
+          { line: "BANK_BALANCES", accountClass: "ASSET", description: "Bank balances" }],
+        accounts: [{ accountCode: "1000-VAULT", name: "Vault", accountClass: "ASSET", line: "BANK_BALANCES" },
+          { accountCode: "3000-SHARES", name: "Shares", accountClass: "EQUITY" }] }),
+      "PUT /api/v1/regulatory/mapping": () => ({ lines: [], accounts: [] }),
+    });
+    renderAt("/regulatory/setup", session("fin-1", "FINANCE"), api);
+    expect(await screen.findByText(/defaults from the Deposit-taking Sacco Business Regulations, 2010/)).toBeTruthy();
+    const vault = await screen.findByLabelText("Return line for 1000-VAULT");
+    expect(within(vault).getAllByRole("option").map((o) => o.textContent)).toEqual(["(not used)", "Notes and coins", "Bank balances"]);
+    await userEvent.selectOptions(vault, "CASH");
+    await userEvent.selectOptions(screen.getByLabelText("Return line for 3000-SHARES"), "SHARE_CAPITAL");
+    await userEvent.click(screen.getByRole("button", { name: "Save mapping (2 change(s))" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ changes: [
+      { accountCode: "1000-VAULT", line: "CASH" }, { accountCode: "3000-SHARES", line: "SHARE_CAPITAL" }] }));
+    expect(await screen.findByText("Account mapping saved.")).toBeTruthy();
+  });
+
   it("shows portfolio at risk by branch, loans in arrears and closed loans holding credit", async () => {
     const { api, calls } = fakeApi({
       "GET /api/v1/reports/portfolio-at-risk": () => ({ asOf: "2026-11-30",
@@ -430,7 +504,7 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns"]);
   });
 
   it("flags control accounts that do not match their records", async () => {

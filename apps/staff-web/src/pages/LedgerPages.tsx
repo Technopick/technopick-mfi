@@ -25,7 +25,8 @@ export function TrialBalancePage() {
     <>
       <h1>General ledger</h1>
       <p><Link to="/ledger/reconciliation">Reconciliation of control accounts</Link> · <Link to="/ledger/journals">Manual journals</Link>
-        {" "}· <Link to="/ledger/periods">Accounting periods</Link> · <Link to="/ledger/statements">Financial statements</Link></p>
+        {" "}· <Link to="/ledger/periods">Accounting periods</Link> · <Link to="/ledger/statements">Financial statements</Link>
+        {" "}· <Link to="/regulatory">Prudential returns</Link></p>
       <form className="search" onSubmit={(e) => {
         e.preventDefault();
         const next = new URLSearchParams();
