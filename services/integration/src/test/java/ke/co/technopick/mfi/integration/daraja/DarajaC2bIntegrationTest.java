@@ -65,6 +65,8 @@ class DarajaC2bIntegrationTest {
     static HttpServer core;
     static final List<String> applyCalls = new CopyOnWriteArrayList<>();
     static final AtomicInteger applyFailuresToSimulate = new AtomicInteger();
+    /** Core applies the payment but the response never reaches the runtime (timeout, crash, network). */
+    static final AtomicInteger responsesToLose = new AtomicInteger();
 
     static {
         try {
@@ -91,6 +93,10 @@ class DarajaC2bIntegrationTest {
                 return;
             }
             applyCalls.add(ex.getRequestHeaders().getFirst("Authorization") + " " + body);
+            if (responsesToLose.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
+                reply(ex, 504, "{}");
+                return;
+            }
             reply(ex, 200, "{\"outcome\":\"APPLIED\",\"replayed\":false}");
         });
         core.start();
@@ -212,5 +218,79 @@ class DarajaC2bIntegrationTest {
         assertTrue(call.contains("\"amount\":\"1500.00\""), call);
         assertTrue(call.contains("2547*****678"), call);
         assertTrue(!call.contains("254712345678"), "full MSISDN must not be forwarded");
+    }
+
+    long callsFor(String transId) {
+        return applyCalls.stream().filter(c -> c.contains("\"transId\":\"" + transId + "\"")).count();
+    }
+
+    void confirm(String transId) throws Exception {
+        mvc.perform(post(BASE + "/confirmation").contentType(MediaType.APPLICATION_JSON)
+                .content(payload(transId, "0100000004", "250.00", "600991")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.ResultCode").value("0"));
+    }
+
+    String statusOf(String transId) {
+        return owner().queryForObject("SELECT status FROM integration.provider_callback WHERE provider_ref = ?",
+                String.class, transId);
+    }
+
+    /**
+     * Crash windows (increment 28). Core applies each TransID at most once (checked in core's
+     * PerformanceIT and API tests), so the runtime must only guarantee that nothing stored is lost
+     * and that re-sending is the only consequence of a crash.
+     */
+    @Test
+    void crashWindowsLoseNothingAndOnlyResend() throws Exception {
+        // 1. Core applied, response lost: the callback stays FAILED and is re-sent with the same TransID and
+        //    correlation id, which core answers as a replay.
+        confirm("TCRASH0001");
+        responsesToLose.set(1);
+        assertEquals(0, processor.processPending());
+        assertEquals("FAILED", statusOf("TCRASH0001"));
+        assertEquals(1, callsFor("TCRASH0001"));
+        assertEquals(1, processor.processPending());
+        assertEquals("APPLIED", statusOf("TCRASH0001"));
+        assertEquals(2, callsFor("TCRASH0001"));
+        assertTrue(applyCalls.stream().filter(c -> c.contains("TCRASH0001"))
+                .allMatch(c -> c.contains("\"correlationId\":\"mpesa:TCRASH0001\"")));
+
+        // 2. A node dies while holding a callback: the row lock is released with its connection and
+        //    another node applies it; while the lock is held, nobody else touches it.
+        confirm("TCRASH0002");
+        try (java.sql.Connection dying = java.sql.DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword())) {
+            dying.setAutoCommit(false);
+            try (var st = dying.createStatement()) {
+                st.executeQuery("SELECT 1 FROM integration.provider_callback WHERE provider_ref = 'TCRASH0002' FOR UPDATE").close();
+            }
+            assertEquals(0, processor.processPending());
+            assertEquals(0, callsFor("TCRASH0002"));
+            assertEquals("RECEIVED", statusOf("TCRASH0002"));
+            try (var st = dying.createStatement()) {
+                st.execute("SELECT pg_terminate_backend(pg_backend_pid())"); // the node's connection dies mid-transaction
+            } catch (java.sql.SQLException expected) {
+                // connection terminated, as intended
+            }
+        }
+        assertEquals(1, processor.processPending());
+        assertEquals("APPLIED", statusOf("TCRASH0002"));
+        assertEquals(1, callsFor("TCRASH0002"));
+
+        // 3. Two nodes drain a backlog of 40 callbacks at once: every one is applied, each sent once.
+        for (int i = 0; i < 40; i++) {
+            confirm("TRACE%05d".formatted(i));
+        }
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(processor::processPending);
+            var b = pool.submit(processor::processPending);
+            assertEquals(40, a.get() + b.get());
+        } finally {
+            pool.shutdown();
+        }
+        for (int i = 0; i < 40; i++) {
+            assertEquals(1, callsFor("TRACE%05d".formatted(i)), "TRACE%05d".formatted(i));
+            assertEquals("APPLIED", statusOf("TRACE%05d".formatted(i)));
+        }
     }
 }

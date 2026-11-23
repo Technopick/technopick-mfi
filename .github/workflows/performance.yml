@@ -1,0 +1,52 @@
+name: performance
+
+# Manual only: load and failure test over a synthetic TEST-ONLY book (50,000 members, 20,000
+# loans) in a PostgreSQL container. No external systems, no secrets. Uploads the measured report.
+on:
+  workflow_dispatch:
+    inputs:
+      members:
+        description: Savings members to seed
+        default: '50000'
+      loans:
+        description: Active loans to seed
+        default: '20000'
+      ops_per_worker:
+        description: Postings per teller / M-Pesa worker (4 + 4 workers)
+        default: '600'
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: Load and failure test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Load and failure test
+        shell: bash
+        env:
+          MEMBERS: ${{ inputs.members }}
+          LOANS: ${{ inputs.loans }}
+          OPS: ${{ inputs.ops_per_worker }}
+        run: >
+          mvn -B -ntp -pl services/core-banking -am test
+          -Dsurefire.excludedGroups=sandbox -Dgroups=performance -Dsurefire.failIfNoSpecifiedTests=false
+          -Dtest=PerformanceLoadTest
+          -Dperf.members="$MEMBERS" -Dperf.loans="$LOANS" -Dperf.opsPerWorker="$OPS"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: performance-report
+          path: |
+            services/core-banking/target/performance-report.md
+            services/core-banking/target/surefire-reports/*PerformanceLoadTest*
+          if-no-files-found: warn

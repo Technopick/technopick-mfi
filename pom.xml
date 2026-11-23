@@ -40,8 +40,9 @@
     <maven-enforcer.version>3.6.1</maven-enforcer.version>
     <!-- Container-based tests are tagged "integration"; the Windows CI job excludes them.
          Tests tagged "sandbox" call Safaricom's Daraja sandbox and only run in the manual
-         daraja-sandbox workflow; they are excluded everywhere else. -->
-    <surefire.excludedGroups>sandbox</surefire.excludedGroups>
+         daraja-sandbox workflow; they are excluded everywhere else. Tests tagged "performance"
+         load a 50,000-member synthetic book and only run in the manual performance workflow. -->
+    <surefire.excludedGroups>sandbox,performance</surefire.excludedGroups>
   </properties>
 
   <dependencyManagement>

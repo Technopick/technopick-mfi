@@ -45,7 +45,12 @@ public class EndOfDayService {
                                   int loansClosed, String creditApplied, int reconciliationDifferences,
                                   int accountsAccrued,
                                   String interestAccrued, int accountsCredited, String interestCredited,
-                                  String taxWithheld) { }
+                                  String taxWithheld, StepTimings timings) { }
+
+    /** How long each step of the run took, in milliseconds (for operations and load testing). */
+    public record StepTimings(long loansMs, long savingsAccrualMs, long interestCreditMs, long closeMs, long totalMs) { }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EndOfDayService.class);
 
     private final JdbcClient jdbc;
     private final TenantSession session;
@@ -102,6 +107,7 @@ public class EndOfDayService {
             }
             return st.businessDate();
         });
+        long t0 = System.nanoTime();
         try {
             int loansDone = 0;
             int inArrears = 0;
@@ -127,6 +133,7 @@ public class EndOfDayService {
                     inArrears += r.daysPastDue() > 0 ? 1 : 0;
                 }
             }
+            long t1 = System.nanoTime();
             int accrued = 0;
             BigDecimal accruedAmount = BigDecimal.ZERO.setScale(2);
             List<AccrualGroup> groups = tx.execute(s -> {
@@ -141,6 +148,7 @@ public class EndOfDayService {
                 accrued += r.accounts();
                 accruedAmount = accruedAmount.add(r.amount());
             }
+            long t2 = System.nanoTime();
             int credited = 0;
             BigDecimal net = BigDecimal.ZERO.setScale(2);
             BigDecimal tax = BigDecimal.ZERO.setScale(2);
@@ -159,6 +167,7 @@ public class EndOfDayService {
                     tax = tax.add(r.tax());
                 }
             }
+            long t3 = System.nanoTime();
             int loanCount = loansDone;
             int closedCount = closedLoans;
             BigDecimal creditTotal = credit;
@@ -170,7 +179,7 @@ public class EndOfDayService {
             int creditedAccounts = credited;
             BigDecimal creditedNet = net;
             BigDecimal taxTotal = tax;
-            return tx.execute(s -> {
+            EndOfDaySummary done = tx.execute(s -> {
                 session.bind(tenantId);
                 int differences = (int) reconciliation.record(tenantId, date).stream()
                     .filter(r -> !r.reconciled()).count();
@@ -188,8 +197,17 @@ public class EndOfDayService {
                 return new EndOfDaySummary(date, date.plusDays(1), loanCount, loanInterestTotal.toPlainString(),
                         penaltyTotal.toPlainString(), arrearsCount, closedCount, creditTotal.toPlainString(), differences,
                         accruedAccounts, accruedTotal.toPlainString(),
-                        creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString());
+                        creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString(), null);
             });
+            long t4 = System.nanoTime();
+            StepTimings timings = new StepTimings(ms(t1 - t0), ms(t2 - t1), ms(t3 - t2), ms(t4 - t3), ms(t4 - t0));
+            log.info("EOD {} closed in {} ms (loans {}, savings accrual {}, interest credit {}, reconciliation and close {})",
+                    date, timings.totalMs(), timings.loansMs(), timings.savingsAccrualMs(), timings.interestCreditMs(),
+                    timings.closeMs());
+            return new EndOfDaySummary(done.closedDate(), done.newBusinessDate(), done.loansProcessed(),
+                    done.loanInterestAccrued(), done.penaltiesCharged(), done.loansInArrears(), done.loansClosed(),
+                    done.creditApplied(), done.reconciliationDifferences(), done.accountsAccrued(), done.interestAccrued(),
+                    done.accountsCredited(), done.interestCredited(), done.taxWithheld(), timings);
         } catch (RuntimeException e) {
             String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             tx.executeWithoutResult(s -> {
@@ -199,6 +217,10 @@ public class EndOfDayService {
             });
             throw e;
         }
+    }
+
+    private static long ms(long nanos) {
+        return nanos / 1_000_000;
     }
 
     private EndOfDayStatus readStatus() {
