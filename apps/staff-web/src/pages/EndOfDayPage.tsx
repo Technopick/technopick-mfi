@@ -11,6 +11,8 @@ type EodSummary = Schemas["EndOfDaySummary"];
 const EOD = "/api/v1/end-of-day";
 
 /** Close the business day: shows what blocks it, runs it (OPERATIONS) and shows what it posted. */
+const secs = (ms?: number) => ((ms ?? 0) / 1000).toFixed(1);
+
 export function EndOfDayPage() {
   const api = useApi();
   const { session } = useAuth();
@@ -41,6 +43,8 @@ export function EndOfDayPage() {
           {(summary.reconciliationDifferences ?? 0) > 0 && <> {summary.reconciliationDifferences} control account(s) did not reconcile.</>} Savings interest accrued:{" "}
           {summary.interestAccrued} on {summary.accountsAccrued} account(s).
           {(summary.accountsCredited ?? 0) > 0 && <> Interest credited: {summary.interestCredited} to {summary.accountsCredited} account(s), tax withheld {summary.taxWithheld}.</>}
+          {summary.timings && <> The run took {secs(summary.timings.totalMs)} s (loans {secs(summary.timings.loansMs)} s,
+            savings {secs((summary.timings.savingsAccrualMs ?? 0) + (summary.timings.interestCreditMs ?? 0))} s).</>}
         </p>
       )}
       {status.loading && !s ? <Loading /> : s && (

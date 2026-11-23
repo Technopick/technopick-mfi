@@ -1674,6 +1674,7 @@ export interface components {
             /** Format: int32 */
             reconciliationDifferences?: number;
             taxWithheld?: string;
+            timings?: components["schemas"]["StepTimings"];
         };
         EntryLine: {
             accountCode?: string;
@@ -2104,6 +2105,18 @@ export interface components {
             entryId?: string;
             /** Format: date-time */
             postedAt?: string;
+        };
+        StepTimings: {
+            /** Format: int64 */
+            closeMs?: number;
+            /** Format: int64 */
+            interestCreditMs?: number;
+            /** Format: int64 */
+            loansMs?: number;
+            /** Format: int64 */
+            savingsAccrualMs?: number;
+            /** Format: int64 */
+            totalMs?: number;
         };
         Submitted: {
             checkoutRequestId: string;

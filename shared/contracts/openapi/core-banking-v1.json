@@ -1247,6 +1247,9 @@
           },
           "taxWithheld": {
             "type": "string"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/StepTimings"
           }
         },
         "type": "object"
@@ -2535,6 +2538,31 @@
           "postedAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StepTimings": {
+        "properties": {
+          "closeMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "interestCreditMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "loansMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "savingsAccrualMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalMs": {
+            "format": "int64",
+            "type": "integer"
           }
         },
         "type": "object"
