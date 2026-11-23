@@ -1,12 +1,16 @@
 package ke.co.technopick.mfi.core.eod.application;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import javax.sql.DataSource;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import ke.co.technopick.mfi.core.accounting.application.ReconciliationService;
-import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService;
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService.AccrualGroup;
@@ -27,18 +31,29 @@ import org.springframework.transaction.support.TransactionTemplate;
  * reconciliation (ADR-0024); then complete the run and move the business
  * date forward one day. The database refuses to complete while any till is open (V18) and refuses
  * to move the date before the run has completed (V4).
+ *
+ * <p>Only one process runs a tenant's end of day at a time (ADR-0029): the run holds a PostgreSQL
+ * session-level advisory lock on a dedicated connection for its whole duration. If the process
+ * dies, its connection closes and the lock is released, so a run left RUNNING without its lock was
+ * interrupted and is resumed at once; a run whose lock is held is never resumed, however long it
+ * takes. (This replaces the earlier rule that treated a run older than 10 minutes as interrupted,
+ * which could start a second run beside a long but live one.)
  */
 @Service
 public class EndOfDayService {
 
-    /** A run left RUNNING longer than this is treated as interrupted and may be resumed. */
-    static final int STALE_MINUTES = 10;
+    /** SQL that is true while some session holds the tenant's end-of-day lock. */
+    static final String LOCK_HELD = """
+            WITH k AS (SELECT hashtextextended('mfi:eod:' || CAST(:t AS text), 0) AS v)
+            SELECT EXISTS (SELECT 1 FROM pg_locks l, k WHERE l.locktype = 'advisory' AND l.objsubid = 1 AND l.granted
+                              AND l.classid = ((k.v >> 32) & 4294967295)::oid AND l.objid = (k.v & 4294967295)::oid)
+            """;
 
     public record OpenTill(String tillCode, String teller, String status) { }
 
     public record EndOfDayStatus(LocalDate businessDate, String runStatus, OffsetDateTime runStartedAt, String failureReason,
                                  List<OpenTill> openTills, int activeLoans, boolean interestPostingDay,
-                                 LocalDate lastClosedDate) { }
+                                 LocalDate lastClosedDate, boolean runInProgress) { }
 
     public record EndOfDaySummary(LocalDate closedDate, LocalDate newBusinessDate, int loansProcessed,
                                   String loanInterestAccrued, String penaltiesCharged, int loansInArrears,
@@ -59,9 +74,12 @@ public class EndOfDayService {
     private final ReconciliationService reconciliation;
     private final Outbox outbox;
     private final TransactionTemplate tx;
+    private final DataSource dataSource;
 
     public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, LoanEndOfDayStep loans,
-                           ReconciliationService reconciliation, Outbox outbox, PlatformTransactionManager transactions) {
+                           ReconciliationService reconciliation, Outbox outbox, PlatformTransactionManager transactions,
+                           DataSource dataSource) {
+        this.dataSource = dataSource;
         this.reconciliation = reconciliation;
         this.loans = loans;
         this.jdbc = jdbc;
@@ -78,24 +96,79 @@ public class EndOfDayService {
         });
     }
 
+    /** True while some process holds this tenant's end-of-day lock (that is, a run is really in progress). */
+    public boolean inProgress(UUID tenantId) {
+        return Boolean.TRUE.equals(jdbc.sql(LOCK_HELD).param("t", tenantId.toString()).query(Boolean.class).single());
+    }
+
     public EndOfDaySummary run(UUID tenantId, String actor) {
+        return run(tenantId, actor, () -> { });
+    }
+
+    /** Runs end of day; {@code whileLocked} runs first, once this process holds the tenant's run lock. */
+    public EndOfDaySummary run(UUID tenantId, String actor, Runnable whileLocked) {
+        Connection lock;
+        try {
+            lock = dataSource.getConnection();
+        } catch (SQLException e) {
+            throw new IllegalStateException("no database connection for the end-of-day lock", e);
+        }
+        boolean held = false;
+        try {
+            held = tryLock(lock, "SELECT pg_try_advisory_lock(hashtextextended(?, 0))", tenantId);
+            if (!held) {
+                throw new EndOfDayRunningException("end of day is already running for this tenant");
+            }
+            whileLocked.run();
+            return runLocked(tenantId, actor);
+        } finally {
+            release(lock, held, tenantId);
+        }
+    }
+
+    private static boolean tryLock(Connection c, String sql, UUID tenantId) {
+        try (PreparedStatement st = c.prepareStatement(sql)) {
+            st.setString(1, "mfi:eod:" + tenantId);
+            try (ResultSet rs = st.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not take the end-of-day lock", e);
+        }
+    }
+
+    private static void release(Connection c, boolean held, UUID tenantId) {
+        try {
+            if (held && !tryLock(c, "SELECT pg_advisory_unlock(hashtextextended(?, 0))", tenantId)) {
+                throw new IllegalStateException("end-of-day lock was not held at release");
+            }
+            c.close();
+        } catch (RuntimeException | SQLException e) {
+            // Never hand a connection that may still hold the lock back to the pool: drop it, which ends the session.
+            log.error("EOD lock release failed for tenant {}; discarding the connection", tenantId, e);
+            try {
+                c.abort(Runnable::run);
+            } catch (SQLException ignored) {
+                log.warn("could not abort the end-of-day lock connection", ignored);
+            }
+        }
+    }
+
+    private EndOfDaySummary runLocked(UUID tenantId, String actor) {
         LocalDate date = tx.execute(s -> {
             session.bind(tenantId);
             EndOfDayStatus st = readStatus();
             if (!st.openTills().isEmpty()) {
-                throw new ConflictException("close and balance every till first: " + st.openTills().stream()
+                throw new EndOfDayBlockedException("close and balance every till first: " + st.openTills().stream()
                         .map(t -> t.tillCode() + " (" + t.teller() + ", " + t.status() + ")").toList());
             }
             if (jdbc.sql("""
                     SELECT count(*) FROM ledger.accounting_period WHERE status = 'OPEN' AND :d BETWEEN start_date AND end_date
                     """).param("d", st.businessDate().plusDays(1)).query(Integer.class).single() == 0) {
-                throw new ConflictException("there is no open accounting period for " + st.businessDate().plusDays(1)
+                throw new EndOfDayBlockedException("there is no open accounting period for " + st.businessDate().plusDays(1)
                         + "; finance must open it before the day can close");
             }
-            if ("RUNNING".equals(st.runStatus()) && st.runStartedAt() != null
-                    && st.runStartedAt().isAfter(OffsetDateTime.now().minusMinutes(STALE_MINUTES))) {
-                throw new ConflictException("end of day for " + st.businessDate() + " is already running");
-            }
+            // RUNNING here means an earlier process died mid-run (this process holds the lock): resume it.
             if (st.runStatus() == null) {
                 jdbc.sql("INSERT INTO ledger.eod_run (tenant_id, business_date) VALUES (:t, :d)")
                     .param("t", tenantId).param("d", st.businessDate()).update();
@@ -240,7 +313,9 @@ public class EndOfDayService {
         int loans = jdbc.sql("SELECT count(*) FROM lending.loan WHERE status = 'ACTIVE'").query(Integer.class).single();
         LocalDate last = jdbc.sql("SELECT max(business_date) FROM ledger.eod_run WHERE status = 'COMPLETED'")
             .query(LocalDate.class).optional().orElse(null);
+        String tenant = jdbc.sql("SELECT CAST(tenancy.current_tenant() AS text)").query(String.class).single();
+        boolean live = Boolean.TRUE.equals(jdbc.sql(LOCK_HELD).param("t", tenant).query(Boolean.class).single());
         return new EndOfDayStatus(date, run.status(), run.startedAt(), run.reason(), tills, loans,
-                SavingsInterest.isPostingDay(date), last);
+                SavingsInterest.isPostingDay(date), last, live);
     }
 }
