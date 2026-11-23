@@ -56,7 +56,9 @@ BEGIN
 END $$;
 COMMIT;
 
--- I4: an entry that does not match its rows fails at commit.
+-- I4: an entry that does not match its rows fails at commit. V25 checks each entry once per
+-- transaction; a marker left in the session (here a forged, session-level one) never skips the check.
+SET mfi_i4.ede000000000000000000000000000020 = '1';
 DO $$
 BEGIN
   BEGIN
@@ -76,6 +78,8 @@ BEGIN
     IF SQLERRM NOT LIKE 'EOD_AMOUNT_MISMATCH%' THEN RAISE; END IF;
   END;
 END $$;
+RESET mfi_i4.ede000000000000000000000000000020;
+\echo PASS J a stale or forged I4 marker cannot skip the accrual entry check
 
 BEGIN;
 SET LOCAL app.tenant_id = :tA;
