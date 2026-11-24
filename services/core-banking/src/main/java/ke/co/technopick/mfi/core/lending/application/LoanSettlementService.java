@@ -127,7 +127,8 @@ public class LoanSettlementService {
         return jdbc.sql("""
                 SELECT settlement_id, business_date, principal, interest, penalty, payoff, interest_waived, credit_left,
                        schedule_version, settled_by, settled_at
-                  FROM lending.settlement WHERE """ + where + " = :v")
+                  FROM lending.settlement
+                """ + " WHERE " + where + " = :v")
             .param("v", value)
             .query((rs, i) -> new SettlementView(rs.getObject(1, UUID.class), rs.getObject(2, LocalDate.class),
                     m(rs.getBigDecimal(3)), m(rs.getBigDecimal(4)), m(rs.getBigDecimal(5)), m(rs.getBigDecimal(6)),
