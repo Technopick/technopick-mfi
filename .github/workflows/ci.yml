@@ -99,9 +99,18 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npx playwright test
+      - name: Browser test results
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-results
+          path: apps/staff-web/test-results
+          retention-days: 7
       - name: Stack logs
         if: failure()
-        run: docker compose -f infrastructure/e2e/docker-compose.yml logs --no-color --tail=300
+        run: |
+          docker compose -f infrastructure/e2e/docker-compose.yml logs --no-color --tail=300
+          docker compose -f infrastructure/e2e/docker-compose.yml logs --no-color core integration | grep -E "WARN|ERROR|Exception" | tail -80 || true
       - name: Stop the stack
         if: always()
         run: docker compose -f infrastructure/e2e/docker-compose.yml down -v

@@ -6,14 +6,21 @@ const HANDSET = process.env.E2E_USSD_URL ?? "http://localhost:18091/";
 
 /** Dials, then answers each prompt in turn; returns the last screen. */
 async function dial(handset: Page, ...keys: string[]): Promise<string> {
-  await handset.getByRole("button", { name: /^Dial/ }).click();
-  for (const key of keys) {
-    await expect(handset.getByRole("button", { name: "Send" })).toBeEnabled();
+  const screen = handset.getByRole("status");
+  const send = handset.getByRole("button", { name: "Send" });
+  const again = handset.getByRole("button", { name: /^Dial/ });
+  await again.click();
+  for (const [i, key] of keys.entries()) {
+    // Wait for the answer: a prompt (Send enabled) or the end of the session (Dial enabled again).
+    await expect.poll(async () => (await send.isEnabled()) || (await again.isEnabled())).toBe(true);
+    if (!(await send.isEnabled())) {
+      throw new Error(`session ended before key ${i + 1} of ${keys.length}: «${await screen.textContent()}»`);
+    }
     await handset.getByLabel("Reply").fill(key);
-    await handset.getByRole("button", { name: "Send" }).click();
+    await send.click();
   }
-  await expect(handset.getByRole("button", { name: /^Dial/ })).toBeEnabled();
-  return (await handset.getByRole("status").textContent()) ?? "";
+  await expect(again).toBeEnabled();
+  return (await screen.textContent()) ?? "";
 }
 
 /**

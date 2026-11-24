@@ -163,6 +163,7 @@ public final class UssdHandsetSimulator implements AutoCloseable {
             $('send').disabled = true; $('hangup').disabled = true; $('dial').disabled = false; }
           async function ask() {
             $('screen').textContent = 'Please wait...';
+            $('dial').disabled = true; $('send').disabled = true; $('reply').disabled = true;
             const r = await fetch('/dial', { method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ sessionId: session, phone: $('phone').value, text: inputs.join('*') }) });
             const answer = (await r.json()).response || 'END (simulator) no answer';
