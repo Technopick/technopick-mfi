@@ -5,6 +5,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.common.NotFoundException;
+import ke.co.technopick.mfi.core.common.TooManyRequestsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -33,6 +34,13 @@ public class ProblemHandler {
     @ExceptionHandler(ConflictException.class)
     ProblemDetail conflict(ConflictException e) {
         return problem(HttpStatus.CONFLICT, "conflict", e.getMessage());
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    org.springframework.http.ResponseEntity<ProblemDetail> tooMany(TooManyRequestsException e) {
+        return org.springframework.http.ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(org.springframework.http.HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()))
+            .body(problem(HttpStatus.TOO_MANY_REQUESTS, "too-many-requests", e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

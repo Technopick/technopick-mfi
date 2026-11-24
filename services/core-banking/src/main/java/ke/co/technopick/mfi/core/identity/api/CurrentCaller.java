@@ -15,9 +15,29 @@ import org.springframework.stereotype.Component;
 public class CurrentCaller {
 
     private final String tenantClaim;
+    private final String memberClaim;
 
-    public CurrentCaller(@Value("${mfi.security.tenant-claim}") String tenantClaim) {
+    public CurrentCaller(@Value("${mfi.security.tenant-claim}") String tenantClaim,
+                         @Value("${mfi.security.member-claim:customer_number}") String memberClaim) {
         this.tenantClaim = tenantClaim;
+        this.memberClaim = memberClaim;
+    }
+
+    /** True for a member's own token (role MEMBER). */
+    public boolean isMember() {
+        return SecurityConfig.isMember(token());
+    }
+
+    /** The customer number a member's token was issued for; refused for any other caller. */
+    public String memberCustomerNumber() {
+        if (!isMember()) {
+            throw new AccessDeniedException("not a member token");
+        }
+        String value = token().getToken().getClaimAsString(memberClaim);
+        if (value == null || !value.matches("^CU[0-9]{2}-[0-9]{7}$")) {
+            throw new AccessDeniedException("member token carries no valid customer number");
+        }
+        return value;
     }
 
     public UUID tenantId() {
@@ -32,11 +52,14 @@ public class CurrentCaller {
         }
     }
 
-    /** Stable principal for audit columns, e.g. "user:3f2c..." or "client:switch". */
+    /** Stable principal for audit columns, e.g. "user:3f2c...", "member:9a1b..." or "client:switch". */
     public String actor() {
         JwtAuthenticationToken t = token();
         String clientId = t.getToken().getClaimAsString("azp");
         String subject = t.getToken().getSubject();
+        if (subject != null && SecurityConfig.isMember(t)) {
+            return "member:" + subject;
+        }
         return subject != null ? "user:" + subject : "client:" + clientId;
     }
 

@@ -104,4 +104,31 @@ class ArchitectureRulesTest {
             }
         }
     }
+
+    /**
+     * Every endpoint states who may call it (ADR-0033): a role check on the method or on its controller.
+     * With member tokens in the system, an endpoint left at "any authenticated caller" is not acceptable.
+     */
+    @Test
+    void everyEndpointHasARoleCheck() {
+        com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods()
+                .that().areAnnotatedWith(org.springframework.web.bind.annotation.GetMapping.class)
+                .or().areAnnotatedWith(org.springframework.web.bind.annotation.PostMapping.class)
+                .or().areAnnotatedWith(org.springframework.web.bind.annotation.PutMapping.class)
+                .or().areAnnotatedWith(org.springframework.web.bind.annotation.DeleteMapping.class)
+                .or().areAnnotatedWith(org.springframework.web.bind.annotation.PatchMapping.class)
+                .or().areAnnotatedWith(org.springframework.web.bind.annotation.RequestMapping.class)
+                .should(new com.tngtech.archunit.lang.ArchCondition<com.tngtech.archunit.core.domain.JavaMethod>("have @PreAuthorize on the method or its class") {
+                    @Override
+                    public void check(com.tngtech.archunit.core.domain.JavaMethod method, com.tngtech.archunit.lang.ConditionEvents events) {
+                        Class<org.springframework.security.access.prepost.PreAuthorize> pre =
+                                org.springframework.security.access.prepost.PreAuthorize.class;
+                        if (!method.isAnnotatedWith(pre) && !method.getOwner().isAnnotatedWith(pre)) {
+                            events.add(com.tngtech.archunit.lang.SimpleConditionEvent.violated(method,
+                                    method.getFullName() + " has no @PreAuthorize"));
+                        }
+                    }
+                })
+                .check(CORE);
+    }
 }

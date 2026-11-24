@@ -94,6 +94,16 @@ public class MpesaStkService {
     @Transactional
     public Created request(UUID tenantId, String idempotencyKey, String shortCode, String phone, Money amount,
                            String targetReference, String actor) {
+        return request(tenantId, idempotencyKey, shortCode, phone, amount, targetReference, actor, null);
+    }
+
+    /**
+     * @param memberCustomerId the member who asked, for prompts a member starts (ADR-0033); the database then
+     *                         requires the member's own phone and own account or loan. Null for staff requests.
+     */
+    @Transactional
+    public Created request(UUID tenantId, String idempotencyKey, String shortCode, String phone, Money amount,
+                           String targetReference, String actor, UUID memberCustomerId) {
         session.bind(tenantId);
         String msisdn = normaliseMsisdn(phone);
         String target = targetReference.strip().toUpperCase(Locale.ROOT);
@@ -120,13 +130,13 @@ public class MpesaStkService {
         UUID id = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO payments.stk_request (tenant_id, request_id, idempotency_key, short_code, target_reference,
-                    amount, currency, msisdn, msisdn_masked, description, requested_by)
-                VALUES (:tenant, :id, :key, :code, :target, :amount, :ccy, :msisdn, :masked, :desc, :actor)
+                    amount, currency, msisdn, msisdn_masked, description, requested_by, member_customer_id)
+                VALUES (:tenant, :id, :key, :code, :target, :amount, :ccy, :msisdn, :masked, :desc, :actor, :member)
                 """)
             .param("tenant", tenantId).param("id", id).param("key", idempotencyKey).param("code", code)
             .param("target", target).param("amount", amount.amount()).param("ccy", amount.currency().getCurrencyCode())
             .param("msisdn", msisdn).param("masked", mask(msisdn)).param("desc", loan ? "Loan payment" : "Deposit")
-            .param("actor", actor)
+            .param("actor", actor).param("member", memberCustomerId)
             .update();
         // Carries no personal data: the integration runtime fetches the phone number on dispatch.
         outbox.record(tenantId, "MpesaStkPushRequested", "stk_request", id.toString(),

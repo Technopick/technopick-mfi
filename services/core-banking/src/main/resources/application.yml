@@ -51,6 +51,7 @@ mfi:
   security:
     # JWT claim carrying the caller's tenant for staff and customer tokens.
     tenant-claim: tenant_id
+    member-claim: customer_number
     roles-claim: roles
 
 # OpenAPI document: off unless explicitly enabled; when on, only PLATFORM_ADMIN may read it.
