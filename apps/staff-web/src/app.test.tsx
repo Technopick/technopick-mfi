@@ -762,6 +762,75 @@ describe("screens", () => {
     expect((put.body as { rows: { productCode: string; stage2Pct: string }[] }).rows[0]).toMatchObject({ productCode: "BIASHARA", stage2Pct: "12.5" });
   });
 
+  it("lets finance upload an M-Pesa statement and resolve exceptions, and a supervisor sign the day off", async () => {
+    const B = "/api/v1/payments/mpesa/statements";
+    const upload = (by: string, status = "OPEN", exceptions = 2) => ({ uploadId: "u-1", accountKind: "PAYBILL", shortCode: "600993",
+      clearingAccount: "1120-MPESA-C2B-CLEARING", statementDate: "2026-11-28", fileName: "paybill.csv", lineCount: 4,
+      openingBalance: "0.00", closingBalance: "1517.00", totalPaidIn: "1550.00", totalWithdrawn: "33.00", balanceChainOk: true,
+      status, matched: 1, exceptions, resolved: 2 - exceptions, ignored: 0, uploadedBy: by, uploadedAt: "2026-11-29T08:00:00Z" });
+    const check = { live: true, ledgerBalance: "1667.00", difference: "-150.00", ledgerOnlyCount: 1, ledgerOnlyAmount: "200.00",
+      ledgerOnly: [{ entryId: "e-3", businessDate: "2026-11-28", source: "MPESA", reference: "QAR0000003", amount: "200.00" }] };
+    const charge = (n: number, amount: string) => ({ lineNo: n, receiptNo: `QAR000000${n}`, completedAt: "2026-11-28T09:00:00+03:00",
+      details: "Pay Bill Charge", transactionStatus: "Completed", paidIn: "0.00", withdrawn: amount, category: "CHARGE",
+      status: "EXCEPTION", exceptionCode: "NOT_IN_LEDGER" });
+    let open = [charge(2, "15.00"), charge(4, "18.00")];
+    const { api, calls } = fakeApi({
+      [`GET ${B}/accounts`]: () => [{ accountKind: "PAYBILL", shortCode: "600993", clearingAccount: "1120-MPESA-C2B-CLEARING", branchCode: "NBO01" }],
+      [`GET ${B}`]: () => [],
+      [`POST ${B}`]: () => ({ upload: upload("user:fin-1"), check }),
+      [`GET ${B}/u-1`]: () => ({ upload: upload("user:fin-1"), check }),
+      [`GET ${B}/u-1/lines?status=EXCEPTION`]: () => open,
+      [`POST ${B}/u-1/link`]: () => {
+        open = [];
+        return { upload: upload("user:fin-1", "OPEN", 0), check };
+      },
+    });
+    renderAt("/mpesa-statements", session("fin-1", "FINANCE"), api);
+    await screen.findByRole("option", { name: /Paybill 600993/ });
+    fireEvent.change(screen.getByLabelText("Statement date"), { target: { value: "2026-11-28" } });
+    const csv = "Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance\n";
+    await userEvent.upload(screen.getByLabelText("Statement file (CSV)"), new File([csv], "paybill.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByRole("button", { name: "Upload and match" }));
+    expect(await screen.findByText("Paybill 600993 — 2026-11-28")).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ accountKind: "PAYBILL", shortCode: "600993",
+      statementDate: "2026-11-28", fileName: "paybill.csv", csv });
+    expect(screen.getByText("-150.00")).toBeTruthy();
+    expect(screen.getByText("QAR0000003")).toBeTruthy();
+    expect(screen.getByText(/You uploaded this statement/)).toBeTruthy();
+    await userEvent.click(await screen.findByLabelText("Select line 2"));
+    await userEvent.click(screen.getByLabelText("Select line 4"));
+    expect(screen.getByText(/2 selected, net -33.00/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Note (at least 10 characters)"), "Charges booked by journal");
+    await userEvent.type(screen.getByLabelText("Journal entry id (to link)"), "e-4");
+    await userEvent.click(screen.getByRole("button", { name: "Link to entry" }));
+    expect(await screen.findByText("No open exceptions.")).toBeTruthy();
+    expect(calls.find((c) => c.path === `${B}/u-1/link`)?.body).toEqual({ lineNos: [2, 4], journalEntryId: "e-4",
+      note: "Charges booked by journal" });
+
+    let attempts = 0;
+    const sup = fakeApi({
+      [`GET ${B}`]: () => [upload("user:fin-1", "OPEN", 0)],
+      [`GET ${B}/u-1`]: () => ({ upload: upload("user:fin-1", "OPEN", 0), check }),
+      [`GET ${B}/u-1/lines?status=EXCEPTION`]: () => [],
+      [`POST ${B}/u-1/sign-off`]: () => {
+        if (attempts++ === 0) throw new ApiError({ status: 422, title: "Unprocessable Content", detail: "rejected by a ledger rule",
+          code: "RECON_NOTE_REQUIRED" });
+        return { upload: { ...upload("user:fin-1", "SIGNED_OFF", 0), signedOffBy: "user:sup-1", note: "QAR0000003 on next statement" },
+          check: { ...check, live: false } };
+      },
+    });
+    cleanup();
+    renderAt("/mpesa-statements?id=u-1", session("sup-1", "SUPERVISOR"), sup.api);
+    await userEvent.click(await screen.findByRole("button", { name: "Sign off 2026-11-28" }));
+    expect(await screen.findByText(/Add a note explaining them/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Upload and match" })).toBeNull();
+    await userEvent.type(screen.getByLabelText(/Sign-off note/), "QAR0000003 on next statement");
+    await userEvent.click(screen.getByRole("button", { name: "Sign off 2026-11-28" }));
+    expect(await screen.findByText(/signed off by user:sup-1/)).toBeTruthy();
+    expect(sup.calls.filter((c) => c.method === "POST").map((c) => c.body)).toEqual([{ note: undefined },
+      { note: "QAR0000003 on next statement" }]);
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -845,7 +914,8 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns", "Provisioning"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns", "M-Pesa statements",
+      "Provisioning"]);
   });
 
   it("flags control accounts that do not match their records", async () => {

@@ -4358,6 +4358,107 @@
         ],
         "type": "object"
       },
+      "StatementAccount": {
+        "properties": {
+          "accountKind": {
+            "type": "string"
+          },
+          "branchCode": {
+            "type": "string"
+          },
+          "clearingAccount": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StatementCheck": {
+        "properties": {
+          "difference": {
+            "type": "string"
+          },
+          "ledgerBalance": {
+            "type": "string"
+          },
+          "ledgerOnly": {
+            "items": {
+              "$ref": "#/components/schemas/StatementLedgerItem"
+            },
+            "type": "array"
+          },
+          "ledgerOnlyAmount": {
+            "type": "string"
+          },
+          "ledgerOnlyCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "live": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "StatementDetail": {
+        "properties": {
+          "check": {
+            "$ref": "#/components/schemas/StatementCheck"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/StatementUploadView"
+          }
+        },
+        "type": "object"
+      },
+      "StatementExplainRequest": {
+        "properties": {
+          "lineNos": {
+            "items": {
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 0,
+            "type": "array"
+          },
+          "note": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineNos",
+          "note"
+        ],
+        "type": "object"
+      },
+      "StatementLedgerItem": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "StatementLine": {
         "properties": {
           "balance": {
@@ -4385,6 +4486,282 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "StatementLineView": {
+        "properties": {
+          "accountRef": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "exceptionCode": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lineNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "matchedReference": {
+            "type": "string"
+          },
+          "otherParty": {
+            "type": "string"
+          },
+          "paidIn": {
+            "type": "string"
+          },
+          "paymentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reasonType": {
+            "type": "string"
+          },
+          "receiptNo": {
+            "type": "string"
+          },
+          "resolution": {
+            "type": "string"
+          },
+          "resolutionNote": {
+            "type": "string"
+          },
+          "resolvedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "transactionStatus": {
+            "type": "string"
+          },
+          "withdrawn": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StatementLinkRequest": {
+        "properties": {
+          "journalEntryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lineNos": {
+            "items": {
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 0,
+            "type": "array"
+          },
+          "note": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journalEntryId",
+          "lineNos",
+          "note"
+        ],
+        "type": "object"
+      },
+      "StatementRematch": {
+        "properties": {
+          "matched": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stillOpen": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StatementSignOffRequest": {
+        "properties": {
+          "note": {
+            "maxLength": 500,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StatementUploadRequest": {
+        "properties": {
+          "accountKind": {
+            "enum": [
+              "PAYBILL",
+              "B2C"
+            ],
+            "type": "string"
+          },
+          "csv": {
+            "maxLength": 8000000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "fileName": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "shortCode": {
+            "minLength": 1,
+            "pattern": "^[0-9]{5,10}$",
+            "type": "string"
+          },
+          "statementDate": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountKind",
+          "csv",
+          "fileName",
+          "shortCode",
+          "statementDate"
+        ],
+        "type": "object"
+      },
+      "StatementUploadView": {
+        "properties": {
+          "accountKind": {
+            "type": "string"
+          },
+          "balanceChainOk": {
+            "type": "boolean"
+          },
+          "clearingAccount": {
+            "type": "string"
+          },
+          "closingBalance": {
+            "type": "string"
+          },
+          "difference": {
+            "type": "string"
+          },
+          "exceptions": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "ignored": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ledgerBalance": {
+            "type": "string"
+          },
+          "ledgerOnlyAmount": {
+            "type": "string"
+          },
+          "ledgerOnlyCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lineCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "matched": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          },
+          "openingBalance": {
+            "type": "string"
+          },
+          "resolved": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "signedOffAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "signedOffBy": {
+            "type": "string"
+          },
+          "statementDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "totalPaidIn": {
+            "type": "string"
+          },
+          "totalWithdrawn": {
+            "type": "string"
+          },
+          "uploadId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uploadedBy": {
+            "type": "string"
+          },
+          "withdrawnAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "withdrawnBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StatementWithdrawRequest": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
         "type": "object"
       },
       "StepTimings": {
@@ -7984,6 +8361,371 @@
         },
         "tags": [
           "mpesa-resolution-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements": {
+      "get": {
+        "operationId": "MpesaStatement_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "pattern": "OPEN|SIGNED_OFF|WITHDRAWN",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatementUploadView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      },
+      "post": {
+        "operationId": "MpesaStatement_upload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/accounts": {
+      "get": {
+        "operationId": "MpesaStatement_accounts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatementAccount"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}": {
+      "get": {
+        "operationId": "MpesaStatement_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}/explain": {
+      "post": {
+        "operationId": "MpesaStatement_explain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}/lines": {
+      "get": {
+        "operationId": "MpesaStatement_lines",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "pattern": "MATCHED|EXCEPTION|RESOLVED|IGNORED",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "format": "int32",
+              "maximum": 5000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatementLineView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}/link": {
+      "post": {
+        "operationId": "MpesaStatement_link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}/rematch": {
+      "post": {
+        "operationId": "MpesaStatement_rematch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementRematch"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}/sign-off": {
+      "post": {
+        "operationId": "MpesaStatement_signOff",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementSignOffRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/statements/{uploadId}/withdraw": {
+      "post": {
+        "operationId": "MpesaStatement_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementWithdrawRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mpesa-statement-controller"
         ]
       }
     },

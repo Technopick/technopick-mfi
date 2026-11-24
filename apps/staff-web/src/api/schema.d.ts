@@ -1284,6 +1284,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payments/mpesa/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MpesaStatement_list"];
+        put?: never;
+        post: operations["MpesaStatement_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MpesaStatement_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MpesaStatement_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MpesaStatement_explain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MpesaStatement_lines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MpesaStatement_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}/rematch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MpesaStatement_rematch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}/sign-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MpesaStatement_signOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/statements/{uploadId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MpesaStatement_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/mpesa/stk-requests": {
         parameters: {
             query?: never;
@@ -3455,6 +3599,38 @@ export interface components {
             /** Format: uuid */
             tenantId: string;
         };
+        StatementAccount: {
+            accountKind?: string;
+            branchCode?: string;
+            clearingAccount?: string;
+            shortCode?: string;
+        };
+        StatementCheck: {
+            difference?: string;
+            ledgerBalance?: string;
+            ledgerOnly?: components["schemas"]["StatementLedgerItem"][];
+            ledgerOnlyAmount?: string;
+            /** Format: int32 */
+            ledgerOnlyCount?: number;
+            live?: boolean;
+        };
+        StatementDetail: {
+            check?: components["schemas"]["StatementCheck"];
+            upload?: components["schemas"]["StatementUploadView"];
+        };
+        StatementExplainRequest: {
+            lineNos: number[];
+            note: string;
+        };
+        StatementLedgerItem: {
+            amount?: string;
+            /** Format: date */
+            businessDate?: string;
+            /** Format: uuid */
+            entryId?: string;
+            reference?: string;
+            source?: string;
+        };
         StatementLine: {
             balance?: string;
             credit?: string;
@@ -3466,6 +3642,102 @@ export interface components {
             entryId?: string;
             /** Format: date-time */
             postedAt?: string;
+        };
+        StatementLineView: {
+            accountRef?: string;
+            balance?: string;
+            category?: string;
+            /** Format: date-time */
+            completedAt?: string;
+            details?: string;
+            /** Format: uuid */
+            disbursementId?: string;
+            exceptionCode?: string;
+            /** Format: uuid */
+            journalEntryId?: string;
+            /** Format: int32 */
+            lineNo?: number;
+            matchedReference?: string;
+            otherParty?: string;
+            paidIn?: string;
+            /** Format: uuid */
+            paymentId?: string;
+            reasonType?: string;
+            receiptNo?: string;
+            resolution?: string;
+            resolutionNote?: string;
+            resolvedBy?: string;
+            status?: string;
+            transactionStatus?: string;
+            withdrawn?: string;
+        };
+        StatementLinkRequest: {
+            /** Format: uuid */
+            journalEntryId: string;
+            lineNos: number[];
+            note: string;
+        };
+        StatementRematch: {
+            /** Format: int32 */
+            matched?: number;
+            /** Format: int32 */
+            stillOpen?: number;
+        };
+        StatementSignOffRequest: {
+            note?: string;
+        };
+        StatementUploadRequest: {
+            /** @enum {string} */
+            accountKind: "PAYBILL" | "B2C";
+            csv: string;
+            fileName: string;
+            shortCode: string;
+            /** Format: date */
+            statementDate: string;
+        };
+        StatementUploadView: {
+            accountKind?: string;
+            balanceChainOk?: boolean;
+            clearingAccount?: string;
+            closingBalance?: string;
+            difference?: string;
+            /** Format: int32 */
+            exceptions?: number;
+            fileName?: string;
+            /** Format: int32 */
+            ignored?: number;
+            ledgerBalance?: string;
+            ledgerOnlyAmount?: string;
+            /** Format: int32 */
+            ledgerOnlyCount?: number;
+            /** Format: int32 */
+            lineCount?: number;
+            /** Format: int32 */
+            matched?: number;
+            note?: string;
+            openingBalance?: string;
+            /** Format: int32 */
+            resolved?: number;
+            shortCode?: string;
+            /** Format: date-time */
+            signedOffAt?: string;
+            signedOffBy?: string;
+            /** Format: date */
+            statementDate?: string;
+            status?: string;
+            totalPaidIn?: string;
+            totalWithdrawn?: string;
+            /** Format: uuid */
+            uploadId?: string;
+            /** Format: date-time */
+            uploadedAt?: string;
+            uploadedBy?: string;
+            /** Format: date-time */
+            withdrawnAt?: string;
+            withdrawnBy?: string;
+        };
+        StatementWithdrawRequest: {
+            reason: string;
         };
         StepTimings: {
             /** Format: int64 */
@@ -5759,6 +6031,245 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MpesaResolutionView"];
+                };
+            };
+        };
+    };
+    MpesaStatement_list: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementUploadView"][];
+                };
+            };
+        };
+    };
+    MpesaStatement_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetail"];
+                };
+            };
+        };
+    };
+    MpesaStatement_accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementAccount"][];
+                };
+            };
+        };
+    };
+    MpesaStatement_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetail"];
+                };
+            };
+        };
+    };
+    MpesaStatement_explain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetail"];
+                };
+            };
+        };
+    };
+    MpesaStatement_lines: {
+        parameters: {
+            query?: {
+                status?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementLineView"][];
+                };
+            };
+        };
+    };
+    MpesaStatement_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetail"];
+                };
+            };
+        };
+    };
+    MpesaStatement_rematch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementRematch"];
+                };
+            };
+        };
+    };
+    MpesaStatement_signOff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StatementSignOffRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetail"];
+                };
+            };
+        };
+    };
+    MpesaStatement_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementWithdrawRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetail"];
                 };
             };
         };
