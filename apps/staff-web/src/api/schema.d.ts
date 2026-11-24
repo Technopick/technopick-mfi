@@ -644,6 +644,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lending/loans/{loanNumber}/reschedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanReschedule_forLoan"];
+        put?: never;
+        post: operations["LoanReschedule_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/loans/{loanNumber}/reschedules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanReschedule_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/loans/{loanNumber}/schedule": {
         parameters: {
             query?: never;
@@ -686,6 +718,54 @@ export interface paths {
         get: operations["LoanWriteOff_ofLoan"];
         put?: never;
         post: operations["LoanWriteOff_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/reschedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanReschedule_pending"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/reschedules/{rescheduleId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanReschedule_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/reschedules/{rescheduleId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanReschedule_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2402,6 +2482,8 @@ export interface components {
             allowanceAccount?: string;
             expenseAccount?: string;
             /** Format: int32 */
+            restructureProbationMonths?: number;
+            /** Format: int32 */
             stage2Dpd?: number;
             /** Format: int32 */
             stage3Dpd?: number;
@@ -2410,6 +2492,8 @@ export interface components {
             allowanceAccount?: string;
             configured?: boolean;
             expenseAccount?: string;
+            /** Format: int32 */
+            restructureProbationMonths?: number;
             /** Format: int32 */
             stage2Dpd?: number;
             /** Format: int32 */
@@ -2646,6 +2730,7 @@ export interface components {
             daysPastDue?: number;
             loanNumber?: string;
             outstandingPrincipal?: string;
+            restructured?: boolean;
         };
         LoanQuote: {
             annualRate?: string;
@@ -2665,6 +2750,7 @@ export interface components {
         LoanScheduleView: {
             installments?: components["schemas"]["QuoteInstallment"][];
             loanNumber?: string;
+            restructured?: boolean;
             /** Format: int32 */
             scheduleVersion?: number;
             status?: string;
@@ -2993,6 +3079,78 @@ export interface components {
         RegulatoryMappingRequest: {
             changes?: components["schemas"]["MappingChange"][];
         };
+        RescheduleDecision: {
+            reason?: string;
+        };
+        ReschedulePreview: {
+            /** Format: date */
+            businessDate?: string;
+            credit?: string;
+            current?: components["schemas"]["ScheduleRow"][];
+            /** Format: int32 */
+            firstChanged?: number;
+            /** Format: date */
+            firstDue?: string;
+            instalmentAmount?: string;
+            /** Format: int32 */
+            instalments?: number;
+            interestAfter?: string;
+            interestBefore?: string;
+            kind?: string;
+            loanNumber?: string;
+            outstandingPrincipal?: string;
+            proposed?: components["schemas"]["ScheduleRow"][];
+            stillDueNow?: string;
+        };
+        RescheduleRequest: {
+            amount?: string;
+            /** Format: int32 */
+            graceMonths?: number;
+            idempotencyKey: string;
+            /** Format: int32 */
+            instalments?: number;
+            kind: string;
+            mode?: string;
+            reason: string;
+        };
+        RescheduleTerms: {
+            amount?: string;
+            /** Format: int32 */
+            graceMonths?: number;
+            /** Format: int32 */
+            instalments?: number;
+            kind?: string;
+            mode?: string;
+        };
+        RescheduleView: {
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: int32 */
+            fromVersion?: number;
+            /** Format: int32 */
+            graceMonths?: number;
+            /** Format: int32 */
+            instalments?: number;
+            kind?: string;
+            loanNumber?: string;
+            outstanding?: string;
+            prepayment?: string;
+            prepaymentMode?: string;
+            reason?: string;
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            /** Format: uuid */
+            rescheduleId?: string;
+            status?: string;
+            /** Format: int32 */
+            toVersion?: number;
+        };
         ResolutionCreated: {
             /** Format: uuid */
             resolutionId?: string;
@@ -3087,6 +3245,15 @@ export interface components {
             to?: string;
             totalCredits?: string;
             totalDebits?: string;
+        };
+        ScheduleRow: {
+            /** Format: date */
+            dueDate?: string;
+            interest?: string;
+            /** Format: int32 */
+            no?: number;
+            principal?: string;
+            total?: string;
         };
         SendFailure: {
             code: string;
@@ -4509,6 +4676,80 @@ export interface operations {
             };
         };
     };
+    LoanReschedule_forLoan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleView"][];
+                };
+            };
+        };
+    };
+    LoanReschedule_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleView"];
+                };
+            };
+        };
+    };
+    LoanReschedule_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleTerms"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReschedulePreview"];
+                };
+            };
+        };
+    };
     LoanOrigination_schedule: {
         parameters: {
             query?: never;
@@ -4623,6 +4864,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    LoanReschedule_pending: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleView"][];
+                };
+            };
+        };
+    };
+    LoanReschedule_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rescheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RescheduleDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleView"];
+                };
+            };
+        };
+    };
+    LoanReschedule_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rescheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleView"];
                 };
             };
         };

@@ -54,7 +54,8 @@ export function PortfolioPage() {
                   <tbody>
                     {r.loansInArrears.map((l) => (
                       <tr key={l.loanNumber}>
-                        <td>{l.loanNumber}</td><td>{l.customerNumber ?? "-"}</td><td>{l.branchCode}</td>
+                        <td>{l.loanNumber}{l.restructured && <div className="muted small">Restructured</div>}</td>
+                        <td>{l.customerNumber ?? "-"}</td><td>{l.branchCode}</td>
                         <td className="num">{l.daysPastDue}</td><td>{l.bucket}</td><td><Status value={l.classification} /></td>
                         <td className="num"><Money amount={l.arrearsAmount} /></td>
                         <td className="num"><Money amount={l.outstandingPrincipal} /></td>

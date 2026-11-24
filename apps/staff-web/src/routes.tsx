@@ -16,6 +16,7 @@ import { CreditRefundsPage } from "./pages/SettlementPages";
 import { PinRequestsPage } from "./pages/MemberPinPages";
 import { SmsPage } from "./pages/SmsPages";
 import { ProvisioningPage } from "./pages/ProvisioningPage";
+import { ReschedulesPage } from "./pages/ReschedulePages";
 import { StatementsPage } from "./pages/StatementsPage";
 import { WriteOffsPage } from "./pages/WriteOffsPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
@@ -56,6 +57,7 @@ export const routes: RouteObject[] = [
       { path: "pin-requests", element: <PinRequestsPage /> },
       { path: "sms", element: <SmsPage /> },
       { path: "provisioning", element: <ProvisioningPage /> },
+      { path: "reschedules", element: <ReschedulesPage /> },
       { path: "loans", element: <LoanSchedulePage /> },
       { path: "loans/:number", element: <LoanSchedulePage /> },
       { path: "*", element: <p className="empty">Page not found.</p> },

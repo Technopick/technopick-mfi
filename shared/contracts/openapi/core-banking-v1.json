@@ -1564,6 +1564,10 @@
           "expenseAccount": {
             "type": "string"
           },
+          "restructureProbationMonths": {
+            "format": "int32",
+            "type": "integer"
+          },
           "stage2Dpd": {
             "format": "int32",
             "type": "integer"
@@ -1585,6 +1589,10 @@
           },
           "expenseAccount": {
             "type": "string"
+          },
+          "restructureProbationMonths": {
+            "format": "int32",
+            "type": "integer"
           },
           "stage2Dpd": {
             "format": "int32",
@@ -2239,6 +2247,9 @@
           },
           "outstandingPrincipal": {
             "type": "string"
+          },
+          "restructured": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -2296,6 +2307,9 @@
           },
           "loanNumber": {
             "type": "string"
+          },
+          "restructured": {
+            "type": "boolean"
           },
           "scheduleVersion": {
             "format": "int32",
@@ -3239,6 +3253,199 @@
         },
         "type": "object"
       },
+      "RescheduleDecision": {
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReschedulePreview": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "current": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRow"
+            },
+            "type": "array"
+          },
+          "firstChanged": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "firstDue": {
+            "format": "date",
+            "type": "string"
+          },
+          "instalmentAmount": {
+            "type": "string"
+          },
+          "instalments": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "interestAfter": {
+            "type": "string"
+          },
+          "interestBefore": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "outstandingPrincipal": {
+            "type": "string"
+          },
+          "proposed": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRow"
+            },
+            "type": "array"
+          },
+          "stillDueNow": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RescheduleRequest": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "graceMonths": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "idempotencyKey": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "instalments": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "kind": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "kind",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RescheduleTerms": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "graceMonths": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "instalments": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RescheduleView": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "fromVersion": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "graceMonths": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "instalments": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "outstanding": {
+            "type": "string"
+          },
+          "prepayment": {
+            "type": "string"
+          },
+          "prepaymentMode": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "rescheduleId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "toVersion": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ResolutionCreated": {
         "properties": {
           "resolutionId": {
@@ -3539,6 +3746,28 @@
             "type": "string"
           },
           "totalDebits": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleRow": {
+        "properties": {
+          "dueDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "interest": {
+            "type": "string"
+          },
+          "no": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "total": {
             "type": "string"
           }
         },
@@ -6212,6 +6441,117 @@
         ]
       }
     },
+    "/api/v1/lending/loans/{loanNumber}/reschedules": {
+      "get": {
+        "operationId": "LoanReschedule_forLoan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RescheduleView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-reschedule-controller"
+        ]
+      },
+      "post": {
+        "operationId": "LoanReschedule_request",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-reschedule-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/loans/{loanNumber}/reschedules/preview": {
+      "post": {
+        "operationId": "LoanReschedule_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleTerms"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReschedulePreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-reschedule-controller"
+        ]
+      }
+    },
     "/api/v1/lending/loans/{loanNumber}/schedule": {
       "get": {
         "operationId": "LoanOrigination_schedule",
@@ -6383,6 +6723,110 @@
         },
         "tags": [
           "loan-write-off-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/reschedules": {
+      "get": {
+        "operationId": "LoanReschedule_pending",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RescheduleView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-reschedule-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/reschedules/{rescheduleId}/approve": {
+      "post": {
+        "operationId": "LoanReschedule_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rescheduleId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-reschedule-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/reschedules/{rescheduleId}/reject": {
+      "post": {
+        "operationId": "LoanReschedule_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rescheduleId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-reschedule-controller"
         ]
       }
     },

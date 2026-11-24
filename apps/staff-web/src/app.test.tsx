@@ -511,6 +511,69 @@ describe("screens", () => {
     expect(screen.queryByRole("button", { name: "Settle loan now" })).toBeNull();
   });
 
+  it("lets a loan officer preview and request a restructure", async () => {
+    const preview = { loanNumber: "LN26-0000009", kind: "RESTRUCTURE", businessDate: "2026-11-28", outstandingPrincipal: "12000.00",
+      stillDueNow: "690.00", credit: "0.00", instalments: 13, instalmentAmount: "1205.55", firstDue: "2026-12-01",
+      interestBefore: "2340.00", interestAfter: "2766.60", firstChanged: 3, current: [],
+      proposed: [{ no: 3, dueDate: "2026-12-01", principal: "0.00", interest: "300.00", total: "300.00" },
+        { no: 4, dueDate: "2027-01-01", principal: "845.55", interest: "360.00", total: "1205.55" }] };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000009/schedule": () => ({ loanNumber: "LN26-0000009", status: "ACTIVE", scheduleVersion: 1,
+        restructured: false, installments: [] }),
+      "GET /api/v1/lending/loans/LN26-0000009/settlement": () => ({ loanNumber: "LN26-0000009", status: "ACTIVE", canSettle: false,
+        businessDate: "2026-11-28", currency: "KES", principal: "12000.00", interest: "0.00", penalty: "0.00", payoff: "12000.00",
+        interestWaived: "0.00", creditHeld: "0.00", stillToPay: "12000.00" }),
+      "GET /api/v1/lending/loans/LN26-0000009/reschedules": () => [],
+      "POST /api/v1/lending/loans/LN26-0000009/reschedules/preview": () => preview,
+      "POST /api/v1/lending/loans/LN26-0000009/reschedules": () => ({ rescheduleId: "rs-1", loanNumber: "LN26-0000009", kind: "RESTRUCTURE",
+        status: "REQUESTED", businessDate: "2026-11-28", instalments: 12, graceMonths: 1, requestedBy: "user:officer-1" }),
+    });
+    renderAt("/loans/LN26-0000009", session("officer-1", "LOAN_OFFICER"), api);
+    expect(await screen.findByRole("heading", { name: "Restructure or prepay" })).toBeTruthy();
+    await userEvent.clear(screen.getByLabelText("Instalments"));
+    await userEvent.type(screen.getByLabelText("Instalments"), "12");
+    await userEvent.clear(screen.getByLabelText("Interest-only months first"));
+    await userEvent.type(screen.getByLabelText("Interest-only months first"), "1");
+    await userEvent.click(screen.getByRole("button", { name: "Preview new schedule" }));
+    expect(await screen.findByText("Still due now (overdue interest and penalties)")).toBeTruthy();
+    expect(screen.getByText("690.00", { exact: false })).toBeTruthy();
+    expect(calls.find((c) => c.path.endsWith("/preview"))?.body).toEqual({ kind: "RESTRUCTURE", instalments: 12, graceMonths: 1 });
+    const ask = screen.getByRole("button", { name: "Request restructure" });
+    expect((ask as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText(/Why, and what the member agreed/), "Member's income fell; plan agreed");
+    await userEvent.click(ask);
+    expect(await screen.findByText(/must approve it today/)).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST" && c.path.endsWith("/reschedules"))?.body).toMatchObject({
+      kind: "RESTRUCTURE", instalments: 12, graceMonths: 1, reason: "Member's income fell; plan agreed", idempotencyKey: expect.any(String) });
+  });
+
+  it("lets a branch manager see the proposed schedule and approve another person's prepayment", async () => {
+    const pending = { rescheduleId: "rs-2", loanNumber: "LN26-0000010", kind: "PREPAYMENT", status: "REQUESTED", businessDate: "2026-11-28",
+      graceMonths: 0, prepayment: "3000.00", prepaymentMode: "SHORTEN_TERM", reason: "Member paid ahead and asked to finish sooner",
+      requestedBy: "user:officer-1" };
+    let approved = false;
+    const { api, calls } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000010/schedule": () => ({ loanNumber: "LN26-0000010", status: "ACTIVE",
+        scheduleVersion: approved ? 2 : 1, restructured: false, installments: [] }),
+      "GET /api/v1/lending/loans/LN26-0000010/settlement": () => ({ loanNumber: "LN26-0000010", status: "ACTIVE", canSettle: false,
+        businessDate: "2026-11-28", currency: "KES", principal: "12000.00", interest: "0.00", penalty: "0.00", payoff: "12000.00",
+        interestWaived: "0.00", creditHeld: "3000.00", stillToPay: "9000.00" }),
+      "GET /api/v1/lending/loans/LN26-0000010/reschedules": () => [approved ? { ...pending, status: "APPROVED", toVersion: 2 } : pending],
+      "POST /api/v1/lending/loans/LN26-0000010/reschedules/preview": () => ({ loanNumber: "LN26-0000010", kind: "PREPAYMENT",
+        outstandingPrincipal: "12000.00", stillDueNow: "0.00", credit: "3000.00", instalments: 8, instalmentAmount: "1284.05",
+        firstDue: "2026-12-01", interestBefore: "2340.00", interestAfter: "1350.00", firstChanged: 1, current: [],
+        proposed: [{ no: 1, dueDate: "2026-12-01", principal: "4000.00", interest: "360.00", total: "4360.00" }] }),
+      "POST /api/v1/lending/reschedules/rs-2/approve": () => { approved = true; return { ...pending, status: "APPROVED", toVersion: 2 }; },
+    });
+    renderAt("/loans/LN26-0000010", session("mgr-1", "BRANCH_MANAGER"), api);
+    expect(await screen.findByText(/Partial prepayment requested by user:officer-1/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Show proposed schedule" }));
+    expect(await screen.findByText(/4,360\.00/)).toBeTruthy();
+    expect(calls.find((c) => c.path.endsWith("/preview"))?.body).toEqual({ kind: "PREPAYMENT", amount: "3000.00", mode: "SHORTEN_TERM" });
+    await userEvent.click(screen.getByRole("button", { name: "Approve new schedule" }));
+    expect(await screen.findByText("New schedule approved (version 2).")).toBeTruthy();
+  });
+
   it("lets a supervisor approve a refund of loan credit, but not one they asked for", async () => {
     const refund = (id: string, by: string) => ({ refundId: id, loanNumber: "LN26-0000007", amount: "500.00", currency: "KES", method: "SAVINGS",
       accountNumber: "SA26-0000001", reason: "Member settled early and asked for the balance", status: "REQUESTED", requestedBy: by,

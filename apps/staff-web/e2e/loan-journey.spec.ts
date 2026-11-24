@@ -6,7 +6,9 @@ import { signIn, verifiedCustomer } from "./helpers";
  * session: officer registers the customer (with consent) -> manager verifies KYC -> officer
  * applies -> manager approves (loan + schedule) -> officer requests the
  * M-Pesa B2C disbursement -> supervisor approves and sends -> integration -> TEST-ONLY Daraja
- * simulator -> result callback -> core posts and activates the loan, which the manager sees ACTIVE.
+ * simulator -> result callback -> core posts and activates the loan, which the manager sees ACTIVE ->
+ * the officer requests a restructure (18 instalments after one interest-only month) and the manager,
+ * after looking at the proposed schedule, approves it.
  */
 test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser }) => {
   const officer = await signIn(browser, "officer");
@@ -53,4 +55,22 @@ test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser 
     await expect(manager.getByText("ACTIVE", { exact: true })).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 90_000, intervals: [2_000] });
   await expect(manager.locator("table tbody tr")).toHaveCount(12); // the 12-month schedule
+
+  // Restructure: the officer previews and requests; the manager reviews the proposal and approves.
+  await officer.goto(`/loans/${loanNumber}`);
+  await officer.getByLabel("Instalments").fill("18");
+  await officer.getByLabel("Interest-only months first").fill("1");
+  await officer.getByRole("button", { name: "Preview new schedule" }).click();
+  await expect(officer.getByText("Proposed schedule from the next instalment")).toBeVisible();
+  await officer.getByLabel(/Why, and what the member agreed/).fill("Shop closed for repairs; plan agreed with the member (e2e)");
+  await officer.getByRole("button", { name: "Request restructure" }).click();
+  await expect(officer.getByRole("status")).toContainText("must approve it today");
+  await expect(officer.getByRole("button", { name: "Approve new schedule" })).toHaveCount(0);
+
+  await manager.goto(`/loans/${loanNumber}`);
+  await manager.getByRole("button", { name: "Show proposed schedule" }).click();
+  await expect(manager.getByText("Proposed schedule from the next instalment")).toBeVisible();
+  await manager.getByRole("button", { name: "Approve new schedule" }).click();
+  await expect(manager.getByRole("status")).toContainText("New schedule approved (version 2).");
+  await expect(manager.getByText(/Schedule version 2 - this loan has been restructured/)).toBeVisible();
 });
