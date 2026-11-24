@@ -65,6 +65,12 @@ mfi:
     pin-setup-hours: 24
     # Aggregators end sessions after about three minutes; older session ids are refused.
     session-max-seconds: 180
+  # SMS to members (ADR-0035). Sending is switched on per tenant in the staff app (off by default).
+  sms:
+    # Sends per message before it is marked FAILED (back-off 1, 5, 15, 60 minutes between them).
+    max-attempts: 5
+    # A claim the sender never reported is queued again after this (the member may get it twice).
+    stale-claim: PT5M
 
 # OpenAPI document: off unless explicitly enabled; when on, only PLATFORM_ADMIN may read it.
 # The reviewed contract lives in shared/contracts/openapi/core-banking-v1.json.

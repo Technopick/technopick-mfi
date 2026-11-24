@@ -19,6 +19,7 @@ import ke.co.technopick.mfi.core.lending.application.LoanWriteOffService;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.tenancy.persistence.BusinessDates;
 import ke.co.technopick.mfi.core.tenancy.persistence.TenantSession;
+import ke.co.technopick.mfi.core.notification.application.NotificationService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,10 +66,13 @@ public class MpesaC2bService {
     private final Outbox outbox;
     private final LoanRepaymentService loans;
     private final LoanWriteOffService writeOffs;
+    private final NotificationService notifications;
 
     public MpesaC2bService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, JdbcJournal journal,
-                           Outbox outbox, LoanRepaymentService loans, LoanWriteOffService writeOffs) {
+                           Outbox outbox, LoanRepaymentService loans, LoanWriteOffService writeOffs,
+                           NotificationService notifications) {
         this.writeOffs = writeOffs;
+        this.notifications = notifications;
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
@@ -191,6 +195,12 @@ public class MpesaC2bService {
                                         .or(() -> loan.or(() -> recovery).map(l -> ",\"loanId\":\"" + l.loanId() + "\""))
                                         .orElse("")),
                 p.correlationId());
+        // The member's SMS is written in this transaction: it exists only if the payment does (ADR-0035).
+        if (outcome == Outcome.APPLIED) {
+            notifications.paymentReceived(account.get().accountId(), null, p.amount().amount(), p.transId(), businessDates.current());
+        } else if (outcome == Outcome.LOAN_REPAYMENT) {
+            notifications.paymentReceived(null, loan.get().loanId(), p.amount().amount(), p.transId(), businessDates.current());
+        }
         return new Applied(paymentId, outcome, entryId,
                 account.map(Account::accountNumber)
                         .or(() -> loan.or(() -> recovery).map(LoanRepaymentService.LoanRef::loanNumber)).orElse(null),

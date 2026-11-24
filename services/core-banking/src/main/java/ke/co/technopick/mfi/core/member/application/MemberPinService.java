@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import ke.co.technopick.mfi.core.common.ConflictException;
 import ke.co.technopick.mfi.core.common.NotFoundException;
+import ke.co.technopick.mfi.core.notification.application.NotificationService;
 import ke.co.technopick.mfi.core.tenancy.persistence.TenantSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -45,8 +46,9 @@ public class MemberPinService {
     private final TenantSession session;
     private final Duration setupWindow;
     private final int maxAttempts;
+    private final NotificationService notifications;
 
-    public MemberPinService(JdbcClient jdbc, TenantSession session,
+    public MemberPinService(JdbcClient jdbc, TenantSession session, NotificationService notifications,
                             @Value("${mfi.ussd.pin-setup-hours:24}") int setupHours,
                             @Value("${mfi.ussd.max-pin-attempts:3}") int maxAttempts) {
         if (setupHours < 1 || setupHours > 168) {
@@ -54,6 +56,7 @@ public class MemberPinService {
         }
         this.jdbc = jdbc;
         this.session = session;
+        this.notifications = notifications;
         this.setupWindow = Duration.ofHours(setupHours);
         this.maxAttempts = maxAttempts;
     }
@@ -164,6 +167,7 @@ public class MemberPinService {
                        SET status = 'SETUP_OPEN', setup_id = EXCLUDED.setup_id, setup_expires_at = EXCLUDED.setup_expires_at,
                            pin_hash = NULL, failed_attempts = 0, locked_at = NULL
                     """).param("c", s.customerId()).param("s", setupId).param("secs", setupWindow.toSeconds()).update();
+            notifications.pinSetupReady(s.customerId(), setupId, (int) setupWindow.toHours(), actor);
         }
         return view(setupId);
     }

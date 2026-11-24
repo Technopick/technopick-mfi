@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import ke.co.technopick.mfi.core.common.TooManyRequestsException;
+import ke.co.technopick.mfi.core.notification.application.NotificationService;
 import ke.co.technopick.mfi.core.member.application.MemberService.MemberLoan;
 import ke.co.technopick.mfi.core.member.application.MemberService.MemberOverview;
 import ke.co.technopick.mfi.core.member.application.MemberService.MemberPaymentRequest;
@@ -63,17 +64,20 @@ public class UssdService {
     private final TenantSession session;
     private final TransactionTemplate tx;
     private final MemberService members;
+    private final NotificationService notifications;
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(10);
     private final int maxAttempts;
     private final int sessionSeconds;
 
     public UssdService(JdbcClient jdbc, TenantSession session, PlatformTransactionManager transactions, MemberService members,
+                       NotificationService notifications,
                        @Value("${mfi.ussd.max-pin-attempts:3}") int maxAttempts,
                        @Value("${mfi.ussd.session-max-seconds:180}") int sessionSeconds) {
         this.jdbc = jdbc;
         this.session = session;
         this.tx = new TransactionTemplate(transactions);
         this.members = members;
+        this.notifications = notifications;
         this.maxAttempts = maxAttempts;
         this.sessionSeconds = sessionSeconds;
     }
@@ -214,6 +218,7 @@ public class UssdService {
                  WHERE customer_id = :c
                 """).param("h", bcrypt.encode(pin)).param("c", customerId).update();
         event(sessionId, customerId, "PIN_SET", null);
+        notifications.pinEvent(customerId, "PIN_SET", sessionId);
         return end("Your PIN is set. Dial again to use mobile banking. Never share your PIN.");
     }
 
@@ -224,6 +229,7 @@ public class UssdService {
                 .param("f", Math.min(now, 10)).param("c", customerId).update();
             event(sessionId, customerId, event, null);
             event(sessionId, customerId, "PIN_LOCKED", null);
+            notifications.pinEvent(customerId, "PIN_LOCKED", sessionId);
             return end(message + " Your PIN is now locked. " + VISIT);
         }
         jdbc.sql("UPDATE member.pin SET failed_attempts = :f WHERE customer_id = :c").param("f", now).param("c", customerId).update();
@@ -423,6 +429,7 @@ public class UssdService {
                 throw new IllegalStateException("PIN is no longer active");
             }
             event(r.sessionId(), c.customerId(), "PIN_CHANGED", null);
+            notifications.pinEvent(c.customerId(), "PIN_CHANGED", r.sessionId());
         });
         return reply("END Your PIN has been changed. Never share your PIN.");
     }

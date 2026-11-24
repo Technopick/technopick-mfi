@@ -18,6 +18,7 @@ import ke.co.technopick.mfi.core.savings.application.SavingsInterestService.Accr
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService.PostingResult;
 import ke.co.technopick.mfi.core.savings.domain.SavingsInterest;
 import ke.co.technopick.mfi.core.tenancy.persistence.TenantSession;
+import ke.co.technopick.mfi.core.notification.application.NotificationService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -75,10 +76,12 @@ public class EndOfDayService {
     private final Outbox outbox;
     private final TransactionTemplate tx;
     private final DataSource dataSource;
+    private final NotificationService notifications;
 
     public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, LoanEndOfDayStep loans,
                            ReconciliationService reconciliation, Outbox outbox, PlatformTransactionManager transactions,
-                           DataSource dataSource) {
+                           DataSource dataSource, NotificationService notifications) {
+        this.notifications = notifications;
         this.dataSource = dataSource;
         this.reconciliation = reconciliation;
         this.loans = loans;
@@ -256,6 +259,8 @@ public class EndOfDayService {
                 session.bind(tenantId);
                 int differences = (int) reconciliation.record(tenantId, date).stream()
                     .filter(r -> !r.reconciled()).count();
+                // Loan reminders for the next morning, in the closing transaction (ADR-0035).
+                notifications.loanReminders(date, actor);
                 int processedToday = jdbc.sql("SELECT count(*) FROM lending.arrears_snapshot WHERE as_of = :d")
                     .param("d", date).query(Integer.class).single();
                 jdbc.sql("UPDATE ledger.eod_run SET status = 'COMPLETED', loans_processed = :n WHERE business_date = :d")
