@@ -84,7 +84,7 @@ class MpesaStatementIntegrationTest {
     MockMvc mvc;
 
     /** Minimal JSON for flat maps of strings and lists of integers. */
-    static String json(Map<String, ?> body) {
+    static String json(Map<String, Object> body) {
         return body.entrySet().stream().map(e -> str(e.getKey()) + ":" + (e.getValue() instanceof List<?> l
                 ? l.stream().map(String::valueOf).collect(Collectors.joining(",", "[", "]")) : str(String.valueOf(e.getValue()))))
             .collect(Collectors.joining(",", "{", "}"));
@@ -123,7 +123,7 @@ class MpesaStatementIntegrationTest {
 
     void receipt(String transId, String amount, String time) throws Exception {
         mvc.perform(post("/api/v1/payments/mpesa/c2b").with(SWITCH).contentType(MediaType.APPLICATION_JSON)
-                .content(json(Map.of("tenantId", T, "transId", transId, "shortCode", "600993",
+                .content(json(Map.<String, Object>of("tenantId", T, "transId", transId, "shortCode", "600993",
                         "amount", amount, "currency", "KES", "billRef", "NO-SUCH-ACCOUNT", "msisdnMasked", "2547****001",
                         "transTime", time))))
             .andExpect(status().isOk());
@@ -131,11 +131,11 @@ class MpesaStatementIntegrationTest {
 
     ResultActions upload(JwtRequestPostProcessor who, String date, String fileName, String csv) throws Exception {
         return mvc.perform(post(S).with(who).contentType(MediaType.APPLICATION_JSON)
-                .content(json(Map.of("accountKind", "PAYBILL", "shortCode", "600993", "statementDate", date,
+                .content(json(Map.<String, Object>of("accountKind", "PAYBILL", "shortCode", "600993", "statementDate", date,
                         "fileName", fileName, "csv", csv))));
     }
 
-    ResultActions act(JwtRequestPostProcessor who, String id, String action, Object body) throws Exception {
+    ResultActions act(JwtRequestPostProcessor who, String id, String action, Map<String, Object> body) throws Exception {
         return mvc.perform(post(S + "/" + id + "/" + action).with(who).contentType(MediaType.APPLICATION_JSON)
                 .content(json(body)));
     }
