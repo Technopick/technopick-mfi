@@ -53,6 +53,18 @@ mfi:
     tenant-claim: tenant_id
     member-claim: customer_number
     roles-claim: roles
+  # Member self-service (ADR-0033) and USSD (ADR-0034).
+  member:
+    payment-prompts-per-window: 3
+    payment-prompt-window-minutes: 10
+    requests-per-minute: 60
+  ussd:
+    # Wrong PINs (or ID numbers during setup) before the PIN locks; a locked PIN needs an approved reset.
+    max-pin-attempts: 3
+    # How long an approved setup lets the member choose a PIN.
+    pin-setup-hours: 24
+    # Aggregators end sessions after about three minutes; older session ids are refused.
+    session-max-seconds: 180
 
 # OpenAPI document: off unless explicitly enabled; when on, only PLATFORM_ADMIN may read it.
 # The reviewed contract lives in shared/contracts/openapi/core-banking-v1.json.
