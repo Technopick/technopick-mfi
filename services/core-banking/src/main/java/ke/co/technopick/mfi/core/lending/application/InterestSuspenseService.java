@@ -44,22 +44,30 @@ public class InterestSuspenseService {
         this.journal = journal;
     }
 
-    private record Policy(boolean enabled, String account, int watchMaxDpd) { }
-
     private record LoanGl(String number, String branch, Currency currency, String income, String writeOffExpense) { }
 
-    private Policy policy() {
-        return jdbc.sql("SELECT interest_suspension_enabled, interest_suspense_account, watch_max_dpd FROM ledger.prudential_settings")
-            .query((rs, i) -> new Policy(rs.getBoolean(1), rs.getString(2), rs.getInt(3)))
-            .optional().orElse(new Policy(false, null, 30));
+    private record Policy(boolean enabled, String account, int watchMaxDpd, boolean loanHasSuspense) { }
+
+    /** One round trip: the tenant's policy and whether this loan has ever had interest in suspense. */
+    private Policy policy(UUID loanId) {
+        return jdbc.sql("""
+                SELECT COALESCE(p.interest_suspension_enabled, false), p.interest_suspense_account, COALESCE(p.watch_max_dpd, 30),
+                       EXISTS (SELECT 1 FROM lending.interest_suspense m WHERE m.loan_id = :loan)
+                  FROM (VALUES (1)) AS one LEFT JOIN ledger.prudential_settings p ON true
+                """).param("loan", loanId)
+            .query((rs, i) -> new Policy(rs.getBoolean(1), rs.getString(2), rs.getInt(3), rs.getBoolean(4))).single();
     }
 
     /** End of day, after the loan's arrears snapshot: suspense follows the loan's classification. */
     @Transactional(propagation = Propagation.MANDATORY)
     public BigDecimal adjustAtEndOfDay(UUID tenantId, UUID loanId, LocalDate date, long daysPastDue, String actor) {
-        Policy p = policy();
+        Policy p = policy(loanId);
+        boolean suspend = p.enabled() && daysPastDue > p.watchMaxDpd();
+        if (!suspend && !p.loanHasSuspense()) {
+            return BigDecimal.ZERO; // the common case: nothing held and nothing to hold
+        }
         Map<String, BigDecimal> target = new LinkedHashMap<>();
-        if (p.enabled() && daysPastDue > p.watchMaxDpd()) {
+        if (suspend) {
             BigDecimal unpaid = jdbc.sql("SELECT lending.loan_interest_receivable(:t, :loan)").param("t", tenantId)
                 .param("loan", loanId).query(BigDecimal.class).single();
             target.put(p.account(), unpaid);
