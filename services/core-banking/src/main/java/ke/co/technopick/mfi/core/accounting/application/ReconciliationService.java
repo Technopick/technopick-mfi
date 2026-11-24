@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>LOAN_PRINCIPAL - principal disbursed less principal repaid and written off;</li>
  *   <li>LOAN_INTEREST_RECEIVABLE - per installment, interest accrued less paid, less amounts written off;</li>
  *   <li>LOAN_PENALTY_RECEIVABLE - penalties charged less paid and written off;</li>
- *   <li>LOAN_OVERPAYMENT - credit held for customers (overpayments less credit applied).</li>
+ *   <li>LOAN_OVERPAYMENT - credit held for customers (overpayments less credit applied);</li>
+ *   <li>LOAN_INTEREST_SUSPENSE - interest in suspense on non-performing loans (ADR-0031);</li>
+ *   <li>LOAN_LOSS_ALLOWANCE - the IFRS 9 allowance, equal to the approved provision runs (ADR-0036).</li>
  * </ul>
  * A difference means a posting reached the ledger without its business record (or the reverse),
  * and finance must investigate. Balances are in the account's natural sign.
@@ -90,7 +92,17 @@ public class ReconciliationService {
                   FROM ledger.gl_account a
                  WHERE a.account_code IN (SELECT interest_suspense_account FROM ledger.prudential_settings
                                            WHERE interest_suspense_account IS NOT NULL
-                                          UNION SELECT account_code FROM lending.interest_suspense))
+                                          UNION SELECT account_code FROM lending.interest_suspense)
+                UNION ALL
+                -- Loan loss allowance (ADR-0036): a contra asset holding exactly what approved provision runs put there.
+                SELECT 'LOAN_LOSS_ALLOWANCE', a.account_code, a.currency,
+                       -COALESCE((SELECT sum(r.change) FROM ledger.ecl_run r
+                                   WHERE r.status = 'POSTED' AND r.allowance_account = a.account_code), 0),
+                       COALESCE((SELECT r.loans FROM ledger.ecl_run r WHERE r.status = 'POSTED' AND r.allowance_account = a.account_code
+                                  ORDER BY r.as_of DESC LIMIT 1), 0)
+                  FROM ledger.gl_account a
+                 WHERE a.account_code IN (SELECT allowance_account FROM ledger.ecl_settings
+                                          UNION SELECT allowance_account FROM ledger.ecl_run WHERE status = 'POSTED'))
             SELECT s.check_code, s.account_code, s.currency, s.amount AS subledger, s.items,
                    CASE WHEN a.account_class IN ('ASSET', 'EXPENSE') THEN COALESCE(g.debit_positive, 0)
                         ELSE -COALESCE(g.debit_positive, 0) END AS ledger

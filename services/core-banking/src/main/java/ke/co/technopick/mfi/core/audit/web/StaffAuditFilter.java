@@ -37,7 +37,7 @@ public class StaffAuditFilter extends OncePerRequestFilter implements Authentica
 
     private static final Logger LOG = LoggerFactory.getLogger(StaffAuditFilter.class);
     private static final Set<String> READ_AUDITED = Set.of("/api/v1/customers", "/api/v1/savings/accounts",
-            "/api/v1/savings/customers", "/api/v1/lending/loans", "/api/v1/audit", "/api/v1/member");
+            "/api/v1/savings/customers", "/api/v1/lending/loans", "/api/v1/audit", "/api/v1/member", "/api/v1/provisioning");
     private static final Set<String> KEPT_QUERY_PARAMS = Set.of("from", "to", "asOf", "businessDate", "status", "branchCode",
             "method", "refusedOnly");
     private static final Pattern REQUEST_ID = Pattern.compile("^[A-Za-z0-9._-]{1,64}$");
