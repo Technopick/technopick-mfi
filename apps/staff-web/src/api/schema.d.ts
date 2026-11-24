@@ -308,6 +308,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/ussd/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Ussd_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -334,6 +350,38 @@ export interface paths {
         get: operations["Customer_detail"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerNumber}/member-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberPin_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerNumber}/member-pin/setups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberPin_request"];
         delete?: never;
         options?: never;
         head?: never;
@@ -654,6 +702,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["LoanWriteOff_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-pin-setups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberPin_pending"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-pin-setups/{setupId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberPin_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-pin-setups/{setupId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberPin_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1720,6 +1816,12 @@ export interface components {
             /** Format: int64 */
             rows?: number;
         };
+        ChannelEvent: {
+            detail?: string;
+            event?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+        };
         CheckResult: {
             accountCode?: string;
             checkCode?: string;
@@ -2348,6 +2450,23 @@ export interface components {
             startDate?: string;
             status?: string;
         };
+        PinStatus: {
+            customerNumber?: string;
+            /** Format: int32 */
+            failedAttempts?: number;
+            /** Format: date-time */
+            lockedAt?: string;
+            /** Format: int32 */
+            maxAttempts?: number;
+            pendingSetup?: components["schemas"]["SetupView"];
+            /** Format: date-time */
+            pinSetAt?: string;
+            recentEvents?: components["schemas"]["ChannelEvent"][];
+            /** Format: date-time */
+            setupExpiresAt?: string;
+            setups?: components["schemas"]["SetupView"][];
+            status?: string;
+        };
         PortfolioReport: {
             /** Format: date */
             asOf?: string;
@@ -2592,6 +2711,18 @@ export interface components {
             /** Format: uuid */
             tenantId: string;
         };
+        SessionRequest: {
+            phoneNumber: string;
+            serviceCode: string;
+            sessionId: string;
+            /** Format: uuid */
+            tenantId: string;
+            text?: string;
+        };
+        SessionResponse: {
+            end?: boolean;
+            response?: string;
+        };
         SettlementQuote: {
             /** Format: date */
             businessDate?: string;
@@ -2627,6 +2758,30 @@ export interface components {
             settledBy?: string;
             /** Format: uuid */
             settlementId?: string;
+        };
+        SetupDecision: {
+            reason?: string;
+        };
+        SetupRequest: {
+            idempotencyKey: string;
+            reason: string;
+        };
+        SetupView: {
+            customerName?: string;
+            customerNumber?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            kind?: string;
+            reason?: string;
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            /** Format: uuid */
+            setupId?: string;
+            status?: string;
         };
         StaffAction: {
             actor?: string;
@@ -3328,6 +3483,30 @@ export interface operations {
             };
         };
     };
+    Ussd_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
     Customer_search: {
         parameters: {
             query?: {
@@ -3393,6 +3572,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+        };
+    };
+    MemberPin_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinStatus"];
+                };
+            };
+        };
+    };
+    MemberPin_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupView"];
                 };
             };
         };
@@ -3956,6 +4183,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    MemberPin_pending: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupView"][];
+                };
+            };
+        };
+    };
+    MemberPin_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                setupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SetupDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupView"];
+                };
+            };
+        };
+    };
+    MemberPin_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                setupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupView"];
                 };
             };
         };

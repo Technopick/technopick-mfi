@@ -168,6 +168,8 @@ describe("screens", () => {
       "GET /api/v1/customers/CU26-0000001": () => customer,
       "POST /api/v1/customers/CU26-0000001/verify": () => ({ ...customer, status: "ACTIVE" }),
       "GET /api/v1/savings/accounts?customerNumber=CU26-0000001": () => [],
+      "GET /api/v1/customers/CU26-0000001/member-pin": () => ({ customerNumber: "CU26-0000001", status: "NONE", failedAttempts: 0,
+        maxAttempts: 3, setups: [], recentEvents: [] }),
     });
     renderAt("/customers/CU26-0000001", session("manager-1", "BRANCH_MANAGER"), api);
     const verify = await screen.findByRole("button", { name: /verify identity/i });
@@ -524,6 +526,81 @@ describe("screens", () => {
     await userEvent.click(buttons[0]!);
     expect(await screen.findByText("500.00 paid into SA26-0000001 from loan LN26-0000007.")).toBeTruthy();
     expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/v1/lending/credit-refunds/r-1/approve"]);
+  });
+
+  it("lets a teller ask for a USSD PIN setup for an active member, never handling the PIN", async () => {
+    const customer = {
+      customerNumber: "CU26-0000002", firstName: "Wanjiku", lastName: "Kamau", status: "ACTIVE", createdBy: "user:officer-1",
+      idType: "NATIONAL_ID", idNumber: "23456789", phoneNumber: "254722000002",
+    };
+    const setup = { setupId: "s-1", customerNumber: "CU26-0000002", customerName: "Wanjiku Kamau", kind: "FIRST",
+      reason: "ID sighted, member present", status: "REQUESTED", requestedBy: "user:teller-1", requestedAt: "2026-11-29T08:00:00Z" };
+    let requested = false;
+    const { api, calls } = fakeApi({
+      "GET /api/v1/customers/CU26-0000002": () => customer,
+      "GET /api/v1/savings/accounts?customerNumber=CU26-0000002": () => [],
+      ...noTill,
+      "GET /api/v1/customers/CU26-0000002/member-pin": () => ({ customerNumber: "CU26-0000002", status: "NONE", failedAttempts: 0,
+        maxAttempts: 3, setups: requested ? [setup] : [], recentEvents: [], pendingSetup: requested ? setup : undefined }),
+      "POST /api/v1/customers/CU26-0000002/member-pin/setups": () => { requested = true; return setup; },
+    });
+    renderAt("/customers/CU26-0000002", session("teller-1", "TELLER"), api);
+    expect(await screen.findByText("Not set up")).toBeTruthy();
+    const ask = screen.getByRole("button", { name: "Request PIN setup" });
+    expect((ask as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText(/how the member was identified/i), "ID sighted, member present");
+    await userEvent.click(ask);
+    expect(await screen.findByText(/a branch manager or supervisor must approve it/)).toBeTruthy();
+    const post = calls.find((c) => c.method === "POST")!;
+    expect(post.body).toMatchObject({ reason: "ID sighted, member present" });
+    expect(Object.keys(post.body as object).sort()).toEqual(["idempotencyKey", "reason"]);
+    // The teller who asked cannot approve it.
+    expect(await screen.findByText(/requested by user:teller-1/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Approve PIN setup" })).toBeNull();
+    expect(screen.queryByLabelText(/pin$/i)).toBeNull();
+  });
+
+  it("shows a locked PIN and the member's USSD activity, and lets a manager approve someone else's reset", async () => {
+    const customer = {
+      customerNumber: "CU26-0000003", firstName: "Otieno", lastName: "Ouma", status: "ACTIVE", createdBy: "user:officer-1",
+      idType: "NATIONAL_ID", idNumber: "34567890", phoneNumber: "254733000003",
+    };
+    const reset = { setupId: "s-2", customerNumber: "CU26-0000003", customerName: "Otieno Ouma", kind: "RESET",
+      reason: "Member forgot PIN, ID sighted", status: "REQUESTED", requestedBy: "user:teller-1", requestedAt: "2026-11-29T08:00:00Z" };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/customers/CU26-0000003": () => customer,
+      "GET /api/v1/savings/accounts?customerNumber=CU26-0000003": () => [],
+      "GET /api/v1/customers/CU26-0000003/member-pin": () => ({ customerNumber: "CU26-0000003", status: "LOCKED", failedAttempts: 3,
+        maxAttempts: 3, lockedAt: "2026-11-28T19:00:00Z", pinSetAt: "2026-11-20T10:00:00Z", pendingSetup: reset, setups: [reset],
+        recentEvents: [{ occurredAt: "2026-11-28T19:00:00Z", event: "PIN_LOCKED" }, { occurredAt: "2026-11-28T18:59:00Z", event: "PIN_WRONG" },
+          { occurredAt: "2026-11-27T12:00:00Z", event: "PAYMENT_PROMPT", detail: "LN26-0000009 500.00" }] }),
+      "POST /api/v1/member-pin-setups/s-2/approve": () => ({ ...reset, status: "APPROVED", decidedBy: "user:manager-1" }),
+    });
+    renderAt("/customers/CU26-0000003", session("manager-1", "BRANCH_MANAGER"), api);
+    expect(await screen.findByText("Locked after too many wrong attempts")).toBeTruthy();
+    expect(screen.getByText("3 of 3")).toBeTruthy();
+    expect(screen.getByText("M-Pesa payment prompt")).toBeTruthy();
+    expect(screen.getByText("LN26-0000009 500.00")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Approve PIN setup" }));
+    expect(await screen.findByText(/The member can now dial the USSD code/)).toBeTruthy();
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/v1/member-pin-setups/s-2/approve"]);
+  });
+
+  it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
+    const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
+      kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
+    const { api, calls } = fakeApi({
+      "GET /api/v1/member-pin-setups": () => [setup("s-4", "user:teller-1", "Akinyi Odhiambo"), setup("s-5", "user:sup-1", "Mutua Kioko")],
+      "POST /api/v1/member-pin-setups/s-4/reject": () => ({ ...setup("s-4", "user:teller-1", "Akinyi Odhiambo"), status: "REJECTED" }),
+    });
+    renderAt("/pin-requests", session("sup-1", "SUPERVISOR"), api);
+    expect(await screen.findAllByRole("button", { name: "Approve PIN setup" })).toHaveLength(1);
+    const reject = screen.getByRole("button", { name: "Reject" });
+    expect((reject as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText("Note for PIN setup of CU26-0000004"), "Phone number not confirmed");
+    await userEvent.click(reject);
+    expect(await screen.findByText("PIN setup for Akinyi Odhiambo rejected.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ reason: "Phone number not confirmed" });
   });
 
   it("shows portfolio at risk by branch, loans in arrears and closed loans holding credit", async () => {

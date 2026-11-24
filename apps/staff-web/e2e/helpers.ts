@@ -23,13 +23,19 @@ export async function signIn(browser: Browser, user: keyof typeof USERS): Promis
 
 /** Officer registers a customer with consent; manager verifies. Returns the customer number. */
 export async function verifiedCustomer(officer: Page, manager: Page, firstName = "Achieng"): Promise<string> {
+  return (await verifiedMember(officer, manager, firstName)).customer;
+}
+
+/** As verifiedCustomer, with a chosen M-Pesa number; also returns the ID number used. */
+export async function verifiedMember(officer: Page, manager: Page, firstName: string, phone = "0712345678"):
+    Promise<{ customer: string; idNumber: string }> {
   const idNumber = String(Date.now()).slice(-8);
   await officer.goto("/customers/new");
   await officer.getByLabel("First name").fill(firstName);
   await officer.getByLabel("Last name").fill("Otieno");
   await officer.getByLabel("Date of birth").fill("1990-05-01");
   await officer.getByLabel("ID number").fill(idNumber);
-  await officer.getByLabel("M-Pesa number").fill("0712345678");
+  await officer.getByLabel("M-Pesa number").fill(phone);
   await officer.getByLabel("Branch code").fill("NBO01");
   await officer.getByRole("checkbox").check();
   await officer.getByRole("button", { name: /^Register/ }).click();
@@ -40,5 +46,5 @@ export async function verifiedCustomer(officer: Page, manager: Page, firstName =
   await manager.getByLabel(/what was checked/i).fill("National ID sighted at branch (e2e)");
   await manager.getByRole("button", { name: "Verify identity" }).click();
   await expect(manager.getByText("ACTIVE", { exact: true }).first()).toBeVisible();
-  return customer;
+  return { customer, idNumber };
 }

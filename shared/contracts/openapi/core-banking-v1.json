@@ -551,6 +551,21 @@
         },
         "type": "object"
       },
+      "ChannelEvent": {
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CheckResult": {
         "properties": {
           "accountCode": {
@@ -2425,6 +2440,52 @@
         },
         "type": "object"
       },
+      "PinStatus": {
+        "properties": {
+          "customerNumber": {
+            "type": "string"
+          },
+          "failedAttempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lockedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "maxAttempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pendingSetup": {
+            "$ref": "#/components/schemas/SetupView"
+          },
+          "pinSetAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "recentEvents": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelEvent"
+            },
+            "type": "array"
+          },
+          "setupExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "setups": {
+            "items": {
+              "$ref": "#/components/schemas/SetupView"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PortfolioReport": {
         "properties": {
           "asOf": {
@@ -3164,6 +3225,47 @@
         ],
         "type": "object"
       },
+      "SessionRequest": {
+        "properties": {
+          "phoneNumber": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "serviceCode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sessionId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phoneNumber",
+          "serviceCode",
+          "sessionId",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "SessionResponse": {
+        "properties": {
+          "end": {
+            "type": "boolean"
+          },
+          "response": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "SettlementQuote": {
         "properties": {
           "businessDate": {
@@ -3259,6 +3361,79 @@
           },
           "settlementId": {
             "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SetupDecision": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SetupRequest": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "SetupView": {
+        "properties": {
+          "customerName": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "setupId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
             "type": "string"
           }
         },
@@ -4669,6 +4844,36 @@
         ]
       }
     },
+    "/api/v1/channels/ussd/sessions": {
+      "post": {
+        "operationId": "Ussd_session",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ussd-controller"
+        ]
+      }
+    },
     "/api/v1/customers": {
       "get": {
         "operationId": "Customer_search",
@@ -4765,6 +4970,76 @@
         },
         "tags": [
           "customer-controller"
+        ]
+      }
+    },
+    "/api/v1/customers/{customerNumber}/member-pin": {
+      "get": {
+        "operationId": "MemberPin_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinStatus"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-pin-controller"
+        ]
+      }
+    },
+    "/api/v1/customers/{customerNumber}/member-pin/setups": {
+      "post": {
+        "operationId": "MemberPin_request",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-pin-controller"
         ]
       }
     },
@@ -5570,6 +5845,110 @@
         },
         "tags": [
           "loan-write-off-controller"
+        ]
+      }
+    },
+    "/api/v1/member-pin-setups": {
+      "get": {
+        "operationId": "MemberPin_pending",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetupView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-pin-controller"
+        ]
+      }
+    },
+    "/api/v1/member-pin-setups/{setupId}/approve": {
+      "post": {
+        "operationId": "MemberPin_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "setupId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-pin-controller"
+        ]
+      }
+    },
+    "/api/v1/member-pin-setups/{setupId}/reject": {
+      "post": {
+        "operationId": "MemberPin_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "setupId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-pin-controller"
         ]
       }
     },

@@ -61,7 +61,7 @@ public class CallbackGuard {
         return Optional.ofNullable(match);
     }
 
-    static boolean inRange(InetAddress address, String cidr) throws UnknownHostException {
+    public static boolean inRange(InetAddress address, String cidr) throws UnknownHostException {
         String[] parts = cidr.split("/");
         InetAddress network = InetAddress.getByName(parts[0]);
         byte[] a = address.getAddress();

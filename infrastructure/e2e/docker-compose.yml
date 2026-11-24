@@ -76,6 +76,11 @@ services:
       DARAJA_SIM_B2C_INITIATOR_PASSWORD: e2e-only-initiator
       DARAJA_SIM_CALLBACK_DELAY_MS: "1500"
       DARAJA_SIM_PUBLIC_KEY_FILE: /shared/mfi.daraja.certificate-pem
+      # TEST-ONLY USSD handset page (http://localhost:18091), posting like an aggregator to the integration runtime.
+      USSD_SIM_TARGET_URL: http://integration:8081/ussd/e2e-only-ussd-token
+      USSD_SIM_PORT: "18091"
+      USSD_SIM_SERVICE_CODE: "*483*1#"
+    ports: ["18091:18091"]
     volumes:
       - simshared:/shared
     networks: [mfi]
@@ -130,6 +135,10 @@ services:
                        "short-code":"600991","passkey":"e2e-only-passkey"}],
           "b2c-accounts":[{"token":"e2e-only-b2c-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001",
                            "short-code":"600000","initiator-name":"e2eapi","initiator-password":"e2e-only-initiator"}]
+        },
+        "ussd":{
+          "allowed-cidrs":["172.30.57.0/24"],
+          "services":[{"token":"e2e-only-ussd-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001","service-code":"*483*1#"}]
         }}}
     volumes:
       - simshared:/shared:ro

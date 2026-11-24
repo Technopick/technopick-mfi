@@ -63,6 +63,11 @@ mfi:
     process-interval-ms: 2000
     max-attempts: 10
     retry-backoff: PT30S
+  ussd:
+    # USSD aggregator (ADR-0034): per tenant USSD code an unguessable path token (secret store), tenant and
+    # service code. Callback URL: https://<host>/ussd/<token>. Source ranges from the aggregator's documentation.
+    services: []
+    allowed-cidrs: []
   outbox:
     enabled: ${MFI_OUTBOX_RELAY_ENABLED:true}
     poll-interval-ms: ${MFI_OUTBOX_POLL_MS:1000}

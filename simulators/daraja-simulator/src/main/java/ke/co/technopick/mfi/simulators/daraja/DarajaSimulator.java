@@ -496,5 +496,12 @@ public final class DarajaSimulator implements AutoCloseable {
             java.nio.file.Files.writeString(path, sim.publicKeyPem(), StandardCharsets.US_ASCII);
         }
         System.out.println(LABEL + " listening on " + sim.server.getAddress() + " - NOT FOR PRODUCTION");
+        String ussdTarget = env.get("USSD_SIM_TARGET_URL");
+        if (ussdTarget != null && !ussdTarget.isBlank()) {
+            UssdHandsetSimulator handset = UssdHandsetSimulator.start(env.getOrDefault("DARAJA_SIM_BIND", "127.0.0.1"),
+                    Integer.parseInt(env.getOrDefault("USSD_SIM_PORT", "18091")), URI.create(ussdTarget),
+                    env.getOrDefault("USSD_SIM_SERVICE_CODE", "*483*1#"));
+            System.out.println(UssdHandsetSimulator.LABEL + " listening on port " + handset.port() + " - NOT FOR PRODUCTION");
+        }
     }
 }
