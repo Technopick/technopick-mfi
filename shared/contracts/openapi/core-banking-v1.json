@@ -758,6 +758,47 @@
         },
         "type": "object"
       },
+      "CreditRefundDecision": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CreditRefundRequest": {
+        "properties": {
+          "accountNumber": {
+            "maxLength": 34,
+            "minLength": 0,
+            "type": "string"
+          },
+          "amount": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountNumber",
+          "amount",
+          "idempotencyKey",
+          "reason"
+        ],
+        "type": "object"
+      },
       "CurrencyTotal": {
         "properties": {
           "balanced": {
@@ -2590,6 +2631,64 @@
         },
         "type": "object"
       },
+      "RefundView": {
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "creditRemaining": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "refundId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RegulatoryLine": {
         "properties": {
           "accountClass": {
@@ -2958,6 +3057,106 @@
           "code",
           "tenantId"
         ],
+        "type": "object"
+      },
+      "SettlementQuote": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "canSettle": {
+            "type": "boolean"
+          },
+          "creditHeld": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "interest": {
+            "type": "string"
+          },
+          "interestWaived": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "payoff": {
+            "type": "string"
+          },
+          "penalty": {
+            "type": "string"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/SettlementView"
+          },
+          "status": {
+            "type": "string"
+          },
+          "stillToPay": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SettlementRequest": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "SettlementView": {
+        "properties": {
+          "businessDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "creditLeft": {
+            "type": "string"
+          },
+          "interest": {
+            "type": "string"
+          },
+          "interestWaived": {
+            "type": "string"
+          },
+          "payoff": {
+            "type": "string"
+          },
+          "penalty": {
+            "type": "string"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "scheduleVersion": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "settledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "settledBy": {
+            "type": "string"
+          },
+          "settlementId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "StaffAction": {
@@ -4813,6 +5012,173 @@
         ]
       }
     },
+    "/api/v1/lending/credit-refunds": {
+      "get": {
+        "operationId": "LoanSettlement_refunds",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "pattern": "REQUESTED|APPROVED|REJECTED",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "loanNumber",
+            "required": false,
+            "schema": {
+              "maxLength": 34,
+              "minLength": 0,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RefundView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-settlement-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/credit-refunds/{refundId}/approve": {
+      "post": {
+        "operationId": "LoanSettlement_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refundId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditRefundDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-settlement-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/credit-refunds/{refundId}/reject": {
+      "post": {
+        "operationId": "LoanSettlement_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refundId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditRefundDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-settlement-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/loans/{loanNumber}/credit-refunds": {
+      "post": {
+        "operationId": "LoanSettlement_requestRefund",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "maxLength": 34,
+              "minLength": 0,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditRefundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-settlement-controller"
+        ]
+      }
+    },
     "/api/v1/lending/loans/{loanNumber}/schedule": {
       "get": {
         "operationId": "LoanOrigination_schedule",
@@ -4840,6 +5206,78 @@
         },
         "tags": [
           "loan-origination-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/loans/{loanNumber}/settlement": {
+      "get": {
+        "operationId": "LoanSettlement_quote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "maxLength": 34,
+              "minLength": 0,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementQuote"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-settlement-controller"
+        ]
+      },
+      "post": {
+        "operationId": "LoanSettlement_settle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "maxLength": 34,
+              "minLength": 0,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-settlement-controller"
         ]
       }
     },

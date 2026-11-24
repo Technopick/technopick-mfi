@@ -3,12 +3,13 @@ import { useNavigate, useParams } from "react-router";
 import type { Schemas } from "../api/client";
 import { Empty, Loading, Money, ProblemBox, Section, Status } from "../components/ui";
 import { useLoad } from "../hooks";
+import { SettlementPanel } from "./SettlementPages";
 
 export function LoanSchedulePage() {
   const { number } = useParams();
   const navigate = useNavigate();
   const [query, setQuery] = useState(number ?? "");
-  const { data, error, loading } = useLoad<Schemas["LoanScheduleView"]>(
+  const { data, error, loading, reload } = useLoad<Schemas["LoanScheduleView"]>(
     number ? `/api/v1/lending/loans/${encodeURIComponent(number)}/schedule` : null,
   );
   function submit(e: FormEvent) {
@@ -43,6 +44,7 @@ export function LoanSchedulePage() {
           ))}
         </Section>
       )}
+      {number && data && <SettlementPanel key={number} loanNumber={number} onChange={reload} />}
     </>
   );
 }

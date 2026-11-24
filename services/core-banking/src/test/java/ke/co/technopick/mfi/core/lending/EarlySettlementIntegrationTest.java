@@ -128,7 +128,7 @@ class EarlySettlementIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content("""
                     {"tenantId":"%s","transId":"%s","shortCode":"600993","amount":"%s","currency":"KES","billRef":"%s",
                      "msisdnMasked":"2547*****000","transTime":"2026-11-29T10:15:00+03:00"}
-                    """.formatted(T, transId, amount.toPlainString(), loanNumber)))
+                    """.formatted(T, transId, amount.setScale(2, java.math.RoundingMode.UNNECESSARY).toPlainString(), loanNumber)))
             .andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LOAN_REPAYMENT"));
     }
 

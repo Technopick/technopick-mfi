@@ -500,6 +500,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lending/credit-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanSettlement_refunds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/credit-refunds/{refundId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanSettlement_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/credit-refunds/{refundId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanSettlement_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/loans/{loanNumber}/credit-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanSettlement_requestRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/loans/{loanNumber}/schedule": {
         parameters: {
             query?: never;
@@ -510,6 +574,22 @@ export interface paths {
         get: operations["LoanOrigination_schedule"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/loans/{loanNumber}/settlement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanSettlement_quote"];
+        put?: never;
+        post: operations["LoanSettlement_settle"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1627,6 +1707,15 @@ export interface components {
             /** @enum {string} */
             status?: "PENDING" | "DISPATCHED" | "SUBMITTED" | "COMPLETED" | "FAILED";
         };
+        CreditRefundDecision: {
+            reason?: string;
+        };
+        CreditRefundRequest: {
+            accountNumber: string;
+            amount: string;
+            idempotencyKey: string;
+            reason: string;
+        };
         CurrencyTotal: {
             balanced?: boolean;
             credit?: string;
@@ -2251,6 +2340,29 @@ export interface components {
             /** Format: date-time */
             recordedAt?: string;
         };
+        RefundView: {
+            accountNumber?: string;
+            amount?: string;
+            /** Format: date */
+            businessDate?: string;
+            creditRemaining?: string;
+            currency?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: uuid */
+            entryId?: string;
+            loanNumber?: string;
+            method?: string;
+            reason?: string;
+            /** Format: uuid */
+            refundId?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
+        };
         RegulatoryLine: {
             accountClass?: string;
             description?: string;
@@ -2363,6 +2475,42 @@ export interface components {
             description?: string;
             /** Format: uuid */
             tenantId: string;
+        };
+        SettlementQuote: {
+            /** Format: date */
+            businessDate?: string;
+            canSettle?: boolean;
+            creditHeld?: string;
+            currency?: string;
+            interest?: string;
+            interestWaived?: string;
+            loanNumber?: string;
+            payoff?: string;
+            penalty?: string;
+            principal?: string;
+            settlement?: components["schemas"]["SettlementView"];
+            status?: string;
+            stillToPay?: string;
+        };
+        SettlementRequest: {
+            idempotencyKey: string;
+        };
+        SettlementView: {
+            /** Format: date */
+            businessDate?: string;
+            creditLeft?: string;
+            interest?: string;
+            interestWaived?: string;
+            payoff?: string;
+            penalty?: string;
+            principal?: string;
+            /** Format: int32 */
+            scheduleVersion?: number;
+            /** Format: date-time */
+            settledAt?: string;
+            settledBy?: string;
+            /** Format: uuid */
+            settlementId?: string;
         };
         StaffAction: {
             actor?: string;
@@ -3403,6 +3551,107 @@ export interface operations {
             };
         };
     };
+    LoanSettlement_refunds: {
+        parameters: {
+            query?: {
+                status?: string;
+                loanNumber?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundView"][];
+                };
+            };
+        };
+    };
+    LoanSettlement_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                refundId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CreditRefundDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundView"];
+                };
+            };
+        };
+    };
+    LoanSettlement_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                refundId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditRefundDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundView"];
+                };
+            };
+        };
+    };
+    LoanSettlement_requestRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditRefundRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundView"];
+                };
+            };
+        };
+    };
     LoanOrigination_schedule: {
         parameters: {
             query?: never;
@@ -3421,6 +3670,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoanScheduleView"];
+                };
+            };
+        };
+    };
+    LoanSettlement_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementQuote"];
+                };
+            };
+        };
+    };
+    LoanSettlement_settle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementView"];
                 };
             };
         };

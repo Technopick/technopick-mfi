@@ -468,6 +468,64 @@ describe("screens", () => {
     expect(await screen.findByText("Account mapping saved.")).toBeTruthy();
   });
 
+  it("quotes an early settlement and settles the loan once the member has paid enough", async () => {
+    let settled = false;
+    const { api, calls } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000007/schedule": () => ({ loanNumber: "LN26-0000007", status: settled ? "CLOSED" : "ACTIVE",
+        installments: [{ number: 1, dueDate: "2026-12-01", principal: "1000.00", interest: "360.00", total: "1360.00", closingBalance: "11000.00" }] }),
+      "GET /api/v1/lending/loans/LN26-0000007/settlement": () => settled
+        ? { loanNumber: "LN26-0000007", status: "CLOSED", currency: "KES", creditHeld: "500.00", canSettle: false,
+          settlement: { businessDate: "2026-11-29", payoff: "12324.00", interestWaived: "2016.00", creditLeft: "500.00", settledBy: "user:ops-1" } }
+        : { loanNumber: "LN26-0000007", status: "ACTIVE", businessDate: "2026-11-29", currency: "KES", principal: "12000.00", interest: "324.00",
+          penalty: "0.00", payoff: "12324.00", interestWaived: "2016.00", creditHeld: "12824.00", stillToPay: "0.00", canSettle: true },
+      "GET /api/v1/lending/credit-refunds?loanNumber=LN26-0000007": () => [],
+      "POST /api/v1/lending/loans/LN26-0000007/settlement": () => {
+        settled = true;
+        return { payoff: "12324.00", interestWaived: "2016.00", creditLeft: "500.00" };
+      },
+    });
+    renderAt("/loans/LN26-0000007", session("ops-1", "OPERATIONS"), api);
+    expect(await screen.findByRole("heading", { name: "Early settlement" })).toBeTruthy();
+    expect(screen.getByText("Payoff on 2026-11-29").nextSibling?.textContent).toContain("12,324.00");
+    await userEvent.click(screen.getByRole("button", { name: "Settle loan now" }));
+    expect(await screen.findByText("Loan settled: 12324.00 paid off; 2016.00 of scheduled interest not charged; 500.00 of credit left.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ idempotencyKey: expect.any(String) });
+    expect(await screen.findByRole("heading", { name: "Credit on this loan" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Member's savings account"), "SA26-0000001");
+    await userEvent.type(screen.getByLabelText("Amount"), "500.00");
+    await userEvent.type(screen.getByLabelText("Reason"), "Member settled early and asked for the balance");
+    expect(screen.getByRole("button", { name: "Request refund to savings" })).toBeTruthy();
+  });
+
+  it("shows the settlement quote without a settle button to a loan officer", async () => {
+    const { api } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000008/schedule": () => ({ loanNumber: "LN26-0000008", status: "ACTIVE", installments: [] }),
+      "GET /api/v1/lending/loans/LN26-0000008/settlement": () => ({ loanNumber: "LN26-0000008", status: "ACTIVE", businessDate: "2026-11-29",
+        currency: "KES", principal: "12000.00", interest: "324.00", penalty: "0.00", payoff: "12324.00", interestWaived: "2016.00",
+        creditHeld: "0.00", stillToPay: "12324.00", canSettle: false }),
+    });
+    renderAt("/loans/LN26-0000008", session("officer-1", "LOAN_OFFICER"), api);
+    expect(await screen.findByText(/pays the amount still to pay to the loan number/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Settle loan now" })).toBeNull();
+  });
+
+  it("lets a supervisor approve a refund of loan credit, but not one they asked for", async () => {
+    const refund = (id: string, by: string) => ({ refundId: id, loanNumber: "LN26-0000007", amount: "500.00", currency: "KES", method: "SAVINGS",
+      accountNumber: "SA26-0000001", reason: "Member settled early and asked for the balance", status: "REQUESTED", requestedBy: by,
+      requestedAt: "2026-11-29T08:00:00Z" });
+    const { api, calls } = fakeApi({
+      "GET /api/v1/lending/credit-refunds?status=REQUESTED": () => [refund("r-1", "user:ops-1"), refund("r-2", "user:sup-1")],
+      "GET /api/v1/lending/credit-refunds?status=APPROVED": () => [],
+      "POST /api/v1/lending/credit-refunds/r-1/approve": () => ({ ...refund("r-1", "user:ops-1"), status: "APPROVED", decidedBy: "user:sup-1" }),
+    });
+    renderAt("/credit-refunds", session("sup-1", "SUPERVISOR"), api);
+    const buttons = await screen.findAllByRole("button", { name: "Approve refund" });
+    expect(buttons).toHaveLength(1); // the supervisor's own request cannot be decided by them
+    await userEvent.click(buttons[0]!);
+    expect(await screen.findByText("500.00 paid into SA26-0000001 from loan LN26-0000007.")).toBeTruthy();
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/v1/lending/credit-refunds/r-1/approve"]);
+  });
+
   it("shows portfolio at risk by branch, loans in arrears and closed loans holding credit", async () => {
     const { api, calls } = fakeApi({
       "GET /api/v1/reports/portfolio-at-risk": () => ({ asOf: "2026-11-30",

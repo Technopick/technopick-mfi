@@ -12,6 +12,7 @@ import { MpesaPage } from "./pages/MpesaPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
 import { PrudentialPage, RegulatorySetupPage } from "./pages/RegulatoryPages";
+import { CreditRefundsPage } from "./pages/SettlementPages";
 import { StatementsPage } from "./pages/StatementsPage";
 import { WriteOffsPage } from "./pages/WriteOffsPage";
 import { AccountPage, TellerPage } from "./pages/SavingsPages";
@@ -48,6 +49,7 @@ export const routes: RouteObject[] = [
       { path: "regulatory", element: <PrudentialPage /> },
       { path: "regulatory/setup", element: <RegulatorySetupPage /> },
       { path: "write-offs", element: <WriteOffsPage /> },
+      { path: "credit-refunds", element: <CreditRefundsPage /> },
       { path: "loans", element: <LoanSchedulePage /> },
       { path: "loans/:number", element: <LoanSchedulePage /> },
       { path: "*", element: <p className="empty">Page not found.</p> },
