@@ -189,8 +189,12 @@ public class MpesaStatementService {
                    WHERE s.upload_id = :id AND s.active AND s.status = 'EXCEPTION' AND s.category = 'PAYMENT'
                   """;
         String column = kind == AccountKind.PAYBILL ? "payment_id" : "disbursement_id";
+        // Lines inserted in this transaction have no statistics yet, so the planner expects one row
+        // and picks nested loops that re-run the candidates for every line (minutes for a busy day).
+        // The candidates are materialised once and joined by hash instead.
+        jdbc.sql("SET LOCAL enable_nestloop = off").update();
         jdbc.sql("""
-                WITH c AS (%s)
+                WITH c AS MATERIALIZED (%s)
                 UPDATE payments.statement_line s
                    SET status = CASE WHEN c.usable AND c.same_amount AND NOT c.taken AND c.rn = 1 THEN 'MATCHED' ELSE 'EXCEPTION' END,
                        exception_code = CASE WHEN c.usable AND c.same_amount AND NOT c.taken AND c.rn = 1 THEN NULL
@@ -202,6 +206,7 @@ public class MpesaStatementService {
                  WHERE s.tenant_id = tenancy.current_tenant() AND s.upload_id = :id AND s.line_no = c.line_no
                 """.formatted(candidates, column))
             .param("id", uploadId).update();
+        jdbc.sql("SET LOCAL enable_nestloop = on").update();
         return jdbc.sql("SELECT count(*) FROM payments.statement_line WHERE upload_id = :id AND status = 'MATCHED'")
             .param("id", uploadId).query(Integer.class).single();
     }
