@@ -55,6 +55,9 @@ public class EclService {
                              String change, UUID entryId, String requestedBy, OffsetDateTime requestedAt, String decidedBy,
                              OffsetDateTime decidedAt, String decisionReason, List<EclStageRow> stages, boolean replayed) { }
 
+    public record EclLine(String loanNumber, String customerNumber, String productCode, String branchCode, int daysPastDue,
+                          int stage, String exposure, String ratePct, String ecl) { }
+
     private record Settings(String allowance, String expense, int stage2, int stage3, Currency currency) { }
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
@@ -320,24 +323,22 @@ public class EclService {
         return view(runId, false);
     }
 
-    /** Every loan of a run, for finance and the auditors (CSV). */
+    /** Every loan of a run, for finance and the auditors; largest provisions first. */
     @Transactional(readOnly = true)
-    public String linesCsv(UUID tenantId, UUID runId) {
+    public List<EclLine> lines(UUID tenantId, UUID runId) {
         session.bind(tenantId);
         view(runId, false);
-        StringBuilder csv = new StringBuilder("loan_number,customer_number,product,branch,days_past_due,stage,exposure,rate_pct,ecl\n");
-        jdbc.sql("""
-                SELECT l.loan_number, COALESCE(c.customer_number, ''), x.product_code, x.branch_code, x.days_past_due, x.stage,
+        return jdbc.sql("""
+                SELECT l.loan_number, c.customer_number, x.product_code, x.branch_code, x.days_past_due, x.stage,
                        x.exposure, x.rate_pct, x.ecl
                   FROM ledger.ecl_run_line x
                   JOIN lending.loan l ON l.tenant_id = x.tenant_id AND l.loan_id = x.loan_id
                   LEFT JOIN customer.customer c ON c.tenant_id = l.tenant_id AND c.customer_id = l.customer_id
                  WHERE x.run_id = :id ORDER BY x.stage DESC, x.ecl DESC, l.loan_number
-                """).param("id", runId).query((rs, i) -> csv.append(rs.getString(1)).append(',').append(rs.getString(2)).append(',')
-                    .append(rs.getString(3)).append(',').append(rs.getString(4)).append(',').append(rs.getInt(5)).append(',')
-                    .append(rs.getInt(6)).append(',').append(m(rs.getBigDecimal(7))).append(',').append(pct(rs.getBigDecimal(8)))
-                    .append(',').append(m(rs.getBigDecimal(9))).append('\n')).list();
-        return csv.toString();
+                """).param("id", runId)
+            .query((rs, i) -> new EclLine(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getInt(5),
+                    rs.getInt(6), m(rs.getBigDecimal(7)), pct(rs.getBigDecimal(8)), m(rs.getBigDecimal(9))))
+            .list();
     }
 
     // ------------------------------------------------------------------

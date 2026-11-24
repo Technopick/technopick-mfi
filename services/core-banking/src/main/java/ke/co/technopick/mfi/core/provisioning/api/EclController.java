@@ -7,13 +7,12 @@ import java.util.UUID;
 import ke.co.technopick.mfi.core.identity.api.CurrentCaller;
 import ke.co.technopick.mfi.core.provisioning.application.EclService;
 import ke.co.technopick.mfi.core.provisioning.application.EclService.EclCalculation;
+import ke.co.technopick.mfi.core.provisioning.application.EclService.EclLine;
 import ke.co.technopick.mfi.core.provisioning.application.EclService.EclRates;
 import ke.co.technopick.mfi.core.provisioning.application.EclService.EclRunView;
 import ke.co.technopick.mfi.core.provisioning.application.EclService.EclSettingsRequest;
 import ke.co.technopick.mfi.core.provisioning.application.EclService.EclSettingsView;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -82,10 +81,9 @@ public class EclController {
         return ecl.run(caller.tenantId(), runId);
     }
 
-    @GetMapping(path = "/runs/{runId}/lines", produces = "text/csv")
-    public ResponseEntity<String> lines(@PathVariable UUID runId) {
-        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"ecl-" + runId + ".csv\"")
-            .body(ecl.linesCsv(caller.tenantId(), runId));
+    @GetMapping("/runs/{runId}/lines")
+    public List<EclLine> lines(@PathVariable UUID runId) {
+        return ecl.lines(caller.tenantId(), runId);
     }
 
     @PostMapping("/runs/{runId}/approve")

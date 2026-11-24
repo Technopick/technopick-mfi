@@ -206,10 +206,12 @@ class EclIntegrationTest {
             .andExpect(jsonPath("$.results[?(@.checkCode == 'LOAN_LOSS_ALLOWANCE')].ledgerBalance").value(hasItem("-5520.00")));
 
         // Every loan is in the run's lines, for the auditors.
-        String csv = mvc.perform(get(P + "/runs/" + runId + "/lines").with(FIN1)).andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
-        assertEquals(11, csv.strip().split("\n").length, csv);
-        assertTrue(csv.contains("LN-P0000003,") && csv.contains(",60,2,12000.00,10,1200.00"), csv);
+        mvc.perform(get(P + "/runs/" + runId + "/lines").with(FIN1)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(10))
+            .andExpect(jsonPath("$[0].stage").value(2)).andExpect(jsonPath("$[0].daysPastDue").value(60))
+            .andExpect(jsonPath("$[0].exposure").value("12000.00")).andExpect(jsonPath("$[0].ratePct").value("10"))
+            .andExpect(jsonPath("$[0].ecl").value("1200.00"))
+            .andExpect(jsonPath("$[*].loanNumber", hasItem("LN-P0000003")));
 
         // Nothing else posts to the allowance; it cannot be swapped; and a month already posted is not run again.
         String control = mvc.perform(post("/api/v1/accounting/manual-journals").with(FIN1).contentType(MediaType.APPLICATION_JSON)
