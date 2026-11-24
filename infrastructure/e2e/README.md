@@ -22,6 +22,10 @@ USSD aggregator does). A member needs a PIN setup requested by a teller and appr
 supervisor (customer page, then "PIN requests"); they then confirm their ID number and choose a PIN on the
 handset. Use a phone number no other test member has.
 
+TEST-ONLY SMS inbox: http://localhost:18092 (enter a phone such as +254712345678). SMS to members is
+off until a supervisor switches it on under "SMS" in the staff app. Phones ending 998 make the simulator
+answer 503 (retried); 997 is reported as not delivered.
+
 Browser test: `cd apps/staff-web && npx playwright install chromium && npm run e2e`.
 
 ## How it is wired

@@ -503,5 +503,11 @@ public final class DarajaSimulator implements AutoCloseable {
                     env.getOrDefault("USSD_SIM_SERVICE_CODE", "*483*1#"));
             System.out.println(UssdHandsetSimulator.LABEL + " listening on port " + handset.port() + " - NOT FOR PRODUCTION");
         }
+        String smsPort = env.get("SMS_SIM_PORT");
+        if (smsPort != null && !smsPort.isBlank()) {
+            SmsProviderSimulator sms = SmsProviderSimulator.start(env.getOrDefault("DARAJA_SIM_BIND", "127.0.0.1"),
+                    Integer.parseInt(smsPort), env.get("SMS_SIM_API_KEY"));
+            System.out.println(SmsProviderSimulator.LABEL + " listening on port " + sms.port() + " - NOT FOR PRODUCTION");
+        }
     }
 }

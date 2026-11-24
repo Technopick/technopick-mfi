@@ -3,6 +3,8 @@ import { signIn, verifiedMember } from "./helpers";
 
 /** The TEST-ONLY USSD handset simulator (infrastructure/e2e), posting to the integration runtime like an aggregator. */
 const HANDSET = process.env.E2E_USSD_URL ?? "http://localhost:18091/";
+/** The TEST-ONLY SMS simulator's phone inbox. */
+const SMS_INBOX = process.env.E2E_SMS_URL ?? "http://localhost:18092/";
 
 /** Dials, then answers each prompt in turn; returns the last screen. */
 async function dial(handset: Page, ...keys: string[]): Promise<string> {
@@ -28,7 +30,9 @@ async function dial(handset: Page, ...keys: string[]): Promise<string> {
  * savings account -> a teller asks for a USSD PIN setup, a supervisor approves -> the member, on
  * the TEST-ONLY handset, confirms their ID number and chooses a PIN -> signs in and deposits 250
  * by M-Pesa prompt -> the TEST-ONLY Daraja simulator pays -> the account shows 250 to staff and on
- * USSD -> the member's USSD activity is on their customer page.
+ * USSD -> the member's USSD activity is on their customer page. With SMS switched on by a
+ * supervisor, the member's phone (TEST-ONLY SMS simulator) gets the PIN setup, PIN set and deposit
+ * messages, and staff see them delivered.
  */
 test("a member sets a USSD PIN and deposits to savings by M-Pesa prompt", async ({ browser }) => {
   const officer = await signIn(browser, "officer");
@@ -44,13 +48,21 @@ test("a member sets a USSD PIN and deposits to savings by M-Pesa prompt", async 
   await expect(heading).toBeVisible();
   const account = (await heading.textContent())!.replace("Account ", "").trim();
 
+  // A supervisor switches SMS to members on.
+  const supervisor = await signIn(browser, "supervisor");
+  await supervisor.goto("/sms");
+  await supervisor.getByLabel(/^Signature/).fill("E2E Sacco");
+  await supervisor.getByLabel(/^USSD code/).fill("*483*1#");
+  await supervisor.getByLabel("Send SMS to members").check();
+  await supervisor.getByRole("button", { name: "Save SMS settings" }).click();
+  await expect(supervisor.getByRole("status")).toContainText("SMS to members is on.");
+
   // A teller asks for the PIN setup; a supervisor approves it.
   await teller.goto(`/customers/${customer}`);
   await expect(teller.getByText("Not set up")).toBeVisible();
   await teller.getByLabel(/how the member was identified/i).fill("National ID sighted, member at the counter (e2e)");
   await teller.getByRole("button", { name: "Request PIN setup" }).click();
   await expect(teller.getByRole("status")).toContainText("must approve it");
-  const supervisor = await signIn(browser, "supervisor");
   await supervisor.goto("/pin-requests");
   await supervisor.getByRole("row", { name: new RegExp(customer) }).getByRole("button", { name: "Approve PIN setup" }).click();
   await expect(supervisor.getByRole("status")).toContainText("Approved for Nekesa");
@@ -71,10 +83,25 @@ test("a member sets a USSD PIN and deposits to savings by M-Pesa prompt", async 
   }).toPass({ timeout: 60_000 });
   expect(await dial(handset, "4826", "1")).toContain("250.00");
 
+  // The member's phone got the messages (TEST-ONLY SMS inbox).
+  const phone = await (await browser.newContext()).newPage();
+  await expect(async () => {
+    await phone.goto(`${SMS_INBOX}?to=${encodeURIComponent(msisdn)}`);
+    await expect(phone.getByText(/TEST-ONLY SMS simulator/)).toBeVisible();
+    await expect(phone.getByText(/E2E Sacco: KES 250\.00 was deposited to your savings account/)).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 60_000 });
+  await expect(phone.getByText(/E2E Sacco: Your mobile banking PIN setup is ready\. Dial \*483\*1# from this phone/)).toBeVisible();
+  await expect(phone.getByText(/E2E Sacco: Your mobile banking PIN was set on/)).toBeVisible();
+  await expect(phone.getByText(/4826/)).toHaveCount(0);
+
   // Staff see the member's USSD activity; the PIN is never shown.
   await teller.goto(`/customers/${customer}`);
   await expect(teller.getByText("Active", { exact: true })).toBeVisible();
   await expect(teller.getByText("M-Pesa payment prompt")).toBeVisible();
   await expect(teller.getByText("Wrong ID number during setup")).toBeVisible();
+  await expect(async () => {
+    await teller.reload();
+    await expect(teller.getByRole("row", { name: /Savings deposit received.*Delivered/ })).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await expect(teller.getByText("4826")).toHaveCount(0);
 });

@@ -9,5 +9,5 @@ WORKDIR /app
 COPY target/lib/ lib/
 COPY target/daraja-simulator-*.jar lib/
 USER 10001
-EXPOSE 18090 18091
+EXPOSE 18090 18091 18092
 ENTRYPOINT ["java", "-cp", "/app/lib/*", "ke.co.technopick.mfi.simulators.daraja.DarajaSimulator"]

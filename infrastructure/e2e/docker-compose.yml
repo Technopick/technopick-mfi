@@ -80,7 +80,10 @@ services:
       USSD_SIM_TARGET_URL: http://integration:8081/ussd/e2e-only-ussd-token
       USSD_SIM_PORT: "18091"
       USSD_SIM_SERVICE_CODE: "*483*1#"
-    ports: ["18091:18091"]
+      # TEST-ONLY SMS provider and phone inbox (http://localhost:18092).
+      SMS_SIM_PORT: "18092"
+      SMS_SIM_API_KEY: e2e-only-sms-key
+    ports: ["18091:18091", "18092:18092"]
     volumes:
       - simshared:/shared
     networks: [mfi]
@@ -121,6 +124,12 @@ services:
       MFI_CORE_BASE_URL: http://core:8080
       MFI_CORE_TOKEN_URI: http://keycloak:8080/realms/technopick/protocol/openid-connect/token
       MFI_CORE_CLIENT_SECRET: e2e-only-integration-secret
+      # SMS through the TEST-ONLY SMS simulator (ADR-0035).
+      MFI_SMS_ENABLED: "true"
+      MFI_SMS_PROVIDER_URL: http://daraja-simulator:18092
+      MFI_SMS_API_KEY: e2e-only-sms-key
+      MFI_SMS_CALLBACK_BASE_URL: http://integration:8081
+      MFI_SMS_DELIVERY_TOKEN: e2e-only-dlr-token
       # The simulator's public key (for B2C SecurityCredential) is read from the shared volume.
       SPRING_CONFIG_IMPORT: optional:configtree:/shared/
       SPRING_APPLICATION_JSON: >-
@@ -136,6 +145,7 @@ services:
           "b2c-accounts":[{"token":"e2e-only-b2c-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001",
                            "short-code":"600000","initiator-name":"e2eapi","initiator-password":"e2e-only-initiator"}]
         },
+        "sms":{"allowed-cidrs":["172.30.57.0/24"],"poll-interval-ms":1000},
         "ussd":{
           "allowed-cidrs":["172.30.57.0/24"],
           "services":[{"token":"e2e-only-ussd-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001","service-code":"*483*1#"}]

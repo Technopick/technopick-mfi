@@ -68,6 +68,16 @@ mfi:
     # service code. Callback URL: https://<host>/ussd/<token>. Source ranges from the aggregator's documentation.
     services: []
     allowed-cidrs: []
+  sms:
+    # SMS sending (ADR-0035). Off until a provider is chosen and approved; key and token from the secret store.
+    enabled: ${MFI_SMS_ENABLED:false}
+    provider-url: ${MFI_SMS_PROVIDER_URL:}
+    api-key: ${MFI_SMS_API_KEY:}
+    callback-base-url: ${MFI_SMS_CALLBACK_BASE_URL:}
+    delivery-token: ${MFI_SMS_DELIVERY_TOKEN:}
+    allowed-cidrs: []
+    poll-interval-ms: 2000
+    batch-size: 20
   outbox:
     enabled: ${MFI_OUTBOX_RELAY_ENABLED:true}
     poll-interval-ms: ${MFI_OUTBOX_POLL_MS:1000}

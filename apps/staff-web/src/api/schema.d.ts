@@ -388,6 +388,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/{customerNumber}/sms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Notification_member"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerNumber}/sms-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Notification_preferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{customerNumber}/verify": {
         parameters: {
             query?: never;
@@ -830,6 +862,102 @@ export interface paths {
         get: operations["Member_payment"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Notification_settings"];
+        put: operations["Notification_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/sms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Notification_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/sms/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SmsGateway_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/sms/{messageId}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SmsGateway_delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/sms/{messageId}/failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SmsGateway_failed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/sms/{messageId}/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SmsGateway_sent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1833,6 +1961,15 @@ export interface components {
             reconciled?: boolean;
             subledgerBalance?: string;
         };
+        ClaimedSms: {
+            body?: string;
+            /** Format: uuid */
+            messageId?: string;
+            msisdn?: string;
+            senderId?: string;
+            /** Format: uuid */
+            tenantId?: string;
+        };
         ClassificationRow: {
             allowancePct?: string;
             daysPastDue?: string;
@@ -2378,6 +2515,13 @@ export interface components {
             idempotencyKey?: string;
             target?: string;
         };
+        MemberSms: {
+            customerNumber?: string;
+            messages?: components["schemas"]["SmsView"][];
+            phone?: string;
+            preferences?: components["schemas"]["SmsPreferences"];
+            smsEnabled?: boolean;
+        };
         MpesaResolutionCreated: {
             /** Format: uuid */
             resolutionId?: string;
@@ -2782,6 +2926,89 @@ export interface components {
             /** Format: uuid */
             setupId?: string;
             status?: string;
+        };
+        SmsClaimRequest: {
+            /** Format: int32 */
+            limit?: number;
+        };
+        SmsDeliveryReport: {
+            delivered?: boolean;
+            providerMessageId: string;
+            reason?: string;
+            /** Format: uuid */
+            tenantId: string;
+        };
+        SmsFailureReport: {
+            code?: string;
+            description?: string;
+            retryable?: boolean;
+            /** Format: uuid */
+            tenantId: string;
+        };
+        SmsOverview: {
+            lastSevenDays?: {
+                [key: string]: number;
+            };
+            messages?: components["schemas"]["SmsView"][];
+        };
+        SmsPreferenceUpdate: {
+            language: string;
+            paymentAlerts?: boolean;
+            reminders?: boolean;
+        };
+        SmsPreferences: {
+            language?: string;
+            paymentAlerts?: boolean;
+            reminders?: boolean;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        SmsSentReport: {
+            providerMessageId: string;
+            /** Format: uuid */
+            tenantId: string;
+        };
+        SmsSettings: {
+            enabled?: boolean;
+            /** Format: int32 */
+            reminderHour?: number;
+            senderId?: string;
+            signature?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+            ussdCode?: string;
+        };
+        SmsSettingsUpdate: {
+            enabled?: boolean;
+            /** Format: int32 */
+            reminderHour?: number;
+            senderId?: string;
+            signature: string;
+            ussdCode?: string;
+        };
+        SmsView: {
+            /** Format: int32 */
+            attempts?: number;
+            body?: string;
+            category?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            customerNumber?: string;
+            /** Format: date-time */
+            deliveredAt?: string;
+            language?: string;
+            lastError?: string;
+            /** Format: uuid */
+            messageId?: string;
+            /** Format: date-time */
+            notBefore?: string;
+            /** Format: date-time */
+            sentAt?: string;
+            status?: string;
+            suppressedReason?: string;
+            template?: string;
         };
         StaffAction: {
             actor?: string;
@@ -3624,6 +3851,54 @@ export interface operations {
             };
         };
     };
+    Notification_member: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberSms"];
+                };
+            };
+        };
+    };
+    Notification_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsPreferenceUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberSms"];
+                };
+            };
+        };
+    };
     Customer_verify: {
         parameters: {
             query?: never;
@@ -4368,6 +4643,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberPayment"];
+                };
+            };
+        };
+    };
+    Notification_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsSettings"];
+                };
+            };
+        };
+    };
+    Notification_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsSettings"];
+                };
+            };
+        };
+    };
+    Notification_overview: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsOverview"];
+                };
+            };
+        };
+    };
+    SmsGateway_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimedSms"][];
+                };
+            };
+        };
+    };
+    SmsGateway_delivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsDeliveryReport"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsView"];
+                };
+            };
+        };
+    };
+    SmsGateway_failed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsFailureReport"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsView"];
+                };
+            };
+        };
+    };
+    SmsGateway_sent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSentReport"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsView"];
                 };
             };
         };

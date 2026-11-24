@@ -596,6 +596,28 @@
         },
         "type": "object"
       },
+      "ClaimedSms": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "messageId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "msisdn": {
+            "type": "string"
+          },
+          "senderId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ClassificationRow": {
         "properties": {
           "allowancePct": {
@@ -2241,6 +2263,29 @@
         },
         "type": "object"
       },
+      "MemberSms": {
+        "properties": {
+          "customerNumber": {
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/SmsView"
+            },
+            "type": "array"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/SmsPreferences"
+          },
+          "smsEnabled": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "MpesaResolutionCreated": {
         "properties": {
           "resolutionId": {
@@ -3434,6 +3479,247 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SmsClaimRequest": {
+        "properties": {
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "SmsDeliveryReport": {
+        "properties": {
+          "delivered": {
+            "type": "boolean"
+          },
+          "providerMessageId": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerMessageId",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "SmsFailureReport": {
+        "properties": {
+          "code": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "SmsOverview": {
+        "properties": {
+          "lastSevenDays": {
+            "additionalProperties": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/SmsView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "SmsPreferenceUpdate": {
+        "properties": {
+          "language": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "paymentAlerts": {
+            "type": "boolean"
+          },
+          "reminders": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "type": "object"
+      },
+      "SmsPreferences": {
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "paymentAlerts": {
+            "type": "boolean"
+          },
+          "reminders": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SmsSentReport": {
+        "properties": {
+          "providerMessageId": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerMessageId",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "SmsSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "reminderHour": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "senderId": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "ussdCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SmsSettingsUpdate": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "reminderHour": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "senderId": {
+            "type": "string"
+          },
+          "signature": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "ussdCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "signature"
+        ],
+        "type": "object"
+      },
+      "SmsView": {
+        "properties": {
+          "attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "deliveredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "messageId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "notBefore": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sentAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "suppressedReason": {
+            "type": "string"
+          },
+          "template": {
             "type": "string"
           }
         },
@@ -5043,6 +5329,76 @@
         ]
       }
     },
+    "/api/v1/customers/{customerNumber}/sms": {
+      "get": {
+        "operationId": "Notification_member",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSms"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/v1/customers/{customerNumber}/sms-preferences": {
+      "put": {
+        "operationId": "Notification_preferences",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsPreferenceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSms"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
     "/api/v1/customers/{customerNumber}/verify": {
       "post": {
         "operationId": "Customer_verify",
@@ -6108,6 +6464,240 @@
         },
         "tags": [
           "member-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/settings": {
+      "get": {
+        "operationId": "Notification_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsSettings"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      },
+      "put": {
+        "operationId": "Notification_saveSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsSettings"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/sms": {
+      "get": {
+        "operationId": "Notification_overview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsOverview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/sms/claim": {
+      "post": {
+        "operationId": "SmsGateway_claim",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimedSms"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "sms-gateway-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/sms/{messageId}/delivery": {
+      "post": {
+        "operationId": "SmsGateway_delivery",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsDeliveryReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "sms-gateway-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/sms/{messageId}/failed": {
+      "post": {
+        "operationId": "SmsGateway_failed",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsFailureReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "sms-gateway-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/sms/{messageId}/sent": {
+      "post": {
+        "operationId": "SmsGateway_sent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsSentReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "sms-gateway-controller"
         ]
       }
     },

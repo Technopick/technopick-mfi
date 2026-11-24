@@ -161,7 +161,7 @@ class SmsIntegrationTest {
         Member four = member(4);
 
         // Off until a supervisor switches it on: nothing is queued.
-        pay("SMS0", one.account(), "50.00", "APPLIED");
+        pay("TSMS000000", one.account(), "50.00", "APPLIED");
         assertEquals(0, owner().queryForObject("SELECT count(*) FROM notify.sms_message", Integer.class));
         String settings = """
             {"enabled":true,"signature":"Test Sacco","senderId":"TESTSACCO","ussdCode":"*483*1#","reminderHour":8}
@@ -183,21 +183,21 @@ class SmsIntegrationTest {
         }
 
         // Payments: an SMS in the member's language, one per receipt; opted-out members' messages are recorded, not sent.
-        pay("SMS1", one.account(), "1000.00", "APPLIED");
-        pay("SMS1", one.account(), "1000.00", "APPLIED");
-        pay("SMS2", two.loan(), "500.00", "LOAN_REPAYMENT");
-        pay("SMS3", three.account(), "200.00", "APPLIED");
-        Map<String, Object> m1 = sms("pay:SMS1");
+        pay("TSMS000001", one.account(), "1000.00", "APPLIED");
+        pay("TSMS000001", one.account(), "1000.00", "APPLIED");
+        pay("TSMS000002", two.loan(), "500.00", "LOAN_REPAYMENT");
+        pay("TSMS000003", three.account(), "200.00", "APPLIED");
+        Map<String, Object> m1 = sms("pay:TSMS000001");
         assertEquals("Test Sacco: KES 1,000.00 was deposited to your savings account *" + one.account().substring(one.account().length() - 4)
-                + " on 28/11/2026. M-Pesa ref SMS1.", m1.get("body"));
+                + " on 28/11/2026. M-Pesa ref TSMS000001.", m1.get("body"));
         assertEquals("QUEUED", m1.get("status"));
         assertEquals(one.msisdn(), m1.get("msisdn"));
-        Map<String, Object> m2 = sms("pay:SMS2");
-        assertEquals("Test Sacco: Tumepokea KES 500.00 kwa mkopo " + two.loan() + " tarehe 28/11/2026. Kumbukumbu ya M-Pesa SMS2. Asante.",
+        Map<String, Object> m2 = sms("pay:TSMS000002");
+        assertEquals("Test Sacco: Tumepokea KES 500.00 kwa mkopo " + two.loan() + " tarehe 28/11/2026. Kumbukumbu ya M-Pesa TSMS000002. Asante.",
                 m2.get("body"));
-        assertEquals("SUPPRESSED", sms("pay:SMS3").get("status"));
-        assertEquals("MEMBER_OPTED_OUT", sms("pay:SMS3").get("suppressed_reason"));
-        assertEquals(1, owner().queryForObject("SELECT count(*) FROM notify.sms_message WHERE dedupe_key = 'pay:SMS1'", Integer.class));
+        assertEquals("SUPPRESSED", sms("pay:TSMS000003").get("status"));
+        assertEquals("MEMBER_OPTED_OUT", sms("pay:TSMS000003").get("suppressed_reason"));
+        assertEquals(1, owner().queryForObject("SELECT count(*) FROM notify.sms_message WHERE dedupe_key = 'pay:TSMS000001'", Integer.class));
 
         // The sender claims what is due, once.
         List<Map<String, Object>> claimed = claim();

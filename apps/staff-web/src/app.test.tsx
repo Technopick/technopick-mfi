@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ApiError, createApi } from "./api/client";
 import { sessionFromToken } from "./auth/session";
@@ -584,6 +584,75 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("button", { name: "Approve PIN setup" }));
     expect(await screen.findByText(/The member can now dial the USSD code/)).toBeTruthy();
     expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/v1/member-pin-setups/s-2/approve"]);
+  });
+
+  it("shows a member's SMS and lets a teller record their language and opt-outs", async () => {
+    const customer = {
+      customerNumber: "CU26-0000005", firstName: "Chebet", lastName: "Kirui", status: "ACTIVE", createdBy: "user:officer-1",
+      idType: "NATIONAL_ID", idNumber: "45678901", phoneNumber: "254755000005",
+    };
+    const msg = (id: string, template: string, status: string, extra: object = {}) => ({ messageId: id, createdAt: "2026-11-28T08:00:00Z",
+      customerNumber: "CU26-0000005", template, category: "TRANSACTIONAL", language: "en", body: `Sacco: body of ${id}`, status, attempts: 1,
+      ...extra });
+    const { api, calls } = fakeApi({
+      "GET /api/v1/customers/CU26-0000005": () => customer,
+      "GET /api/v1/savings/accounts?customerNumber=CU26-0000005": () => [],
+      "GET /api/v1/customers/CU26-0000005/member-pin": () => ({ customerNumber: "CU26-0000005", status: "NONE", failedAttempts: 0,
+        maxAttempts: 3, setups: [], recentEvents: [] }),
+      "GET /api/v1/customers/CU26-0000005/sms": () => ({ customerNumber: "CU26-0000005", phone: "2547*****005", smsEnabled: true,
+        preferences: { language: "en", paymentAlerts: true, reminders: true },
+        messages: [msg("m-1", "PAYMENT_SAVINGS", "DELIVERED", { deliveredAt: "2026-11-28T08:01:00Z" }),
+          msg("m-2", "LOAN_DUE_SOON", "QUEUED", { category: "REMINDER", lastError: "HTTP 503" }),
+          msg("m-3", "PAYMENT_LOAN", "SUPPRESSED", { attempts: 0, suppressedReason: "MEMBER_OPTED_OUT" })] }),
+      "PUT /api/v1/customers/CU26-0000005/sms-preferences": () => ({ customerNumber: "CU26-0000005", smsEnabled: true,
+        preferences: { language: "sw", paymentAlerts: true, reminders: false, updatedBy: "user:teller-1" }, messages: [] }),
+    });
+    renderAt("/customers/CU26-0000005", session("teller-1", "TELLER"), api);
+    expect(await screen.findByText("Savings deposit received")).toBeTruthy();
+    expect(screen.getByText("Delivered")).toBeTruthy();
+    expect(screen.getByText("Retrying (1 tried)")).toBeTruthy();
+    expect(screen.getByText("HTTP 503")).toBeTruthy();
+    expect(screen.getByText("Not sent: member opted out")).toBeTruthy();
+    expect(screen.getByText(/registered phone 2547\*\*\*\*\*005/)).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText("Language"), "sw");
+    await userEvent.click(screen.getByLabelText("Loan reminders"));
+    await userEvent.click(screen.getByRole("button", { name: "Save SMS choices" }));
+    expect(await screen.findByText("SMS choices saved.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ language: "sw", paymentAlerts: true, reminders: false });
+  });
+
+  it("lets a supervisor switch SMS on and shows failed messages; operations only read the settings", async () => {
+    const settings = { enabled: false, signature: "Test Sacco", senderId: "", ussdCode: "*483*1#", reminderHour: 8 };
+    const overview = (status: string) => ({ lastSevenDays: { QUEUED: 2, DISPATCHED: 0, SENT: 1, DELIVERED: 40, FAILED: 1, SUPPRESSED: 3 },
+      messages: status === "FAILED" ? [{ messageId: "f-1", createdAt: "2026-11-28T08:00:00Z", customerNumber: "CU26-0000007",
+        template: "PAYMENT_LOAN", category: "TRANSACTIONAL", language: "sw", body: "Sacco: Tumepokea KES 500.00", status: "FAILED",
+        attempts: 5, lastError: "HTTP 503: busy" }] : [] });
+    const { api, calls } = fakeApi({
+      "GET /api/v1/notifications/settings": () => settings,
+      "PUT /api/v1/notifications/settings": () => ({ ...settings, enabled: true, updatedBy: "user:sup-1" }),
+      "GET /api/v1/notifications/sms?status=FAILED": () => overview("FAILED"),
+      "GET /api/v1/notifications/sms?status=QUEUED": () => overview("QUEUED"),
+    });
+    renderAt("/sms", session("sup-1", "SUPERVISOR"), api);
+    expect(await screen.findByText("Loan payment received (Swahili)")).toBeTruthy();
+    expect(screen.getByText("HTTP 503: busy")).toBeTruthy();
+    expect(screen.getByText("40")).toBeTruthy();
+    await userEvent.click(screen.getByLabelText("Send SMS to members"));
+    await userEvent.click(screen.getByRole("button", { name: "Save SMS settings" }));
+    expect(await screen.findByText("SMS to members is on.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ enabled: true, signature: "Test Sacco", senderId: "",
+      ussdCode: "*483*1#", reminderHour: 8 });
+    await userEvent.selectOptions(screen.getByLabelText("Show"), "QUEUED");
+    expect(await screen.findByText("None.")).toBeTruthy();
+
+    const ops = fakeApi({
+      "GET /api/v1/notifications/settings": () => settings,
+      "GET /api/v1/notifications/sms?status=FAILED": () => overview("FAILED"),
+    });
+    cleanup();
+    renderAt("/sms", session("ops-1", "OPERATIONS"), ops.api);
+    expect(await screen.findByText("Only a supervisor changes these settings.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save SMS settings" })).toBeNull();
   });
 
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {

@@ -1,6 +1,7 @@
 package ke.co.technopick.mfi.integration.core;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.springframework.core.ParameterizedTypeReference;
@@ -18,6 +19,7 @@ import org.springframework.web.client.RestClient;
 public class CoreClient {
 
     private static final ParameterizedTypeReference<Map<String, Object>> MAP = new ParameterizedTypeReference<>() { };
+    private static final ParameterizedTypeReference<List<Map<String, Object>>> LIST = new ParameterizedTypeReference<>() { };
 
     private final CoreProperties props;
     private final RestClient http;
@@ -37,6 +39,17 @@ public class CoreClient {
             .body(body)
             .retrieve()
             .body(MAP));
+    }
+
+    /** For core endpoints that answer with a JSON array. */
+    public List<Map<String, Object>> postForList(String path, Map<String, Object> body) {
+        return Objects.requireNonNull(http.post()
+            .uri(props.baseUrl() + path)
+            .header("Authorization", "Bearer " + accessToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(LIST));
     }
 
     private synchronized String accessToken() {

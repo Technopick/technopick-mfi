@@ -7,6 +7,7 @@ import { actorOf, hasAnyRole } from "../auth/session";
 import { Empty, Loading, OwnItemNote, ProblemBox, Section, Status, when } from "../components/ui";
 import { useAction, useLoad } from "../hooks";
 import { MemberPinPanel } from "./MemberPinPages";
+import { MemberSmsPanel } from "./SmsPages";
 import { CustomerAccounts } from "./SavingsPages";
 
 type Summary = Schemas["CustomerSummary"];
@@ -180,6 +181,7 @@ export function CustomerPage() {
         <CustomerAccounts customerNumber={data.customerNumber} branchCode={data.branchCode ?? ""} active={data.status === "ACTIVE"} />
       )}
       {data.customerNumber && <MemberPinPanel customerNumber={data.customerNumber} active={data.status === "ACTIVE"} />}
+      {data.customerNumber && <MemberSmsPanel customerNumber={data.customerNumber} />}
     </>
   );
 }
