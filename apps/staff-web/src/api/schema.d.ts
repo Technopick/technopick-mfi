@@ -1412,6 +1412,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/provisioning/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ecl_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ecl_rates"];
+        put: operations["Ecl_saveRates"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ecl_runs"];
+        put?: never;
+        post: operations["Ecl_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ecl_run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/runs/{runId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Ecl_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/runs/{runId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ecl_lines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/runs/{runId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Ecl_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/provisioning/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ecl_settings"];
+        put: operations["Ecl_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/regulatory/mapping": {
         parameters: {
             query?: never;
@@ -2187,6 +2315,117 @@ export interface components {
             /** Format: uuid */
             requestId?: string;
             shortCode?: string;
+        };
+        EclCalculation: {
+            /** Format: date */
+            asOf?: string;
+            byProduct?: components["schemas"]["EclProductRow"][];
+            change?: string;
+            currentAllowance?: string;
+            exposure?: string;
+            /** Format: int32 */
+            loans?: number;
+            monthEnd?: boolean;
+            productsWithoutRates?: string[];
+            requiredTotal?: string;
+            /** Format: int32 */
+            stage2Dpd?: number;
+            /** Format: int32 */
+            stage3Dpd?: number;
+            stages?: components["schemas"]["EclStageRow"][];
+        };
+        EclDecision: {
+            reason?: string;
+        };
+        EclLine: {
+            branchCode?: string;
+            customerNumber?: string;
+            /** Format: int32 */
+            daysPastDue?: number;
+            ecl?: string;
+            exposure?: string;
+            loanNumber?: string;
+            productCode?: string;
+            ratePct?: string;
+            /** Format: int32 */
+            stage?: number;
+        };
+        EclProductRow: {
+            ecl?: string;
+            exposure?: string;
+            /** Format: int32 */
+            loans?: number;
+            productCode?: string;
+            ratePct?: string;
+            /** Format: int32 */
+            stage?: number;
+        };
+        EclRateRow: {
+            productCode?: string;
+            productName?: string;
+            stage1Pct?: string;
+            stage2Pct?: string;
+            stage3Pct?: string;
+        };
+        EclRates: {
+            rows?: components["schemas"]["EclRateRow"][];
+        };
+        EclRunRequest: {
+            /** Format: date */
+            asOf?: string;
+            idempotencyKey: string;
+        };
+        EclRunView: {
+            /** Format: date */
+            asOf?: string;
+            change?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: uuid */
+            entryId?: string;
+            /** Format: int32 */
+            loans?: number;
+            previousTotal?: string;
+            replayed?: boolean;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            requiredTotal?: string;
+            /** Format: uuid */
+            runId?: string;
+            stages?: components["schemas"]["EclStageRow"][];
+            status?: string;
+        };
+        EclSettingsRequest: {
+            allowanceAccount?: string;
+            expenseAccount?: string;
+            /** Format: int32 */
+            stage2Dpd?: number;
+            /** Format: int32 */
+            stage3Dpd?: number;
+        };
+        EclSettingsView: {
+            allowanceAccount?: string;
+            configured?: boolean;
+            expenseAccount?: string;
+            /** Format: int32 */
+            stage2Dpd?: number;
+            /** Format: int32 */
+            stage3Dpd?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        EclStageRow: {
+            coveragePct?: string;
+            ecl?: string;
+            exposure?: string;
+            /** Format: int32 */
+            loans?: number;
+            /** Format: int32 */
+            stage?: number;
         };
         EndOfDayAlert: {
             code?: string;
@@ -5517,6 +5756,256 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Decision"];
+                };
+            };
+        };
+    };
+    Ecl_preview: {
+        parameters: {
+            query: {
+                asOf: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclCalculation"];
+                };
+            };
+        };
+    };
+    Ecl_rates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRates"];
+                };
+            };
+        };
+    };
+    Ecl_saveRates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EclRates"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRates"];
+                };
+            };
+        };
+    };
+    Ecl_runs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRunView"][];
+                };
+            };
+        };
+    };
+    Ecl_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EclRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRunView"];
+                };
+            };
+        };
+    };
+    Ecl_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRunView"];
+                };
+            };
+        };
+    };
+    Ecl_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EclDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRunView"];
+                };
+            };
+        };
+    };
+    Ecl_lines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclLine"][];
+                };
+            };
+        };
+    };
+    Ecl_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EclDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclRunView"];
+                };
+            };
+        };
+    };
+    Ecl_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclSettingsView"];
+                };
+            };
+        };
+    };
+    Ecl_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EclSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EclSettingsView"];
                 };
             };
         };

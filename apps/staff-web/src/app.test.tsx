@@ -655,6 +655,50 @@ describe("screens", () => {
     expect(screen.queryByRole("button", { name: "Save SMS settings" })).toBeNull();
   });
 
+  it("lets finance calculate IFRS 9 provisions, request a run, approve a colleague's and set rates", async () => {
+    const stages = [{ stage: 1, loans: 6, exposure: "72000.00", ecl: "720.00", coveragePct: "1.00" },
+      { stage: 2, loans: 4, exposure: "48000.00", ecl: "4800.00", coveragePct: "10.00" },
+      { stage: 3, loans: 0, exposure: "0.00", ecl: "0.00", coveragePct: "0.00" }];
+    const run = (id: string, status: string, by: string) => ({ runId: id, asOf: "2026-10-31", status, loans: 10, requiredTotal: "5000.00",
+      previousTotal: "0.00", change: "5000.00", requestedBy: by, requestedAt: "2026-11-02T08:00:00Z", stages });
+    const { api, calls } = fakeApi({
+      "GET /api/v1/provisioning/settings": () => ({ configured: true, allowanceAccount: "1290-LOAN-LOSS-ALLOWANCE",
+        expenseAccount: "5200-IMPAIRMENT", stage2Dpd: 30, stage3Dpd: 90 }),
+      "GET /api/v1/provisioning/rates": () => ({ rows: [
+        { productCode: "BIASHARA", productName: "Biashara loan", stage1Pct: "1", stage2Pct: "10", stage3Pct: "50" },
+        { productCode: "*", productName: "Default", stage1Pct: "2", stage2Pct: "20", stage3Pct: "100" }] }),
+      "PUT /api/v1/provisioning/rates": (body) => body,
+      "GET /api/v1/provisioning/runs": () => [run("r-1", "REQUESTED", "user:fin-2")],
+      "GET /api/v1/provisioning/preview?asOf=2026-11-30": () => ({ asOf: "2026-11-30", monthEnd: true, stage2Dpd: 30, stage3Dpd: 90,
+        loans: 10, exposure: "120000.00", requiredTotal: "5520.00", currentAllowance: "5000.00", change: "520.00", stages,
+        byProduct: [], productsWithoutRates: [] }),
+      "GET /api/v1/regulatory/prudential?asOf=2026-11-30": () => ({ asOf: "2026-11-30", classification: { requiredAllowance: "12720.00" } }),
+      "POST /api/v1/provisioning/runs": () => ({ ...run("r-2", "REQUESTED", "user:fin-1"), asOf: "2026-11-30", requiredTotal: "5520.00",
+        change: "520.00" }),
+      "POST /api/v1/provisioning/runs/r-1/approve": () => run("r-1", "POSTED", "user:fin-2"),
+    });
+    renderAt("/provisioning", session("fin-1", "FINANCE"), api);
+    fireEvent.change(await screen.findByLabelText(/As at/), { target: { value: "2026-11-30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Calculate" }));
+    expect(await screen.findByText("4,800.00")).toBeTruthy();
+    expect(screen.getByText("Stage 2 (credit risk up)")).toBeTruthy();
+    expect(screen.getByText("SASRA required allowance (comparison)")).toBeTruthy();
+    expect(screen.getByText("12,720.00")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Request provision run for 2026-11-30" }));
+    expect(await screen.findByText(/Another finance user must approve it/)).toBeTruthy();
+    const posted = calls.find((c) => c.method === "POST" && c.path === "/api/v1/provisioning/runs")!;
+    expect(posted.body).toMatchObject({ asOf: "2026-11-30" });
+    await userEvent.click(screen.getByRole("button", { name: "Approve and post" }));
+    await waitFor(() => expect(calls.some((c) => c.path === "/api/v1/provisioning/runs/r-1/approve")).toBe(true));
+    const rate = screen.getByLabelText("BIASHARA stage 2 rate");
+    await userEvent.clear(rate);
+    await userEvent.type(rate, "12.5");
+    await userEvent.click(screen.getByRole("button", { name: "Save rates" }));
+    expect(await screen.findByText("Provision rates saved.")).toBeTruthy();
+    const put = calls.find((c) => c.method === "PUT")!;
+    expect((put.body as { rows: { productCode: string; stage2Pct: string }[] }).rows[0]).toMatchObject({ productCode: "BIASHARA", stage2Pct: "12.5" });
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -738,7 +782,7 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns", "Provisioning"]);
   });
 
   it("flags control accounts that do not match their records", async () => {

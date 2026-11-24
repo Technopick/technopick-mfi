@@ -1329,6 +1329,303 @@
         },
         "type": "object"
       },
+      "EclCalculation": {
+        "properties": {
+          "asOf": {
+            "format": "date",
+            "type": "string"
+          },
+          "byProduct": {
+            "items": {
+              "$ref": "#/components/schemas/EclProductRow"
+            },
+            "type": "array"
+          },
+          "change": {
+            "type": "string"
+          },
+          "currentAllowance": {
+            "type": "string"
+          },
+          "exposure": {
+            "type": "string"
+          },
+          "loans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "monthEnd": {
+            "type": "boolean"
+          },
+          "productsWithoutRates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "requiredTotal": {
+            "type": "string"
+          },
+          "stage2Dpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stage3Dpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/EclStageRow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "EclDecision": {
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EclLine": {
+        "properties": {
+          "branchCode": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "daysPastDue": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ecl": {
+            "type": "string"
+          },
+          "exposure": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "ratePct": {
+            "type": "string"
+          },
+          "stage": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EclProductRow": {
+        "properties": {
+          "ecl": {
+            "type": "string"
+          },
+          "exposure": {
+            "type": "string"
+          },
+          "loans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "ratePct": {
+            "type": "string"
+          },
+          "stage": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EclRateRow": {
+        "properties": {
+          "productCode": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "stage1Pct": {
+            "type": "string"
+          },
+          "stage2Pct": {
+            "type": "string"
+          },
+          "stage3Pct": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EclRates": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EclRateRow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "EclRunRequest": {
+        "properties": {
+          "asOf": {
+            "format": "date",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "EclRunView": {
+        "properties": {
+          "asOf": {
+            "format": "date",
+            "type": "string"
+          },
+          "change": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "loans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "previousTotal": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "requiredTotal": {
+            "type": "string"
+          },
+          "runId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/EclStageRow"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EclSettingsRequest": {
+        "properties": {
+          "allowanceAccount": {
+            "type": "string"
+          },
+          "expenseAccount": {
+            "type": "string"
+          },
+          "stage2Dpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stage3Dpd": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EclSettingsView": {
+        "properties": {
+          "allowanceAccount": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "expenseAccount": {
+            "type": "string"
+          },
+          "stage2Dpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stage3Dpd": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EclStageRow": {
+        "properties": {
+          "coveragePct": {
+            "type": "string"
+          },
+          "ecl": {
+            "type": "string"
+          },
+          "exposure": {
+            "type": "string"
+          },
+          "loans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stage": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "EndOfDayAlert": {
         "properties": {
           "code": {
@@ -7688,6 +7985,330 @@
         },
         "tags": [
           "suspense-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/preview": {
+      "get": {
+        "operationId": "Ecl_preview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclCalculation"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/rates": {
+      "get": {
+        "operationId": "Ecl_rates",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclRates"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      },
+      "put": {
+        "operationId": "Ecl_saveRates",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EclRates"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclRates"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/runs": {
+      "get": {
+        "operationId": "Ecl_runs",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EclRunView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      },
+      "post": {
+        "operationId": "Ecl_request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EclRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclRunView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/runs/{runId}": {
+      "get": {
+        "operationId": "Ecl_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclRunView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/runs/{runId}/approve": {
+      "post": {
+        "operationId": "Ecl_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EclDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclRunView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/runs/{runId}/lines": {
+      "get": {
+        "operationId": "Ecl_lines",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EclLine"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/runs/{runId}/reject": {
+      "post": {
+        "operationId": "Ecl_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EclDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclRunView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      }
+    },
+    "/api/v1/provisioning/settings": {
+      "get": {
+        "operationId": "Ecl_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
+        ]
+      },
+      "put": {
+        "operationId": "Ecl_saveSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EclSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EclSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "ecl-controller"
         ]
       }
     },
