@@ -787,6 +787,8 @@ describe("screens", () => {
     });
     renderAt("/mpesa-statements", session("fin-1", "FINANCE"), api);
     await screen.findByRole("option", { name: /Paybill 600993/ });
+    expect((screen.getByRole("button", { name: "Upload and match" }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.selectOptions(screen.getByLabelText("M-Pesa account"), "PAYBILL:600993");
     fireEvent.change(screen.getByLabelText("Statement date"), { target: { value: "2026-11-28" } });
     const csv = "Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance\n";
     await userEvent.upload(screen.getByLabelText("Statement file (CSV)"), new File([csv], "paybill.csv", { type: "text/csv" }));

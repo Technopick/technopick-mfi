@@ -20,6 +20,7 @@ test("finance reconciles an M-Pesa statement and the supervisor cannot sign off 
   await finance.goto("/mpesa-statements");
   await expect(finance.getByRole("heading", { level: 1, name: "M-Pesa statement reconciliation" })).toBeVisible();
   await expect(finance.getByLabel("M-Pesa account")).toContainText("Paybill 600991");
+  await finance.getByLabel("M-Pesa account").selectOption({ label: "Paybill 600991 (clearing 1120-MPESA-C2B-CLEARING)" });
   await finance.getByLabel("Statement date").fill(today);
   await finance.getByLabel("Statement file (CSV)").setInputFiles({ name: `paybill-${today}.csv`, mimeType: "text/csv",
     buffer: Buffer.from(csv, "utf8") });

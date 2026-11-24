@@ -68,11 +68,12 @@ public final class MpesaStatement {
 
     /**
      * Reads a statement. Every line must be on {@code statementDate} in {@code zone}; at least one
-     * line must be completed, and completed lines need a balance.
+     * line must be completed, and completed lines need a balance. When the rows above the table name
+     * a short code ("Short Code:,600993"), it must be {@code shortCode}.
      *
      * @throws IllegalArgumentException naming the row and the problem when the file cannot be read
      */
-    public static Parsed parse(String csv, AccountKind kind, LocalDate statementDate, ZoneId zone) {
+    public static Parsed parse(String csv, AccountKind kind, String shortCode, LocalDate statementDate, ZoneId zone) {
         List<List<String>> rows = rows(csv);
         int headerRow = -1;
         for (int i = 0; i < Math.min(rows.size(), 40) && headerRow < 0; i++) {
@@ -82,6 +83,14 @@ public final class MpesaStatement {
         }
         if (headerRow < 0) {
             throw new IllegalArgumentException("not an M-Pesa statement: no \"Receipt No.\" column header in the first 40 rows");
+        }
+        for (int i = 0; i < headerRow; i++) {
+            List<String> r = rows.get(i);
+            if (r.size() > 1 && key(r.get(0)).equals("shortcode") && !r.get(1).isBlank()
+                    && !r.get(1).strip().equals(shortCode)) {
+                throw new IllegalArgumentException("the file is the statement of short code " + r.get(1).strip()
+                        + ", not " + shortCode);
+            }
         }
         Map<String, Integer> col = new HashMap<>();
         List<String> header = rows.get(headerRow);

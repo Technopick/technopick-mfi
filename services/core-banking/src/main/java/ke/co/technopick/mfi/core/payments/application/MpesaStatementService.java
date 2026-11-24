@@ -115,7 +115,7 @@ public class MpesaStatementService {
                     + " is already uploaded; withdraw it first to replace it");
         }
         ZoneId zone = ZoneId.of(jdbc.sql("SELECT time_zone FROM tenancy.tenant").query(String.class).single());
-        Parsed parsed = MpesaStatement.parse(csv, kind, statementDate, zone);
+        Parsed parsed = MpesaStatement.parse(csv, kind, shortCode, statementDate, zone);
         UUID id = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO payments.statement_upload (tenant_id, upload_id, account_kind, short_code, gl_clearing, statement_date,

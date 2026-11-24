@@ -35,7 +35,7 @@ class MpesaStatementTest {
 
     @Test
     void readsAPaybillDayAndDerivesTheBalances() {
-        Parsed p = MpesaStatement.parse(PAYBILL, AccountKind.PAYBILL, DAY, NAIROBI);
+        Parsed p = MpesaStatement.parse(PAYBILL, AccountKind.PAYBILL, "600993", DAY, NAIROBI);
         assertEquals(5, p.lines().size());
         assertEquals(new BigDecimal("1500.00"), p.totalPaidIn());
         assertEquals(new BigDecimal("10015.00"), p.totalWithdrawn());
@@ -64,7 +64,7 @@ class MpesaStatementTest {
         for (int i = rows.length - 1; i >= 0; i--) {
             reversed.append(rows[i]).append("\r\n");
         }
-        Parsed p = MpesaStatement.parse(reversed.toString(), AccountKind.PAYBILL, DAY, NAIROBI);
+        Parsed p = MpesaStatement.parse(reversed.toString(), AccountKind.PAYBILL, "600993", DAY, NAIROBI);
         assertEquals(new BigDecimal("1485.00"), p.closingBalance());
         assertEquals(new BigDecimal("10000.00"), p.openingBalance());
         assertTrue(p.balanceChainOk());
@@ -78,7 +78,7 @@ class MpesaStatementTest {
                 TKB0000002,27/11/2026 11:00:00,Business Payment to 254711222333 - PETER K,Completed,,9800.00,40200.00,Business Payment to Customer via API,254711222333 - PETER K
                 TKB0000002,27/11/2026 11:00:00,Business Payment to Customer Charge,Completed,,33.00,40167.00,Business Payment to Customer Charge,
                 """;
-        Parsed p = MpesaStatement.parse(csv, AccountKind.B2C, DAY, NAIROBI);
+        Parsed p = MpesaStatement.parse(csv, AccountKind.B2C, "600000", DAY, NAIROBI);
         assertEquals(Category.TRANSFER, p.lines().get(0).category());
         assertEquals(Category.PAYMENT, p.lines().get(1).category());
         assertEquals("Business Payment to 2547****333", p.lines().get(1).details());
@@ -94,7 +94,7 @@ class MpesaStatementTest {
                 TKR0000001,2026-11-27 08:00:00,Pay Bill,Completed,100.00,,600.00
                 TKR0000002,2026-11-27 09:00:00,Pay Bill,Completed,100.00,,650.00
                 """;
-        Parsed p = MpesaStatement.parse(csv, AccountKind.PAYBILL, DAY, NAIROBI);
+        Parsed p = MpesaStatement.parse(csv, AccountKind.PAYBILL, "600993", DAY, NAIROBI);
         assertFalse(p.balanceChainOk());
         assertEquals(new BigDecimal("650.00"), p.closingBalance());
         assertEquals(new BigDecimal("450.00"), p.openingBalance());
@@ -103,27 +103,34 @@ class MpesaStatementTest {
     @Test
     void rejectsFilesThatAreNotOneDayOfThisFormat() {
         assertThrows(IllegalArgumentException.class,
-                () -> MpesaStatement.parse("a,b\n1,2\n", AccountKind.PAYBILL, DAY, NAIROBI));
+                () -> MpesaStatement.parse("a,b\n1,2\n", AccountKind.PAYBILL, "600993", DAY, NAIROBI));
         assertThrows(IllegalArgumentException.class, () -> MpesaStatement.parse("""
                 Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
                 TKR0000001,2026-11-28 08:00:00,Pay Bill,Completed,100.00,,600.00
-                """, AccountKind.PAYBILL, DAY, NAIROBI));
+                """, AccountKind.PAYBILL, "600993", DAY, NAIROBI));
         assertThrows(IllegalArgumentException.class, () -> MpesaStatement.parse("""
                 Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
                 TKR0000001,2026-11-27 08:00:00,Pay Bill,Completed,100.005,,600.00
-                """, AccountKind.PAYBILL, DAY, NAIROBI));
+                """, AccountKind.PAYBILL, "600993", DAY, NAIROBI));
         assertThrows(IllegalArgumentException.class, () -> MpesaStatement.parse("""
                 Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
                 bad,2026-11-27 08:00:00,Pay Bill,Completed,100.00,,600.00
-                """, AccountKind.PAYBILL, DAY, NAIROBI));
+                """, AccountKind.PAYBILL, "600993", DAY, NAIROBI));
         assertThrows(IllegalArgumentException.class, () -> MpesaStatement.parse("""
                 Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
                 TKR0000001,2026-11-27 08:00:00,Pay Bill,Completed,100.00,,
-                """, AccountKind.PAYBILL, DAY, NAIROBI));
+                """, AccountKind.PAYBILL, "600993", DAY, NAIROBI));
         assertThrows(IllegalArgumentException.class, () -> MpesaStatement.parse("""
                 Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
                 TKR0000001,2026-11-27 08:00:00,"Pay Bill,Completed,100.00,,600.00
-                """, AccountKind.PAYBILL, DAY, NAIROBI));
+                """, AccountKind.PAYBILL, "600993", DAY, NAIROBI));
+    }
+
+    @Test
+    void refusesTheStatementOfAnotherShortCode() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> MpesaStatement.parse(PAYBILL, AccountKind.B2C, "600000", DAY, NAIROBI));
+        assertEquals("the file is the statement of short code 600993, not 600000", e.getMessage());
     }
 
     @Test

@@ -62,11 +62,6 @@ function UploadSection({ onUploaded }: { onUploaded: (d: Detail) => void }) {
   const [account, setAccount] = useState("");
   const [date, setDate] = useState(yesterday);
   const [file, setFile] = useState<File | null>(null);
-  useEffect(() => {
-    const first = accounts.data?.[0];
-    if (first && !account) setAccount(`${first.accountKind}:${first.shortCode}`);
-  }, [accounts.data, account]);
-
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!file) return;
@@ -84,6 +79,7 @@ function UploadSection({ onUploaded }: { onUploaded: (d: Detail) => void }) {
       <form className="form" onSubmit={(e) => void submit(e)}>
         <label>M-Pesa account
           <select value={account} required onChange={(e) => setAccount(e.target.value)}>
+            <option value="">Choose the paybill or B2C account</option>
             {(accounts.data ?? []).map((a) => (
               <option key={`${a.accountKind}:${a.shortCode}`} value={`${a.accountKind}:${a.shortCode}`}>
                 {a.accountKind === "PAYBILL" ? "Paybill" : "B2C"} {a.shortCode} (clearing {a.clearingAccount})</option>
