@@ -15,6 +15,7 @@ import ke.co.technopick.mfi.core.accounting.domain.JournalEntry;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDayPlanner;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDayPlanner.InstallmentState;
 import ke.co.technopick.mfi.core.eod.domain.EndOfDayPlanner.Plan;
+import ke.co.technopick.mfi.core.lending.application.InterestSuspenseService;
 import ke.co.technopick.mfi.core.lending.application.LoanClosureService;
 import ke.co.technopick.mfi.core.lending.application.LoanRepaymentService;
 import ke.co.technopick.mfi.core.lending.domain.DueComponent;
@@ -48,9 +49,11 @@ public class LoanEndOfDayStep {
     private final JournalPosting journal;
     private final LoanRepaymentService repayments;
     private final LoanClosureService closure;
+    private final InterestSuspenseService suspension;
 
     public LoanEndOfDayStep(JdbcClient jdbc, JournalPosting journal, LoanRepaymentService repayments,
-                            LoanClosureService closure) {
+                            LoanClosureService closure, InterestSuspenseService suspension) {
+        this.suspension = suspension;
         this.jdbc = jdbc;
         this.journal = journal;
         this.repayments = repayments;
@@ -194,6 +197,7 @@ public class LoanEndOfDayStep {
             .param("bucket", arrears.bucket().name()).param("class", arrears.classification().name())
             .param("arrears", arrears.arrearsAmount().amount()).param("principal", loan.principal().subtract(principalRepaid))
             .update();
+        suspension.adjustAtEndOfDay(tenantId, loanId, date, arrears.daysPastDue(), actor);
         return new LoanResult(true, accrued, penalties, arrears.daysPastDue(), creditApplied, false);
     }
 

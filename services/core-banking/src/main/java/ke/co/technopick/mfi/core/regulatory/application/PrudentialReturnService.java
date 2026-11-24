@@ -49,14 +49,15 @@ public class PrudentialReturnService {
 
     public record RiskClassification(List<ClassificationRow> rows, int totalLoans, String grossLoans, String requiredAllowance,
                                      ReturnLine allowanceHeld, String allowanceShortfall, String nonPerformingLoans,
-                                     String nonPerformingRatioPct, String interestAccruedOnNonPerforming,
+                                     String nonPerformingRatioPct, String interestInSuspense, String interestAccruedOnNonPerforming,
                                      String ledgerLoanPrincipal, String unexplainedPrincipalDifference) { }
 
     public record PrudentialSettingsView(String minCoreCapital, String minCoreToAssetsPct, String minInstitutionalToAssetsPct,
                                          String minCoreToDepositsPct, String minLiquidityPct, int watchMaxDpd,
                                          int substandardMaxDpd, int doubtfulMaxDpd, String provisionPerformingPct,
                                          String provisionWatchPct, String provisionSubstandardPct, String provisionDoubtfulPct,
-                                         String provisionLossPct, boolean includeCurrentYearSurplus, boolean regulationDefaults,
+                                         String provisionLossPct, boolean includeCurrentYearSurplus,
+                                         boolean interestSuspensionEnabled, String interestSuspenseAccount, boolean regulationDefaults,
                                          String updatedBy, OffsetDateTime updatedAt) { }
 
     public record PrudentialReturn(LocalDate asOf, String currency, boolean periodClosed, PrudentialSettingsView settings,
@@ -161,7 +162,8 @@ public class PrudentialReturnService {
             if (line != null) {
                 byLine.computeIfAbsent(line, k -> new ArrayList<>()).add(new AccountAmount(a.code(), a.name(), m(a.natural())));
                 total.merge(line, a.natural(), BigDecimal::add);
-            } else if (!"INCOME".equals(a.accountClass()) && !"EXPENSE".equals(a.accountClass()) && a.natural().signum() != 0) {
+            } else if (!"INCOME".equals(a.accountClass()) && !"EXPENSE".equals(a.accountClass()) && a.natural().signum() != 0
+                    && !a.code().equals(stored.suspenseAccount())) { // interest in suspense is reported with the loans
                 unmapped.add(new AccountAmount(a.code(), a.name(), m(a.natural())));
             }
         }
@@ -246,7 +248,9 @@ public class PrudentialReturnService {
                  WHERE e.business_date <= :d
                    AND l.account_code IN (SELECT DISTINCT gl_principal FROM lending.loan_product_version)
                 """).param("d", d).query(BigDecimal.class).single();
-        BigDecimal interestOnNpl = jdbc.sql("""
+        // Interest on non-performing loans still in income: unpaid accrued interest less what is held in suspense, as of d.
+        record Interest(BigDecimal unpaidOnNpl, BigDecimal suspendedOnNpl, BigDecimal suspendedAll) { }
+        Interest interest = jdbc.sql("""
                 WITH npl AS (SELECT loan_id FROM lending.arrears_snapshot WHERE as_of = :d AND days_past_due > :watch),
                      a AS (SELECT x.loan_id, x.installment_no, sum(x.amount) AS accrued FROM lending.loan_accrual x
                             WHERE x.business_date <= :d AND x.loan_id IN (SELECT loan_id FROM npl) GROUP BY 1, 2),
@@ -256,11 +260,17 @@ public class PrudentialReturnService {
                              JOIN ledger.journal_entry e ON e.tenant_id = r.tenant_id AND e.entry_id = r.journal_entry_id
                             WHERE al.component = 'INTEREST' AND e.business_date <= :d AND r.loan_id IN (SELECT loan_id FROM npl)
                             GROUP BY 1, 2)
-                SELECT COALESCE(sum(GREATEST(COALESCE(a.accrued, 0) - COALESCE(p.paid, 0), 0)), 0)
-                  FROM a FULL JOIN p ON p.loan_id = a.loan_id AND p.installment_no = a.installment_no
-                """).param("d", d).param("watch", s.watchMaxDpd()).query(BigDecimal.class).single();
+                SELECT (SELECT COALESCE(sum(GREATEST(COALESCE(a.accrued, 0) - COALESCE(p.paid, 0), 0)), 0)
+                          FROM a FULL JOIN p ON p.loan_id = a.loan_id AND p.installment_no = a.installment_no),
+                       (SELECT COALESCE(sum(amount), 0) FROM lending.interest_suspense
+                         WHERE business_date <= :d AND loan_id IN (SELECT loan_id FROM npl)),
+                       (SELECT COALESCE(sum(amount), 0) FROM lending.interest_suspense WHERE business_date <= :d)
+                """).param("d", d).param("watch", s.watchMaxDpd())
+            .query((rs, i) -> new Interest(rs.getBigDecimal(1), rs.getBigDecimal(2), rs.getBigDecimal(3))).single();
+        BigDecimal interestOnNpl = interest.unpaidOnNpl().subtract(interest.suspendedOnNpl()).max(ZERO);
         RiskClassification classification = new RiskClassification(rows, loanCount, m(gross), m(requiredTotal), heldLine,
-                m(shortfall), m(npl), pct(PrudentialRules.percent(npl, gross)), m(interestOnNpl), m(ledgerPrincipal),
+                m(shortfall), m(npl), pct(PrudentialRules.percent(npl, gross)), m(interest.suspendedAll()), m(interestOnNpl),
+                m(ledgerPrincipal),
                 m(ledgerPrincipal.subtract(gross)));
 
         if (ledgerPrincipal.compareTo(gross) != 0) {
@@ -268,8 +278,10 @@ public class PrudentialReturnService {
                     + ") by " + m(ledgerPrincipal.subtract(gross)) + ". Check reconciliation for " + d + " before submitting.");
         }
         if (interestOnNpl.signum() > 0) {
-            notes.add("Interest of " + m(interestOnNpl) + " accrued on non-performing loans is still in income and receivables;"
-                    + " Reg 42 requires it to be suspended. Interest suspension is not built yet.");
+            notes.add("Interest of " + m(interestOnNpl) + " accrued on non-performing loans is still in income; Reg 42 requires it"
+                    + " to be suspended. " + (stored.suspensionEnabled()
+                            ? "Interest suspension is on; it applies from the next end of day."
+                            : "Interest suspension is switched off for this Sacco (prudential settings)."));
         }
         if (mapping.isEmpty()) {
             notes.add("No ledger accounts are mapped to return lines yet; capital and liquidity figures are zero until finance maps them.");

@@ -80,7 +80,17 @@ public class ReconciliationService {
                   FROM loans GROUP BY gl_penalty_receivable, currency
                 UNION ALL
                 SELECT 'LOAN_OVERPAYMENT', gl_overpayment, currency, sum(lending.loan_credit(tenant_id, loan_id)), count(*)
-                  FROM loans GROUP BY gl_overpayment, currency)
+                  FROM loans GROUP BY gl_overpayment, currency
+                UNION ALL
+                -- Interest in suspense (ADR-0031): a contra asset, so its ledger balance is the negative of what the loans hold.
+                SELECT 'LOAN_INTEREST_SUSPENSE', a.account_code, a.currency,
+                       -COALESCE((SELECT sum(m.amount) FROM lending.interest_suspense m WHERE m.account_code = a.account_code), 0),
+                       (SELECT count(*) FROM (SELECT m.loan_id FROM lending.interest_suspense m WHERE m.account_code = a.account_code
+                                               GROUP BY m.loan_id HAVING sum(m.amount) <> 0) held)
+                  FROM ledger.gl_account a
+                 WHERE a.account_code IN (SELECT interest_suspense_account FROM ledger.prudential_settings
+                                           WHERE interest_suspense_account IS NOT NULL
+                                          UNION SELECT account_code FROM lending.interest_suspense))
             SELECT s.check_code, s.account_code, s.currency, s.amount AS subledger, s.items,
                    CASE WHEN a.account_class IN ('ASSET', 'EXPENSE') THEN COALESCE(g.debit_positive, 0)
                         ELSE -COALESCE(g.debit_positive, 0) END AS ledger

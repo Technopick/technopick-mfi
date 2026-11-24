@@ -22,13 +22,15 @@ public class PrudentialSettingsService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PrudentialSettingsService.class);
 
-    record Stored(Settings settings, boolean defaults, String updatedBy, OffsetDateTime updatedAt) { }
+    record Stored(Settings settings, boolean suspensionEnabled, String suspenseAccount, boolean defaults, String updatedBy,
+                  OffsetDateTime updatedAt) { }
 
     public record PrudentialSettingsRequest(String minCoreCapital, String minCoreToAssetsPct, String minInstitutionalToAssetsPct,
                                             String minCoreToDepositsPct, String minLiquidityPct, Integer watchMaxDpd,
                                             Integer substandardMaxDpd, Integer doubtfulMaxDpd, String provisionPerformingPct,
                                             String provisionWatchPct, String provisionSubstandardPct, String provisionDoubtfulPct,
-                                            String provisionLossPct, Boolean includeCurrentYearSurplus) { }
+                                            String provisionLossPct, Boolean includeCurrentYearSurplus,
+                                            Boolean interestSuspensionEnabled, String interestSuspenseAccount) { }
 
     public record RegulatoryLine(String line, String accountClass, String description) { }
 
@@ -54,14 +56,14 @@ public class PrudentialSettingsService {
                 SELECT min_core_capital, min_core_to_assets_pct, min_institutional_to_assets_pct, min_core_to_deposits_pct,
                        min_liquidity_pct, watch_max_dpd, substandard_max_dpd, doubtful_max_dpd, provision_performing_pct,
                        provision_watch_pct, provision_substandard_pct, provision_doubtful_pct, provision_loss_pct,
-                       include_current_year_surplus, updated_by, updated_at
+                       include_current_year_surplus, updated_by, updated_at, interest_suspension_enabled, interest_suspense_account
                   FROM ledger.prudential_settings
                 """)
             .query((rs, i) -> new Stored(new Settings(rs.getBigDecimal(1), rs.getBigDecimal(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
                     rs.getBigDecimal(5), rs.getInt(6), rs.getInt(7), rs.getInt(8), rs.getBigDecimal(9), rs.getBigDecimal(10),
-                    rs.getBigDecimal(11), rs.getBigDecimal(12), rs.getBigDecimal(13), rs.getBoolean(14)), false, rs.getString(15),
-                    rs.getObject(16, OffsetDateTime.class)))
-            .optional().orElse(new Stored(Settings.regulationDefaults(), true, null, null));
+                    rs.getBigDecimal(11), rs.getBigDecimal(12), rs.getBigDecimal(13), rs.getBoolean(14)), rs.getBoolean(17),
+                    rs.getString(18), false, rs.getString(15), rs.getObject(16, OffsetDateTime.class)))
+            .optional().orElse(new Stored(Settings.regulationDefaults(), false, null, true, null, null));
     }
 
     PrudentialSettingsView view(Stored st) {
@@ -71,7 +73,8 @@ public class PrudentialSettingsService {
                 s.minLiquidityPct().toPlainString(), s.watchMaxDpd(), s.substandardMaxDpd(), s.doubtfulMaxDpd(),
                 s.provisionPerformingPct().toPlainString(), s.provisionWatchPct().toPlainString(),
                 s.provisionSubstandardPct().toPlainString(), s.provisionDoubtfulPct().toPlainString(),
-                s.provisionLossPct().toPlainString(), s.includeCurrentYearSurplus(), st.defaults(), st.updatedBy(), st.updatedAt());
+                s.provisionLossPct().toPlainString(), s.includeCurrentYearSurplus(), st.suspensionEnabled(), st.suspenseAccount(),
+                st.defaults(), st.updatedBy(), st.updatedAt());
     }
 
     @Transactional(readOnly = true)
@@ -100,13 +103,20 @@ public class PrudentialSettingsService {
                 amount("provisionWatchPct", r.provisionWatchPct()), amount("provisionSubstandardPct", r.provisionSubstandardPct()),
                 amount("provisionDoubtfulPct", r.provisionDoubtfulPct()), amount("provisionLossPct", r.provisionLossPct()),
                 r.includeCurrentYearSurplus());
+        boolean suspend = Boolean.TRUE.equals(r.interestSuspensionEnabled());
+        String suspenseAccount = r.interestSuspenseAccount() == null || r.interestSuspenseAccount().isBlank() ? null
+                : r.interestSuspenseAccount().strip();
+        if (suspend && suspenseAccount == null) {
+            throw new IllegalArgumentException("interest suspension needs a suspense account");
+        }
         session.bind(tenantId);
         jdbc.sql("""
                 INSERT INTO ledger.prudential_settings (tenant_id, min_core_capital, min_core_to_assets_pct,
                     min_institutional_to_assets_pct, min_core_to_deposits_pct, min_liquidity_pct, watch_max_dpd, substandard_max_dpd,
                     doubtful_max_dpd, provision_performing_pct, provision_watch_pct, provision_substandard_pct, provision_doubtful_pct,
-                    provision_loss_pct, include_current_year_surplus, updated_by)
-                VALUES (:t, :a, :b, :c, :d, :e, :f, :g, :h, :i, :j, :k, :l, :m, :n, :by)
+                    provision_loss_pct, include_current_year_surplus, interest_suspension_enabled, interest_suspense_account,
+                    updated_by)
+                VALUES (:t, :a, :b, :c, :d, :e, :f, :g, :h, :i, :j, :k, :l, :m, :n, :se, :sa, :by)
                 ON CONFLICT (tenant_id) DO UPDATE SET min_core_capital = EXCLUDED.min_core_capital,
                     min_core_to_assets_pct = EXCLUDED.min_core_to_assets_pct,
                     min_institutional_to_assets_pct = EXCLUDED.min_institutional_to_assets_pct,
@@ -115,7 +125,9 @@ public class PrudentialSettingsService {
                     doubtful_max_dpd = EXCLUDED.doubtful_max_dpd, provision_performing_pct = EXCLUDED.provision_performing_pct,
                     provision_watch_pct = EXCLUDED.provision_watch_pct, provision_substandard_pct = EXCLUDED.provision_substandard_pct,
                     provision_doubtful_pct = EXCLUDED.provision_doubtful_pct, provision_loss_pct = EXCLUDED.provision_loss_pct,
-                    include_current_year_surplus = EXCLUDED.include_current_year_surplus, updated_by = EXCLUDED.updated_by,
+                    include_current_year_surplus = EXCLUDED.include_current_year_surplus,
+                    interest_suspension_enabled = EXCLUDED.interest_suspension_enabled,
+                    interest_suspense_account = EXCLUDED.interest_suspense_account, updated_by = EXCLUDED.updated_by,
                     updated_at = clock_timestamp()
                 """)
             .param("t", tenantId).param("a", s.minCoreCapital()).param("b", s.minCoreToAssetsPct())
@@ -123,8 +135,9 @@ public class PrudentialSettingsService {
             .param("f", s.watchMaxDpd()).param("g", s.substandardMaxDpd()).param("h", s.doubtfulMaxDpd())
             .param("i", s.provisionPerformingPct()).param("j", s.provisionWatchPct()).param("k", s.provisionSubstandardPct())
             .param("l", s.provisionDoubtfulPct()).param("m", s.provisionLossPct()).param("n", s.includeCurrentYearSurplus())
-            .param("by", actor).update();
-        LOG.info("Prudential settings for tenant {} changed by {}", tenantId, actor);
+            .param("se", suspend).param("sa", suspenseAccount).param("by", actor).update();
+        LOG.info("Prudential settings for tenant {} changed by {} (interest suspension {})", tenantId, actor,
+                suspend ? "on, account " + suspenseAccount : "off");
         return view(stored());
     }
 

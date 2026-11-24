@@ -20,10 +20,12 @@ public class LoanClosureService {
 
     private final JdbcClient jdbc;
     private final Outbox outbox;
+    private final InterestSuspenseService suspension;
 
-    public LoanClosureService(JdbcClient jdbc, Outbox outbox) {
+    public LoanClosureService(JdbcClient jdbc, Outbox outbox, InterestSuspenseService suspension) {
         this.jdbc = jdbc;
         this.outbox = outbox;
+        this.suspension = suspension;
     }
 
     /** @return the credit still held when the loan was closed now; empty if it stays open */
@@ -42,6 +44,8 @@ public class LoanClosureService {
         if (!"ACTIVE".equals(s.status()) || s.unpaid().signum() != 0) {
             return Optional.empty();
         }
+        // Everything has been paid: interest held in suspense is now income (ADR-0031).
+        suspension.releaseAll(tenantId, loanId, businessDate, InterestSuspenseService.Reason.CLOSURE, actor);
         jdbc.sql("""
                 INSERT INTO lending.loan_closure (tenant_id, loan_id, closed_on, reason, credit_balance, closed_by)
                 VALUES (:tenant, :loan, :date, 'REPAID', :credit, :actor)

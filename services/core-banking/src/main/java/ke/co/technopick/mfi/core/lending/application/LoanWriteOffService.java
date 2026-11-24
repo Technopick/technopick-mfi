@@ -49,8 +49,11 @@ public class LoanWriteOffService {
     private final JournalPosting journal;
     private final Outbox outbox;
 
+    private final InterestSuspenseService suspension;
+
     public LoanWriteOffService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, JournalPosting journal,
-                               Outbox outbox) {
+                               Outbox outbox, InterestSuspenseService suspension) {
+        this.suspension = suspension;
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
@@ -155,6 +158,8 @@ public class LoanWriteOffService {
         if (loan.product().gl().writeOffExpense() == null) {
             throw new IllegalStateException("product has no write-off account");
         }
+        // Suspended interest was never income: release it against the write-off expense first (ADR-0031).
+        suspension.releaseAll(tenantId, w.loan(), businessDates.current(), InterestSuspenseService.Reason.WRITE_OFF, actor);
         record Owed(BigDecimal principal, BigDecimal interest, BigDecimal penalty) { }
         Owed owed = jdbc.sql("""
                 SELECT lending.loan_principal_outstanding(tenant_id, loan_id), lending.loan_interest_receivable(tenant_id, loan_id),

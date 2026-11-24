@@ -142,12 +142,16 @@ class PrudentialReturnIntegrationTest {
     }
 
     static String settings(int watchMax, boolean surplus) {
+        return settings(watchMax, surplus, false, null);
+    }
+
+    static String settings(int watchMax, boolean surplus, boolean suspend, String suspenseAccount) {
         return """
             {"minCoreCapital":"10000000","minCoreToAssetsPct":"10","minInstitutionalToAssetsPct":"8","minCoreToDepositsPct":"8",
              "minLiquidityPct":"15","watchMaxDpd":%d,"substandardMaxDpd":180,"doubtfulMaxDpd":360,"provisionPerformingPct":"1",
              "provisionWatchPct":"5","provisionSubstandardPct":"25","provisionDoubtfulPct":"50","provisionLossPct":"100",
-             "includeCurrentYearSurplus":%s}
-            """.formatted(watchMax, surplus);
+             "includeCurrentYearSurplus":%s,"interestSuspensionEnabled":%s,"interestSuspenseAccount":%s}
+            """.formatted(watchMax, surplus, suspend, suspenseAccount == null ? "null" : "\"" + suspenseAccount + "\"");
     }
 
     @Test
@@ -293,5 +297,140 @@ class PrudentialReturnIntegrationTest {
         assertEquals(0, new BigDecimal("1900000.00").add(surplus).compareTo(new BigDecimal(JsonPath.<String>read(withSurplus, "$.capital.coreCapital"))));
         assertEquals(0, new BigDecimal("400000.00").add(surplus)
             .compareTo(new BigDecimal(JsonPath.<String>read(withSurplus, "$.capital.institutionalCapital"))));
+    
+        interestSuspension();
+    }
+
+    static BigDecimal q(String sql, Object... args) {
+        return owner().queryForObject(sql, BigDecimal.class, args);
+    }
+
+    /** Credit balance of a ledger account (income, contra asset). */
+    static BigDecimal credit(String account) {
+        return q("SELECT COALESCE(sum(CASE side WHEN 'C' THEN amount ELSE -amount END), 0) FROM ledger.journal_line"
+                + " WHERE tenant_id = ?::uuid AND account_code = ?", T, account);
+    }
+
+    static BigDecimal suspended(String loanNumber) {
+        return q("SELECT lending.interest_in_suspense(tenant_id, loan_id) FROM lending.loan WHERE tenant_id = ?::uuid AND loan_number = ?",
+                T, loanNumber);
+    }
+
+    static BigDecimal unpaidInterest(String loanNumber) {
+        return q("SELECT lending.loan_interest_receivable(tenant_id, loan_id) FROM lending.loan WHERE tenant_id = ?::uuid AND loan_number = ?",
+                T, loanNumber);
+    }
+
+    static final String[] NPL = {"LN-P0000003", "LN-P0000004", "LN-P0000008", "LN-P0000009"};
+    static final String SUSPENSE = "1650-INTEREST-IN-SUSPENSE";
+
+    /** Interest income recognised = everything accrued less what is held in suspense (no interest was paid before it accrued). */
+    void incomeIsAccruedLessSuspended() {
+        BigDecimal accrued = q("SELECT COALESCE(sum(amount), 0) FROM lending.loan_accrual WHERE tenant_id = ?::uuid", T);
+        BigDecimal inSuspense = q("SELECT COALESCE(sum(amount), 0) FROM lending.interest_suspense WHERE tenant_id = ?::uuid", T);
+        assertEquals(0, accrued.subtract(inSuspense).compareTo(credit("4000-INTEREST-INCOME")),
+                "income " + credit("4000-INTEREST-INCOME") + " vs accrued " + accrued + " less suspended " + inSuspense);
+        assertEquals(0, inSuspense.compareTo(credit(SUSPENSE)), "suspense account equals the loans' suspense");
+    }
+
+    /** Reg 42 (increment 31, ADR-0031): interest on substandard and worse loans is not income until paid. */
+    void interestSuspension() throws Exception {
+        owner().update("INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency)"
+                + " VALUES (?::uuid, ?, 'Interest in suspense', 'ASSET', 'KES')", T, SUSPENSE);
+        mvc.perform(put(P + "/settings").with(FINANCE).contentType(MediaType.APPLICATION_JSON).content(settings(30, false, true, null)))
+            .andExpect(status().isBadRequest());
+        mvc.perform(put(P + "/settings").with(FINANCE).contentType(MediaType.APPLICATION_JSON)
+                .content(settings(30, false, true, "1300-BANK")))
+            .andExpect(status().is(422)).andExpect(jsonPath("$.code").value("SUSPENSE_ACCOUNT_INVALID"));
+        mvc.perform(put(P + "/settings").with(FINANCE).contentType(MediaType.APPLICATION_JSON)
+                .content(settings(30, false, true, SUSPENSE)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.interestSuspensionEnabled").value(true))
+            .andExpect(jsonPath("$.interestSuspenseAccount").value(SUSPENSE));
+        // Switched on, but nothing moves until the next end of day; the return says so.
+        mvc.perform(get(P + "/prudential?asOf=2026-11-28").with(FINANCE)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.classification.interestInSuspense").value("0.00"))
+            .andExpect(jsonPath("$.notes").value(hasItem(containsString("applies from the next end of day"))));
+
+        // 29 Nov closes: the four substandard loans' unpaid interest moves out of income into suspense.
+        mvc.perform(post("/api/v1/end-of-day/run").with(as("ops-1", "OPERATIONS"))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.closedDate").value("2026-11-29"));
+        BigDecimal held = BigDecimal.ZERO;
+        for (String loan : NPL) {
+            assertEquals(1, unpaidInterest(loan).signum(), loan);
+            assertEquals(0, unpaidInterest(loan).compareTo(suspended(loan)), loan);
+            held = held.add(suspended(loan));
+        }
+        assertEquals(0, suspended("LN-P0000001").signum(), "a performing loan holds nothing in suspense");
+        incomeIsAccruedLessSuspended();
+        mvc.perform(get("/api/v1/accounting/reconciliation?businessDate=2026-11-29").with(FINANCE)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.results[?(@.checkCode == 'LOAN_INTEREST_SUSPENSE')].difference").value(hasItem("0.00")))
+            .andExpect(jsonPath("$.results[?(@.checkCode == 'LOAN_INTEREST_SUSPENSE')].items").value(hasItem(4)));
+        mvc.perform(get(P + "/prudential?asOf=2026-11-29").with(FINANCE)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.classification.interestInSuspense").value(held.setScale(2).toPlainString()))
+            .andExpect(jsonPath("$.classification.interestAccruedOnNonPerforming").value("0.00"))
+            .andExpect(jsonPath("$.unmappedBalanceSheetAccounts[*].accountCode").value(org.hamcrest.Matchers.not(hasItem(SUSPENSE))));
+
+        // A payment on a suspended loan: the interest it pays becomes income at that day's close.
+        BigDecimal incomeBefore = credit("4000-INTEREST-INCOME");
+        BigDecimal suspendedBefore = suspended("LN-P0000003");
+        mvc.perform(post("/api/v1/payments/mpesa/c2b").with(jwt().jwt(j -> j.subject("svc-integration"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_INTEGRATION")))
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"tenantId":"%s","transId":"TSUSP00001","shortCode":"600993","amount":"700.00","currency":"KES",
+                     "billRef":"LN-P0000003","msisdnMasked":"2547*****000","transTime":"2026-11-30T10:15:00+03:00"}
+                    """.formatted(T)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("APPLIED"));
+        BigDecimal interestPaid = q("""
+                SELECT COALESCE(sum(a.amount), 0) FROM lending.repayment_allocation a
+                  JOIN lending.repayment r ON r.tenant_id = a.tenant_id AND r.repayment_id = a.repayment_id
+                  JOIN lending.loan l ON l.tenant_id = r.tenant_id AND l.loan_id = r.loan_id
+                 WHERE l.tenant_id = ?::uuid AND l.loan_number = 'LN-P0000003' AND a.component = 'INTEREST'
+                """, T);
+        assertEquals(1, interestPaid.signum(), "the payment paid interest");
+        mvc.perform(post("/api/v1/end-of-day/run").with(as("ops-1", "OPERATIONS"))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.closedDate").value("2026-11-30"));
+        assertEquals(0, unpaidInterest("LN-P0000003").compareTo(suspended("LN-P0000003")));
+        BigDecimal accruedOn30 = q("""
+                SELECT COALESCE(sum(a.amount), 0) FROM lending.loan_accrual a JOIN lending.loan l
+                    ON l.tenant_id = a.tenant_id AND l.loan_id = a.loan_id
+                 WHERE l.tenant_id = ?::uuid AND l.loan_number = 'LN-P0000003' AND a.business_date = '2026-11-30'
+                """, T);
+        // Suspense moved by today's accrual less the interest paid.
+        assertEquals(0, suspendedBefore.add(accruedOn30).subtract(interestPaid).compareTo(suspended("LN-P0000003")));
+        assertEquals(1, credit("4000-INTEREST-INCOME").compareTo(incomeBefore));
+        incomeIsAccruedLessSuspended();
+
+        // Write-off of a suspended loan: its suspended interest is released against the write-off expense, not income.
+        owner().update("INSERT INTO lending.write_off_policy (tenant_id, min_days_past_due) VALUES (?::uuid, 30)", T);
+        BigDecimal held8 = suspended("LN-P0000008");
+        assertEquals(1, held8.signum());
+        BigDecimal incomeBeforeWriteOff = credit("4000-INTEREST-INCOME");
+        String w = mvc.perform(post("/api/v1/lending/loans/LN-P0000008/write-off").with(as("ops-1", "OPERATIONS"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"wo-suspense-1\",\"reason\":\"Member unreachable for over 60 days\"}"))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String writeOffId = JsonPath.read(w, "$.writeOffId");
+        String approved = mvc.perform(post("/api/v1/lending/write-offs/" + writeOffId + "/approve").with(as("sup-1", "SUPERVISOR"))
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(0, suspended("LN-P0000008").signum());
+        assertEquals(0, incomeBeforeWriteOff.compareTo(credit("4000-INTEREST-INCOME")), "write-off does not touch interest income");
+        BigDecimal writtenOff = new BigDecimal(JsonPath.<String>read(approved, "$.writtenOff"));
+        BigDecimal expense = credit("5100-LOAN-WRITE-OFFS").negate();
+        assertEquals(0, writtenOff.subtract(held8).compareTo(expense),
+                "expense " + expense + " = written off " + writtenOff + " less suspended interest " + held8);
+        assertEquals("WRITE_OFF", owner().queryForObject("""
+                SELECT s.reason FROM lending.interest_suspense s JOIN lending.loan l ON l.tenant_id = s.tenant_id AND l.loan_id = s.loan_id
+                 WHERE l.tenant_id = ?::uuid AND l.loan_number = 'LN-P0000008' ORDER BY s.movement_id DESC LIMIT 1
+                """, String.class, T));
+        mvc.perform(get("/api/v1/accounting/reconciliation").with(FINANCE)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.results[?(@.checkCode == 'LOAN_INTEREST_SUSPENSE')].difference").value(hasItem("0.00")));
+
+        // Switched off: the next end of day releases everything to income.
+        mvc.perform(put(P + "/settings").with(FINANCE).contentType(MediaType.APPLICATION_JSON).content(settings(30, false, false, null)))
+            .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/end-of-day/run").with(as("ops-1", "OPERATIONS"))).andExpect(status().isOk());
+        assertEquals(0, credit(SUSPENSE).signum());
+        assertEquals(0, q("SELECT COALESCE(sum(amount), 0) FROM lending.interest_suspense WHERE tenant_id = ?::uuid", T).signum());
     }
 }
