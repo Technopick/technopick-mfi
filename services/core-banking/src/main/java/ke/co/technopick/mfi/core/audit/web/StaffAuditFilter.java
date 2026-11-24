@@ -91,7 +91,9 @@ public class StaffAuditFilter extends OncePerRequestFilter implements Authentica
             return;
         }
         String subject = token.getToken().getSubject();
-        String actor = subject != null ? "user:" + subject : "client:" + token.getToken().getClaimAsString("azp");
+        // Members are recorded as "member:<sub>", the same actor the services write, so a member's trail is never mixed with staff.
+        String actor = subject == null ? "client:" + token.getToken().getClaimAsString("azp")
+            : (token.getAuthorities().stream().anyMatch(a -> "ROLE_MEMBER".equals(a.getAuthority())) ? "member:" : "user:") + subject;
         String roles = token.getAuthorities().stream().map(GrantedAuthority::getAuthority)
             .filter(a -> a.startsWith("ROLE_")).map(a -> a.substring(5)).sorted().collect(Collectors.joining(","));
         Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);

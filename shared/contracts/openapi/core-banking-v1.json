@@ -2121,6 +2121,111 @@
         },
         "type": "object"
       },
+      "MemberLoan": {
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "nextDueAmount": {
+            "type": "string"
+          },
+          "nextDueDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "principalOutstanding": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MemberLoanDetail": {
+        "properties": {
+          "payoff": {
+            "$ref": "#/components/schemas/SettlementQuote"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/LoanScheduleView"
+          }
+        },
+        "type": "object"
+      },
+      "MemberOverview": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/SavingsAccountView"
+            },
+            "type": "array"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "loans": {
+            "items": {
+              "$ref": "#/components/schemas/MemberLoan"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "MemberPayment": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resultDesc": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MemberPaymentRequest": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MpesaResolutionCreated": {
         "properties": {
           "resolutionId": {
@@ -5465,6 +5570,165 @@
         },
         "tags": [
           "loan-write-off-controller"
+        ]
+      }
+    },
+    "/api/v1/member/accounts/{accountNumber}/statement": {
+      "get": {
+        "operationId": "Member_statement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "accountNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavingsStatement"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/v1/member/loans/{loanNumber}": {
+      "get": {
+        "operationId": "Member_loan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberLoanDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/v1/member/me": {
+      "get": {
+        "operationId": "Member_overview",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberOverview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/v1/member/payments": {
+      "post": {
+        "operationId": "Member_pay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPayment"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/v1/member/payments/{requestId}": {
+      "get": {
+        "operationId": "Member_payment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPayment"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
         ]
       }
     },

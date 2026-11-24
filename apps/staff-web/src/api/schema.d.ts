@@ -660,6 +660,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/member/accounts/{accountNumber}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Member_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member/loans/{loanNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Member_loan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Member_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Member_pay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member/payments/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Member_payment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/mpesa/b2c/disbursements": {
         parameters: {
             query?: never;
@@ -2159,6 +2239,42 @@ export interface components {
         MappingChange: {
             accountCode?: string;
             line?: string;
+        };
+        MemberLoan: {
+            currency?: string;
+            loanNumber?: string;
+            nextDueAmount?: string;
+            /** Format: date */
+            nextDueDate?: string;
+            principal?: string;
+            principalOutstanding?: string;
+            status?: string;
+        };
+        MemberLoanDetail: {
+            payoff?: components["schemas"]["SettlementQuote"];
+            schedule?: components["schemas"]["LoanScheduleView"];
+        };
+        MemberOverview: {
+            accounts?: components["schemas"]["SavingsAccountView"][];
+            customerNumber?: string;
+            firstName?: string;
+            loans?: components["schemas"]["MemberLoan"][];
+        };
+        MemberPayment: {
+            amount?: string;
+            currency?: string;
+            phone?: string;
+            replayed?: boolean;
+            /** Format: uuid */
+            requestId?: string;
+            resultDesc?: string;
+            status?: string;
+            target?: string;
+        };
+        MemberPaymentRequest: {
+            amount?: string;
+            idempotencyKey?: string;
+            target?: string;
         };
         MpesaResolutionCreated: {
             /** Format: uuid */
@@ -3840,6 +3956,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    Member_statement: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                accountNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavingsStatement"];
+                };
+            };
+        };
+    };
+    Member_loan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberLoanDetail"];
+                };
+            };
+        };
+    };
+    Member_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOverview"];
+                };
+            };
+        };
+    };
+    Member_pay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberPayment"];
+                };
+            };
+        };
+    };
+    Member_payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberPayment"];
                 };
             };
         };
