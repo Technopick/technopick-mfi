@@ -25,6 +25,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -103,7 +104,7 @@ class MemberSelfServiceIntegrationTest {
     static JwtRequestPostProcessor token(Member m, String... roles) {
         return jwt().jwt(j -> j.subject(m.subject()).claim("tenant_id", T).claim("customer_number", m.customerNumber())
                 .claim("roles", List.of(roles)))
-            .authorities(java.util.Arrays.stream(roles).map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList());
+            .authorities(java.util.Arrays.stream(roles).<GrantedAuthority>map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList());
     }
 
     static JwtRequestPostProcessor staff(String role) {
