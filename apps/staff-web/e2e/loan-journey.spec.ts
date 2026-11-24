@@ -58,7 +58,7 @@ test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser 
 
   // Restructure: the officer previews and requests; the manager reviews the proposal and approves.
   await officer.goto(`/loans/${loanNumber}`);
-  await officer.getByLabel("Instalments").fill("18");
+  await officer.getByLabel("Instalments", { exact: true }).fill("18");
   await officer.getByLabel("Interest-only months first").fill("1");
   await officer.getByRole("button", { name: "Preview new schedule" }).click();
   await expect(officer.getByText("Proposed schedule from the next instalment")).toBeVisible();
