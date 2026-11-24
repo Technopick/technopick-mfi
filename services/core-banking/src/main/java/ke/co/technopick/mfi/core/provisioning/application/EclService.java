@@ -25,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * IFRS 9 expected credit loss for loans, simplified approach (ADR-0036). At a closed month end each
  * loan with principal outstanding is staged by its days past due (stage 2 above
- * {@code stage2Dpd}, stage 3 above {@code stage3Dpd}) and provided at its product's rate for that
+ * {@code stage2Dpd}, stage 3 above {@code stage3Dpd}; a loan restructured in the last
+ * {@code restructureProbationMonths} is at least stage 2, ADR-0037) and provided at its product's rate for that
  * stage (or the default '*' rate) on its outstanding principal. A finance user requests a run; a
  * second finance user approves it, which posts, branch by branch, only the change from what the
  * allowance already holds.
@@ -34,9 +35,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class EclService {
 
     public record EclSettingsView(boolean configured, String allowanceAccount, String expenseAccount, int stage2Dpd, int stage3Dpd,
-                                  String updatedBy, OffsetDateTime updatedAt) { }
+                                  int restructureProbationMonths, String updatedBy, OffsetDateTime updatedAt) { }
 
-    public record EclSettingsRequest(String allowanceAccount, String expenseAccount, Integer stage2Dpd, Integer stage3Dpd) { }
+    /** restructureProbationMonths: a restructured loan stays at least in stage 2 this long (ADR-0037). */
+    public record EclSettingsRequest(String allowanceAccount, String expenseAccount, Integer stage2Dpd, Integer stage3Dpd,
+                                     Integer restructureProbationMonths) { }
 
     /** Rates in percent of exposure; blank means no rate (the default row '*' applies). */
     public record EclRateRow(String productCode, String productName, String stage1Pct, String stage2Pct, String stage3Pct) { }
@@ -58,7 +61,7 @@ public class EclService {
     public record EclLine(String loanNumber, String customerNumber, String productCode, String branchCode, int daysPastDue,
                           int stage, String exposure, String ratePct, String ecl) { }
 
-    private record Settings(String allowance, String expense, int stage2, int stage3, Currency currency) { }
+    private record Settings(String allowance, String expense, int stage2, int stage3, int probation, Currency currency) { }
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
@@ -67,7 +70,9 @@ public class EclService {
             WITH s AS (
                 SELECT a.loan_id, v.product_code, l.branch_code, a.days_past_due AS dpd,
                        round(a.outstanding_principal, 2) AS exposure,
-                       CASE WHEN a.days_past_due > :s3 THEN 3 WHEN a.days_past_due > :s2 THEN 2 ELSE 1 END AS stage
+                       CASE WHEN a.days_past_due > :s3 THEN 3
+                            WHEN a.days_past_due > :s2 OR lending.restructured_within(a.tenant_id, a.loan_id, :d, :probation) THEN 2
+                            ELSE 1 END AS stage
                   FROM lending.arrears_snapshot a
                   JOIN lending.loan l ON l.tenant_id = a.tenant_id AND l.loan_id = a.loan_id
                   JOIN lending.loan_product_version v ON v.tenant_id = l.tenant_id AND v.version_id = l.product_version_id
@@ -94,10 +99,13 @@ public class EclService {
     @Transactional(readOnly = true)
     public EclSettingsView settings(UUID tenantId) {
         session.bind(tenantId);
-        return jdbc.sql("SELECT allowance_account, expense_account, stage2_dpd, stage3_dpd, updated_by, updated_at FROM ledger.ecl_settings")
-            .query((rs, i) -> new EclSettingsView(true, rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4), rs.getString(5),
-                    rs.getObject(6, OffsetDateTime.class)))
-            .optional().orElse(new EclSettingsView(false, null, null, 30, 90, null, null));
+        return jdbc.sql("""
+                SELECT allowance_account, expense_account, stage2_dpd, stage3_dpd, restructure_probation_months, updated_by, updated_at
+                  FROM ledger.ecl_settings
+                """)
+            .query((rs, i) -> new EclSettingsView(true, rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4), rs.getInt(5),
+                    rs.getString(6), rs.getObject(7, OffsetDateTime.class)))
+            .optional().orElse(new EclSettingsView(false, null, null, 30, 90, 6, null, null));
     }
 
     @Transactional
@@ -111,17 +119,23 @@ public class EclService {
         if (s2 < 1 || s3 <= s2 || s3 > 365) {
             throw new IllegalArgumentException("stage thresholds: 1 <= stage 2 days < stage 3 days <= 365");
         }
+        int probation = r.restructureProbationMonths() == null ? 6 : r.restructureProbationMonths();
+        if (probation < 0 || probation > 24) {
+            throw new IllegalArgumentException("restructure probation: 0 to 24 months");
+        }
         if (open() != null) {
             throw new ConflictException("a provision run is waiting for approval; decide it before changing the settings");
         }
         jdbc.sql("""
-                INSERT INTO ledger.ecl_settings (tenant_id, allowance_account, expense_account, stage2_dpd, stage3_dpd, updated_by)
-                VALUES (tenancy.current_tenant(), :a, :e, :s2, :s3, :actor)
+                INSERT INTO ledger.ecl_settings (tenant_id, allowance_account, expense_account, stage2_dpd, stage3_dpd,
+                    restructure_probation_months, updated_by)
+                VALUES (tenancy.current_tenant(), :a, :e, :s2, :s3, :p, :actor)
                 ON CONFLICT (tenant_id) DO UPDATE SET allowance_account = EXCLUDED.allowance_account,
                     expense_account = EXCLUDED.expense_account, stage2_dpd = EXCLUDED.stage2_dpd, stage3_dpd = EXCLUDED.stage3_dpd,
+                    restructure_probation_months = EXCLUDED.restructure_probation_months,
                     updated_by = EXCLUDED.updated_by, updated_at = clock_timestamp()
                 """).param("a", r.allowanceAccount().strip()).param("e", r.expenseAccount().strip()).param("s2", s2).param("s3", s3)
-            .param("actor", actor).update();
+            .param("p", probation).param("actor", actor).update();
         return settings(tenantId);
     }
 
@@ -230,16 +244,16 @@ public class EclService {
         UUID runId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO ledger.ecl_run (tenant_id, run_id, idempotency_key, as_of, allowance_account, expense_account, stage2_dpd,
-                    stage3_dpd, loans, required_total, previous_total, change, requested_by)
-                VALUES (tenancy.current_tenant(), :id, :k, :d, :a, :e, :s2, :s3, :n, :req, :prev, :chg, :actor)
+                    stage3_dpd, restructure_probation_months, loans, required_total, previous_total, change, requested_by)
+                VALUES (tenancy.current_tenant(), :id, :k, :d, :a, :e, :s2, :s3, :p, :n, :req, :prev, :chg, :actor)
                 """).param("id", runId).param("k", idempotencyKey.strip()).param("d", asOf).param("a", s.allowance())
-            .param("e", s.expense()).param("s2", s.stage2()).param("s3", s.stage3()).param("n", c.loans())
+            .param("e", s.expense()).param("s2", s.stage2()).param("s3", s.stage3()).param("p", s.probation()).param("n", c.loans())
             .param("req", new BigDecimal(c.requiredTotal())).param("prev", new BigDecimal(c.currentAllowance()))
             .param("chg", new BigDecimal(c.change())).param("actor", actor).update();
         jdbc.sql("INSERT INTO ledger.ecl_run_line (tenant_id, run_id, loan_id, product_code, branch_code, days_past_due, stage, "
                 + "exposure, rate_pct, ecl) SELECT tenancy.current_tenant(), :id, loan_id, product_code, branch_code, dpd, stage, "
                 + "exposure, rate, ecl FROM (" + STAGED + ") staged")
-            .param("id", runId).param("d", asOf).param("s2", s.stage2()).param("s3", s.stage3()).update();
+            .param("id", runId).param("d", asOf).param("s2", s.stage2()).param("s3", s.stage3()).param("probation", s.probation()).update();
         return view(runId, false);
     }
 
@@ -345,7 +359,7 @@ public class EclService {
 
     private EclCalculation calculate(Settings s, LocalDate asOf) {
         record L(String product, int stage, BigDecimal exposure, BigDecimal rate, BigDecimal ecl) { }
-        List<L> lines = jdbc.sql(STAGED).param("d", asOf).param("s2", s.stage2()).param("s3", s.stage3())
+        List<L> lines = jdbc.sql(STAGED).param("d", asOf).param("s2", s.stage2()).param("s3", s.stage3()).param("probation", s.probation())
             .query((rs, i) -> new L(rs.getString("product_code"), rs.getInt("stage"), rs.getBigDecimal("exposure"),
                     rs.getBigDecimal("rate"), rs.getBigDecimal("ecl")))
             .list();
@@ -415,11 +429,12 @@ public class EclService {
 
     private Settings requireSettings() {
         return jdbc.sql("""
-                SELECT s.allowance_account, s.expense_account, s.stage2_dpd, s.stage3_dpd, a.currency FROM ledger.ecl_settings s
+                SELECT s.allowance_account, s.expense_account, s.stage2_dpd, s.stage3_dpd, s.restructure_probation_months, a.currency
+                  FROM ledger.ecl_settings s
                   JOIN ledger.gl_account a ON a.tenant_id = s.tenant_id AND a.account_code = s.allowance_account
                 """)
-            .query((rs, i) -> new Settings(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4),
-                    Currency.getInstance(rs.getString(5))))
+            .query((rs, i) -> new Settings(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4), rs.getInt(5),
+                    Currency.getInstance(rs.getString(6))))
             .optional().orElseThrow(() -> new ConflictException("set the loss allowance and impairment expense accounts first"));
     }
 

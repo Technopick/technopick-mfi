@@ -11,10 +11,16 @@ import org.junit.jupiter.api.Test;
 class SmsTemplatesTest {
 
     /** The longest values each placeholder takes in practice. */
-    static final Map<String, String> WORST = Map.of(
+    static final Map<String, String> WORST = withCount(Map.of(
         "sig", "Kenya Teachers Sacco", "amount", "1,250,000.00", "loan", "LN26-0000123", "account", "*1234",
         "date", "28/11/2026", "ref", "TKL9ABCDEF", "paybill", "6009931", "ussd", "*483*123*45#", "hours", "168",
-        "time", "28/11/2026 21:45");
+        "time", "28/11/2026 21:45"));
+
+    static Map<String, String> withCount(Map<String, String> m) {
+        Map<String, String> all = new java.util.HashMap<>(m);
+        all.put("count", "120");
+        return Map.copyOf(all);
+    }
 
     @Test
     void everyTemplateFitsTwoSmsInBothLanguagesAsPlainText() {

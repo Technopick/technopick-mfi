@@ -140,6 +140,20 @@ public class NotificationService {
         });
     }
 
+    /** A loan's schedule was restructured or changed by a prepayment (always sent: it changes the member's contract). */
+    public void loanRescheduled(UUID loanId, LocalDate firstDue, int instalments, BigDecimal instalment, UUID rescheduleId, String actor) {
+        safely("reschedule " + rescheduleId, () -> {
+            record L(UUID customerId, String number) { }
+            L l = jdbc.sql("SELECT customer_id, loan_number FROM lending.loan WHERE loan_id = :id").param("id", loanId)
+                .query((rs, i) -> new L(rs.getObject(1, UUID.class), rs.getString(2))).optional().orElse(null);
+            if (l == null || l.customerId() == null) {
+                return;
+            }
+            queue(l.customerId(), "LOAN_RESCHEDULED", Map.of("loan", l.number(), "count", String.valueOf(instalments),
+                    "amount", money(instalment), "date", firstDue.format(DATE)), "reschedule:" + rescheduleId, null, actor);
+        });
+    }
+
     /** PIN_SET, PIN_CHANGED or PIN_LOCKED, once per USSD session. */
     public void pinEvent(UUID customerId, String template, String sessionId) {
         if (!List.of("PIN_SET", "PIN_CHANGED", "PIN_LOCKED").contains(template)) {

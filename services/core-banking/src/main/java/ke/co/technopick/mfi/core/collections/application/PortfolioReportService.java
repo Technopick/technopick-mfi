@@ -21,7 +21,7 @@ public class PortfolioReportService {
                             String atRisk30, String atRisk90, String par1, String par30, String par90) { }
 
     public record LoanInArrears(String loanNumber, String branchCode, String customerNumber, int daysPastDue, String bucket,
-                                String classification, String arrearsAmount, String outstandingPrincipal) { }
+                                String classification, String arrearsAmount, String outstandingPrincipal, boolean restructured) { }
 
     public record ClosedWithCredit(String loanNumber, String branchCode, String customerNumber, LocalDate closedOn,
                                    String creditBalance) { }
@@ -60,7 +60,9 @@ public class PortfolioReportService {
             .list();
         List<LoanInArrears> arrears = date == null ? List.of() : jdbc.sql("""
                 SELECT l.loan_number, l.branch_code, c.customer_number, s.days_past_due, s.bucket, s.classification,
-                       s.arrears_amount, s.outstanding_principal
+                       s.arrears_amount, s.outstanding_principal,
+                       EXISTS (SELECT 1 FROM lending.loan_reschedule r WHERE r.tenant_id = l.tenant_id AND r.loan_id = l.loan_id
+                                  AND r.status = 'APPROVED' AND r.kind = 'RESTRUCTURE' AND r.business_date <= s.as_of) AS restructured
                   FROM lending.arrears_snapshot s
                   JOIN lending.loan l ON l.tenant_id = s.tenant_id AND l.loan_id = s.loan_id
                   LEFT JOIN customer.customer c ON c.tenant_id = l.tenant_id AND c.customer_id = l.customer_id
@@ -72,7 +74,7 @@ public class PortfolioReportService {
             .query((rs, i) -> new LoanInArrears(rs.getString("loan_number"), rs.getString("branch_code"),
                     rs.getString("customer_number"), rs.getInt("days_past_due"), rs.getString("bucket"),
                     rs.getString("classification"), money(rs.getBigDecimal("arrears_amount")),
-                    money(rs.getBigDecimal("outstanding_principal"))))
+                    money(rs.getBigDecimal("outstanding_principal")), rs.getBoolean("restructured")))
             .list();
         List<ClosedWithCredit> credit = jdbc.sql("""
                 SELECT l.loan_number, l.branch_code, c.customer_number, k.closed_on, lending.loan_credit(l.tenant_id, l.loan_id) AS credit

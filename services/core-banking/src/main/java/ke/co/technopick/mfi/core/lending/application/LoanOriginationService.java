@@ -50,7 +50,9 @@ public class LoanOriginationService {
 
     public record LoanApplicationSubmitted(UUID applicationId, String status, boolean replayed, LoanQuote quote) { }
 
-    public record LoanScheduleView(String loanNumber, String status, int scheduleVersion, List<QuoteInstallment> installments) { }
+    /** restructured: an approved restructure changed this loan's schedule (ADR-0037). */
+    public record LoanScheduleView(String loanNumber, String status, int scheduleVersion, List<QuoteInstallment> installments,
+                                   boolean restructured) { }
 
     private record App(UUID id, String key, String customerRef, UUID customerId, UUID versionId, String branchCode, BigDecimal principal,
                        int term, LocalDate firstDue, String purpose, String status, String submittedBy) { }
@@ -221,7 +223,7 @@ public class LoanOriginationService {
         Integer version = jdbc.sql("SELECT max(schedule_version) FROM lending.schedule_installment WHERE loan_id = :l")
             .param("l", loan.id()).query(Integer.class).single();
         if (version == null) {
-            return new LoanScheduleView(loanNumber, loan.status(), 0, List.of());
+            return new LoanScheduleView(loanNumber, loan.status(), 0, List.of(), false);
         }
         List<QuoteInstallment> lines = new ArrayList<>();
         BigDecimal[] balance = {jdbc.sql("SELECT principal FROM lending.loan WHERE loan_id = :l").param("l", loan.id())
@@ -239,7 +241,10 @@ public class LoanOriginationService {
                         plain(p), plain(in), plain(p.add(in)), plain(balance[0]));
             })
             .list().forEach(lines::add);
-        return new LoanScheduleView(loanNumber.strip().toUpperCase(Locale.ROOT), loan.status(), version, lines);
+        boolean restructured = jdbc.sql("""
+                SELECT EXISTS (SELECT 1 FROM lending.loan_reschedule WHERE loan_id = :l AND status = 'APPROVED' AND kind = 'RESTRUCTURE')
+                """).param("l", loan.id()).query(Boolean.class).single();
+        return new LoanScheduleView(loanNumber.strip().toUpperCase(Locale.ROOT), loan.status(), version, lines, restructured);
     }
 
     // ------------------------------------------------------------------ helpers

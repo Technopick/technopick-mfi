@@ -171,4 +171,7 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== IFRS 9 provisioning tests (owner records a closed month end, then mfi_app)"
 psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$HERE/ecl_test.sql"
 
+echo "== loan rescheduling tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/reschedule_test.sql"
+
 echo "== done"
