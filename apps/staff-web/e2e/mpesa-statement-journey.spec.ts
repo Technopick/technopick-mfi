@@ -15,6 +15,8 @@ test("finance reconciles an M-Pesa statement and the supervisor cannot sign off 
   ].join("\n");
 
   const finance = await signIn(browser, "finance");
+  finance.on("pageerror", (e) => console.log(`page error: ${e.message}`));
+  finance.on("console", (m) => { if (m.type() === "error") console.log(`console error: ${m.text()}`); });
   await finance.goto("/mpesa-statements");
   await expect(finance.getByRole("heading", { level: 1, name: "M-Pesa statement reconciliation" })).toBeVisible();
   await expect(finance.getByLabel("M-Pesa account")).toContainText("Paybill 600991");
@@ -22,7 +24,12 @@ test("finance reconciles an M-Pesa statement and the supervisor cannot sign off 
   await finance.getByLabel("Statement file (CSV)").setInputFiles({ name: `paybill-${today}.csv`, mimeType: "text/csv",
     buffer: Buffer.from(csv, "utf8") });
   await finance.getByRole("button", { name: "Upload and match" }).click();
-  await expect(finance.getByRole("heading", { name: `Paybill 600991 — ${today}` })).toBeVisible();
+  try {
+    await expect(finance.getByRole("heading", { name: `Paybill 600991 — ${today}` })).toBeVisible();
+  } catch (e) {
+    console.log(`page after upload:\n${await finance.locator("body").innerText()}`);
+    throw e;
+  }
   await expect(finance.getByText("0 matched · 2 open exceptions")).toBeVisible();
   await expect(finance.getByText("Pay Bill from 2547****001 Acc. NOTHING")).toBeVisible();
   await expect(finance.getByText(/You uploaded this statement/)).toBeVisible();
