@@ -39,7 +39,6 @@ prudential return could only disclose the amount.
   shows as a lower receivable but its income appears only at the close.
 - Penalties on non-performing loans are not suspended (Reg 42 names interest). Whether to suspend
   them too is for compliance.
-- Closure release is exercised through the same code as write-off release, but not yet end to end:
-  a loan cannot close early until early settlement exists.
+- Closure release is tested end to end since increment 32 (early settlement of a suspended loan).
 - Turning suspension on changes income from the next close onwards; earlier closed periods are not
   restated.
