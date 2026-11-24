@@ -115,11 +115,13 @@ SELECT i, gen_random_uuid() AS loan_id, gen_random_uuid() AS entry_id,
        CASE WHEN i % 5 < 3 THEN date '2026-11-01' ELSE date '2026-09-01' END AS disbursed,
        CASE WHEN (i / 500) % 2 = 0 THEN 'NBO01' ELSE 'MSA01' END AS branch
   FROM generate_series(1, {NL}) i;
-INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, product_version_id, branch_code, currency, principal,
-    term_months, created_by, approved_by)
-SELECT '{T}', loan_id, 'LN-P' || lpad(i::text, 7, '0'), 'PERF-' || i, 'cccccccc-0000-0000-0000-0000000000f1', branch, 'KES',
-       12000, 12, 'perf:officer', 'perf:manager'
-  FROM perf_loan;
+-- Loan i belongs to member i (there are never more loans than members).
+INSERT INTO lending.loan (tenant_id, loan_id, loan_number, customer_ref, customer_id, product_version_id, branch_code, currency,
+    principal, term_months, created_by, approved_by)
+SELECT '{T}', l.loan_id, 'LN-P' || lpad(l.i::text, 7, '0'), c.customer_number, m.customer_id,
+       'cccccccc-0000-0000-0000-0000000000f1', l.branch, 'KES', 12000, 12, 'perf:officer', 'perf:manager'
+  FROM perf_loan l JOIN perf_member m ON m.i = l.i
+  JOIN customer.customer c ON c.tenant_id = '{T}' AND c.customer_id = m.customer_id;
 INSERT INTO lending.schedule_installment (tenant_id, loan_id, schedule_version, installment_no, due_date, principal, interest)
 SELECT '{T}', l.loan_id, 1, k, (l.disbursed + make_interval(months => k))::date, 1000, round((12000 - 1000 * (k - 1)) * 0.03, 2)
   FROM perf_loan l CROSS JOIN generate_series(1, 12) k;

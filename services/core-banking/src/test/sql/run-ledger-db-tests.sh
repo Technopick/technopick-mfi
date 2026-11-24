@@ -156,4 +156,7 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== interest suspension tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/interest_suspense_test.sql"
 
+echo "== early settlement and credit refund tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/settlement_refund_test.sql"
+
 echo "== done"
