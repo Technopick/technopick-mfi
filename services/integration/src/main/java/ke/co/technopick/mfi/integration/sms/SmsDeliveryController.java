@@ -70,7 +70,12 @@ public class SmsDeliveryController {
     private boolean sourceAllowed(String remoteAddress) {
         try {
             InetAddress address = InetAddress.getByName(remoteAddress);
-            return props.allowedCidrs().stream().anyMatch(c -> CallbackGuard.inRange(address, c));
+            for (String cidr : props.allowedCidrs()) {
+                if (CallbackGuard.inRange(address, cidr)) {
+                    return true;
+                }
+            }
+            return false;
         } catch (UnknownHostException e) {
             return false;
         }
