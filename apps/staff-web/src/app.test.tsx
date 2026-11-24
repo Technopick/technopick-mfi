@@ -388,7 +388,7 @@ describe("screens", () => {
             { loanClass: "SUBSTANDARD", daysPastDue: "31-180", loans: 4, outstandingPrincipal: "48000.00", allowancePct: "25.00", requiredAllowance: "12000.00" }],
           totalLoans: 10, grossLoans: "120000.00", requiredAllowance: "12720.00",
           allowanceHeld: line("LOAN_LOSS_ALLOWANCE", "Allowance held", "5000.00"), allowanceShortfall: "7720.00",
-          nonPerformingLoans: "48000.00", nonPerformingRatioPct: "40.00", interestAccruedOnNonPerforming: "1080.00",
+          nonPerformingLoans: "48000.00", nonPerformingRatioPct: "40.00", interestInSuspense: "0.00", interestAccruedOnNonPerforming: "1080.00",
           ledgerLoanPrincipal: "120000.00", unexplainedPrincipalDifference: "0.00" },
         unmappedBalanceSheetAccounts: [{ accountCode: "1200-LOANS-PRINCIPAL", name: "Loans", amount: "120000.00" }],
         notes: ["The accounting period containing 2026-11-28 is still open: figures can change until finance closes it.",
@@ -405,11 +405,41 @@ describe("screens", () => {
     expect(rows).toContain("Core capital of at least 10000000.00 (Reg 9(a))1,900,000.0010,000,000.00Not met");
     expect(rows).toContain("Core capital to total deposits (Reg 9(d))1,900,000.00 / 365,855.00519.33%8.00%Met");
     expect(screen.getByText("7,720.00")).toBeTruthy();
+    expect(screen.getByText("Interest on non-performing loans still in income").nextSibling?.textContent).toBe("1,080.00");
     expect(screen.queryByRole("link", { name: "Settings and account mapping" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Watch" })).toBeNull(); // no loans to list
     await userEvent.click(screen.getByRole("button", { name: "Substandard" }));
     expect(await screen.findByRole("link", { name: "LN-P0000003" })).toBeTruthy();
     expect(screen.getByText("3,000.00")).toBeTruthy();
+  });
+
+  it("lets finance switch on interest suspension, offering only unused asset accounts", async () => {
+    let current: Record<string, unknown> = { minCoreCapital: "10000000.00", minCoreToAssetsPct: "10.00", minInstitutionalToAssetsPct: "8.00",
+      minCoreToDepositsPct: "8.00", minLiquidityPct: "15.00", watchMaxDpd: 30, substandardMaxDpd: 180, doubtfulMaxDpd: 360,
+      provisionPerformingPct: "1.00", provisionWatchPct: "5.00", provisionSubstandardPct: "25.00", provisionDoubtfulPct: "50.00",
+      provisionLossPct: "100.00", includeCurrentYearSurplus: true, interestSuspensionEnabled: false, regulationDefaults: false,
+      updatedBy: "user:fin-1" };
+    const { api, calls } = fakeApi({
+      "GET /api/v1/regulatory/settings": () => current,
+      "GET /api/v1/regulatory/mapping": () => ({ lines: [{ line: "CASH", accountClass: "ASSET", description: "Notes and coins" }],
+        accounts: [{ accountCode: "1000-VAULT", name: "Vault", accountClass: "ASSET", line: "CASH" },
+          { accountCode: "1650-SUSPENSE", name: "Interest in suspense", accountClass: "ASSET" },
+          { accountCode: "3000-SHARES", name: "Shares", accountClass: "EQUITY" }] }),
+      "PUT /api/v1/regulatory/settings": (body) => {
+        current = { ...current, ...(body as object) };
+        return current;
+      },
+    });
+    renderAt("/regulatory/setup", session("fin-1", "FINANCE"), api);
+    await userEvent.click(await screen.findByRole("button", { name: "Change settings" }));
+    await userEvent.click(screen.getByLabelText("Suspend interest on non-performing loans (Reg 42)"));
+    const account = screen.getByLabelText(/Interest in suspense account/);
+    expect(within(account).getAllByRole("option").map((o) => o.textContent)).toEqual(["(none)", "1650-SUSPENSE Interest in suspense"]);
+    await userEvent.selectOptions(account, "1650-SUSPENSE");
+    await userEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toMatchObject({
+      interestSuspensionEnabled: true, interestSuspenseAccount: "1650-SUSPENSE", watchMaxDpd: 30 }));
+    expect(await screen.findByText("yes, into 1650-SUSPENSE")).toBeTruthy();
   });
 
   it("lets finance map ledger accounts to return lines, offering only lines of the account's class", async () => {

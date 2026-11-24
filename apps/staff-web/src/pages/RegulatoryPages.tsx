@@ -73,7 +73,9 @@ function csvRows(r: PrudentialReturn): Cell[][] {
   checks("Liquidity", r.liquidity.checks);
   (r.classification.rows ?? []).forEach((c) => rows.push(["Risk classification", `${CLASS_LABEL[c.loanClass ?? ""] ?? c.loanClass} (${c.daysPastDue} days, ${c.loans} loans)`,
     "", c.outstandingPrincipal, c.allowancePct, c.requiredAllowance]));
-  rows.push(["Risk classification", "Required allowance for loan loss", "", r.classification.requiredAllowance],
+  rows.push(["Risk classification", "Interest in suspense", "", r.classification.interestInSuspense],
+    ["Risk classification", "Interest on non-performing loans still in income", "", r.classification.interestAccruedOnNonPerforming],
+    ["Risk classification", "Required allowance for loan loss", "", r.classification.requiredAllowance],
     ["Risk classification", "Allowance held", "", r.classification.allowanceHeld.amount],
     ["Risk classification", "Shortfall", "", r.classification.allowanceShortfall],
     ["Risk classification", "Non-performing loans", "", r.classification.nonPerformingLoans, r.classification.nonPerformingRatioPct]);
@@ -144,7 +146,8 @@ export function PrudentialPage() {
               <dt>Allowance held</dt><dd>{fmt(r.classification.allowanceHeld.amount)}</dd>
               <dt>Shortfall</dt><dd className={Number(r.classification.allowanceShortfall) > 0 ? "problem" : ""}>{fmt(r.classification.allowanceShortfall)}</dd>
               <dt>Non-performing loans</dt><dd>{fmt(r.classification.nonPerformingLoans)} ({r.classification.nonPerformingRatioPct ?? "n/a"}% of gross loans)</dd>
-              <dt>Interest accrued on non-performing loans</dt><dd>{fmt(r.classification.interestAccruedOnNonPerforming)}</dd>
+              <dt>Interest in suspense</dt><dd>{fmt(r.classification.interestInSuspense)}</dd>
+              <dt>Interest on non-performing loans still in income</dt><dd>{fmt(r.classification.interestAccruedOnNonPerforming)}</dd>
               <dt>Loan principal in the ledger</dt><dd>{fmt(r.classification.ledgerLoanPrincipal)}
                 {Number(r.classification.unexplainedPrincipalDifference) !== 0 && <span className="problem"> (differs by {fmt(r.classification.unexplainedPrincipalDifference)})</span>}</dd>
             </dl>
@@ -213,7 +216,8 @@ export function RegulatorySetupPage() {
       minCoreToDepositsPct: s.minCoreToDepositsPct, minLiquidityPct: s.minLiquidityPct, watchMaxDpd: s.watchMaxDpd, substandardMaxDpd: s.substandardMaxDpd,
       doubtfulMaxDpd: s.doubtfulMaxDpd, provisionPerformingPct: s.provisionPerformingPct, provisionWatchPct: s.provisionWatchPct,
       provisionSubstandardPct: s.provisionSubstandardPct, provisionDoubtfulPct: s.provisionDoubtfulPct, provisionLossPct: s.provisionLossPct,
-      includeCurrentYearSurplus: s.includeCurrentYearSurplus });
+      includeCurrentYearSurplus: s.includeCurrentYearSurplus, interestSuspensionEnabled: s.interestSuspensionEnabled,
+      interestSuspenseAccount: s.interestSuspenseAccount });
   }
 
   async function submitSettings() {
@@ -251,6 +255,8 @@ export function RegulatorySetupPage() {
             <dl className="facts">
               {SETTING_FIELDS.map(([k, label]) => <span key={k}><dt>{label}</dt><dd>{String(s[k as keyof SettingsView] ?? "")}</dd></span>)}
               <dt>Count earnings not yet closed to equity as capital</dt><dd>{s.includeCurrentYearSurplus ? "yes" : "no"}</dd>
+              <dt>Suspend interest on non-performing loans (Reg 42)</dt>
+              <dd>{s.interestSuspensionEnabled ? `yes, into ${s.interestSuspenseAccount}` : "no"}</dd>
             </dl>
           </>
         )}
@@ -262,6 +268,16 @@ export function RegulatorySetupPage() {
             ))}
             <label><input type="checkbox" checked={form.includeCurrentYearSurplus ?? false}
               onChange={(e) => setForm({ ...form, includeCurrentYearSurplus: e.target.checked })} /> Count earnings not yet closed to equity as capital</label>
+            <label><input type="checkbox" checked={form.interestSuspensionEnabled ?? false}
+              onChange={(e) => setForm({ ...form, interestSuspensionEnabled: e.target.checked })} /> Suspend interest on non-performing loans (Reg 42)</label>
+            <label>Interest in suspense account (an asset account used for nothing else)
+              <select value={form.interestSuspenseAccount ?? ""} onChange={(e) => setForm({ ...form, interestSuspenseAccount: e.target.value || undefined })}>
+                <option value="">(none)</option>
+                {(mapping.data?.accounts ?? []).filter((a) => a.accountClass === "ASSET" && (!a.line || a.accountCode === form.interestSuspenseAccount))
+                  .map((a) => <option key={a.accountCode} value={a.accountCode}>{a.accountCode} {a.name}</option>)}
+              </select></label>
+            <p className="wide muted small">Takes effect at the next end of day: unpaid interest on loans past the watch band moves out of income into
+              suspense, and comes back to income when it is paid. Switching off releases it all to income.</p>
             <ProblemBox problem={saveSettings.error} />
             <div className="actions">
               <button type="button" disabled={saveSettings.busy} onClick={() => void submitSettings()}>Save settings</button>

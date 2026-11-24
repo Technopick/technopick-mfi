@@ -2354,6 +2354,12 @@
           "includeCurrentYearSurplus": {
             "type": "boolean"
           },
+          "interestSuspenseAccount": {
+            "type": "string"
+          },
+          "interestSuspensionEnabled": {
+            "type": "boolean"
+          },
           "minCoreCapital": {
             "type": "string"
           },
@@ -2402,6 +2408,12 @@
             "type": "integer"
           },
           "includeCurrentYearSurplus": {
+            "type": "boolean"
+          },
+          "interestSuspenseAccount": {
+            "type": "string"
+          },
+          "interestSuspensionEnabled": {
             "type": "boolean"
           },
           "minCoreCapital": {
@@ -2768,6 +2780,9 @@
             "type": "string"
           },
           "interestAccruedOnNonPerforming": {
+            "type": "string"
+          },
+          "interestInSuspense": {
             "type": "string"
           },
           "ledgerLoanPrincipal": {

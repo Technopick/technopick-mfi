@@ -379,7 +379,7 @@ class PrudentialReturnIntegrationTest {
                     {"tenantId":"%s","transId":"TSUSP00001","shortCode":"600993","amount":"700.00","currency":"KES",
                      "billRef":"LN-P0000003","msisdnMasked":"2547*****000","transTime":"2026-11-30T10:15:00+03:00"}
                     """.formatted(T)))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("APPLIED"));
+            .andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LOAN_REPAYMENT"));
         BigDecimal interestPaid = q("""
                 SELECT COALESCE(sum(a.amount), 0) FROM lending.repayment_allocation a
                   JOIN lending.repayment r ON r.tenant_id = a.tenant_id AND r.repayment_id = a.repayment_id

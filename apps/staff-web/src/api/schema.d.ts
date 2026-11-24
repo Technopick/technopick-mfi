@@ -2166,6 +2166,8 @@ export interface components {
             /** Format: int32 */
             doubtfulMaxDpd?: number;
             includeCurrentYearSurplus?: boolean;
+            interestSuspenseAccount?: string;
+            interestSuspensionEnabled?: boolean;
             minCoreCapital?: string;
             minCoreToAssetsPct?: string;
             minCoreToDepositsPct?: string;
@@ -2185,6 +2187,8 @@ export interface components {
             /** Format: int32 */
             doubtfulMaxDpd?: number;
             includeCurrentYearSurplus?: boolean;
+            interestSuspenseAccount?: string;
+            interestSuspensionEnabled?: boolean;
             minCoreCapital?: string;
             minCoreToAssetsPct?: string;
             minCoreToDepositsPct?: string;
@@ -2305,6 +2309,7 @@ export interface components {
             allowanceShortfall?: string;
             grossLoans?: string;
             interestAccruedOnNonPerforming?: string;
+            interestInSuspense?: string;
             ledgerLoanPrincipal?: string;
             nonPerformingLoans?: string;
             nonPerformingRatioPct?: string;
