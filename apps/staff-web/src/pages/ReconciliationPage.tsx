@@ -14,6 +14,8 @@ const LABELS: Record<string, string> = {
   LOAN_PENALTY_RECEIVABLE: "Loan penalties receivable",
   LOAN_OVERPAYMENT: "Loan overpayments held",
   LOAN_INTEREST_SUSPENSE: "Interest in suspense (non-performing loans)",
+  LOAN_LOSS_ALLOWANCE: "Loan loss allowance (IFRS 9)",
+  SHARE_CAPITAL: "Member share capital",
 };
 
 /** Control accounts against the business records: live now, or as recorded by a past end of day. */

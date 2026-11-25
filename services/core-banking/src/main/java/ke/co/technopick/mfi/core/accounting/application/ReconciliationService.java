@@ -23,7 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>LOAN_PENALTY_RECEIVABLE - penalties charged less paid and written off;</li>
  *   <li>LOAN_OVERPAYMENT - credit held for customers (overpayments less credit applied);</li>
  *   <li>LOAN_INTEREST_SUSPENSE - interest in suspense on non-performing loans (ADR-0031);</li>
- *   <li>LOAN_LOSS_ALLOWANCE - the IFRS 9 allowance, equal to the approved provision runs (ADR-0036).</li>
+ *   <li>LOAN_LOSS_ALLOWANCE - the IFRS 9 allowance, equal to the approved provision runs (ADR-0036);</li>
+ *   <li>SHARE_CAPITAL - members' share capital, equal to the share register (ADR-0040).</li>
  * </ul>
  * A difference means a posting reached the ledger without its business record (or the reverse),
  * and finance must investigate. Balances are in the account's natural sign.
@@ -102,7 +103,16 @@ public class ReconciliationService {
                                   ORDER BY r.as_of DESC LIMIT 1), 0)
                   FROM ledger.gl_account a
                  WHERE a.account_code IN (SELECT allowance_account FROM ledger.ecl_settings
-                                          UNION SELECT allowance_account FROM ledger.ecl_run WHERE status = 'POSTED'))
+                                          UNION SELECT allowance_account FROM ledger.ecl_run WHERE status = 'POSTED')
+                UNION ALL
+                -- Share capital (ADR-0040): equity holding exactly the members' shares in the register.
+                SELECT 'SHARE_CAPITAL', a.account_code, a.currency,
+                       COALESCE((SELECT sum(CASE t.kind WHEN 'TRANSFER_OUT' THEN -t.amount ELSE t.amount END)
+                                   FROM shares.share_transaction t), 0),
+                       (SELECT count(*) FROM (SELECT t.customer_id FROM shares.share_transaction t GROUP BY t.customer_id
+                                              HAVING sum(CASE t.kind WHEN 'TRANSFER_OUT' THEN -t.amount ELSE t.amount END) > 0) x)
+                  FROM shares.share_settings s
+                  JOIN ledger.gl_account a ON a.account_code = s.gl_share_capital)
             SELECT s.check_code, s.account_code, s.currency, s.amount AS subledger, s.items,
                    CASE WHEN a.account_class IN ('ASSET', 'EXPENSE') THEN COALESCE(g.debit_positive, 0)
                         ELSE -COALESCE(g.debit_positive, 0) END AS ledger

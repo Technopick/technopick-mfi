@@ -180,4 +180,7 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== M-Pesa B2C status query and float tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/b2c_status_float_test.sql"
 
+echo "== Share capital tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/shares_test.sql"
+
 echo "== done"
