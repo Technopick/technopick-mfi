@@ -2340,6 +2340,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/shares/dividends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Share_dividendRuns"];
+        put?: never;
+        post: operations["Share_requestDividend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/dividends/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Share_previewDividend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/dividends/{runId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Share_approveDividend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/dividends/{runId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Share_dividendLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/dividends/{runId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Share_rejectDividend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/members/{customerNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Share_member"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Share_purchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Share_register"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Share_settings"];
+        put: operations["Share_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Share_transfers"];
+        put?: never;
+        post: operations["Share_requestTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/transfers/{transferId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Share_approveTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/transfers/{transferId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Share_rejectTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2811,6 +3003,77 @@ export interface components {
             /** Format: uuid */
             requestId?: string;
             shortCode?: string;
+        };
+        DividendLineView: {
+            customerNumber?: string;
+            gross?: string;
+            name?: string;
+            net?: string;
+            paidTo?: string;
+            sharesAmount?: string;
+            tax?: string;
+        };
+        DividendPreview: {
+            /** Format: int32 */
+            financialYear?: number;
+            grossTotal?: string;
+            lines?: components["schemas"]["DividendLineView"][];
+            /** Format: int32 */
+            members?: number;
+            netTotal?: string;
+            ratePct?: string;
+            /** Format: date */
+            recordDate?: string;
+            sharesTotal?: string;
+            taxRate?: string;
+            taxTotal?: string;
+            toPayableTotal?: string;
+            toSavingsTotal?: string;
+        };
+        DividendPreviewRequest: {
+            /** Format: int32 */
+            financialYear: number;
+            ratePct: number;
+            /** Format: date */
+            recordDate: string;
+        };
+        DividendRunRequest: {
+            /** Format: int32 */
+            financialYear: number;
+            idempotencyKey: string;
+            ratePct: number;
+            /** Format: date */
+            recordDate: string;
+        };
+        DividendRunView: {
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: uuid */
+            entryId?: string;
+            /** Format: int32 */
+            financialYear?: number;
+            grossTotal?: string;
+            /** Format: int32 */
+            members?: number;
+            netTotal?: string;
+            ratePct?: string;
+            /** Format: date */
+            recordDate?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            /** Format: uuid */
+            runId?: string;
+            sharesTotal?: string;
+            status?: string;
+            taxRate?: string;
+            taxTotal?: string;
+            toPayableTotal?: string;
+            toSavingsTotal?: string;
         };
         EclCalculation: {
             /** Format: date */
@@ -3286,6 +3549,15 @@ export interface components {
             amount?: string;
             idempotencyKey?: string;
             target?: string;
+        };
+        MemberShares: {
+            customerNumber?: string;
+            holding?: string;
+            minimumHolding?: string;
+            name?: string;
+            /** Format: int64 */
+            shares?: number;
+            transactions?: components["schemas"]["ShareTransactionView"][];
         };
         MemberSms: {
             customerNumber?: string;
@@ -3779,6 +4051,102 @@ export interface components {
             /** Format: uuid */
             setupId?: string;
             status?: string;
+        };
+        ShareDecisionRequest: {
+            reason?: string;
+        };
+        SharePurchaseRequest: {
+            accountNumber: string;
+            amount: number;
+            customerNumber: string;
+            idempotencyKey: string;
+        };
+        ShareRegister: {
+            holders?: components["schemas"]["ShareholderRow"][];
+            /** Format: int32 */
+            members?: number;
+            parValue?: string;
+            totalHolding?: string;
+            /** Format: int64 */
+            totalShares?: number;
+        };
+        ShareSettingsRequest: {
+            dividendSourceAccount: string;
+            dividendTaxAccount: string;
+            dividendTaxRate: number;
+            dividendsPayableAccount: string;
+            minimumHolding: number;
+            parValue: number;
+            shareCapitalAccount: string;
+        };
+        ShareSettingsView: {
+            dividendSourceAccount?: string;
+            dividendTaxAccount?: string;
+            dividendTaxRate?: string;
+            dividendsPayableAccount?: string;
+            minimumHolding?: string;
+            parValue?: string;
+            shareCapitalAccount?: string;
+            sharesIssued?: boolean;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        ShareTransactionView: {
+            accountNumber?: string;
+            amount?: string;
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            /** Format: uuid */
+            entryId?: string;
+            kind?: string;
+            /** Format: int64 */
+            shares?: number;
+            /** Format: uuid */
+            transferId?: string;
+            /** Format: uuid */
+            txnId?: string;
+        };
+        ShareTransferRequest: {
+            amount: number;
+            fromCustomerNumber: string;
+            idempotencyKey: string;
+            reason: string;
+            toCustomerNumber: string;
+        };
+        ShareTransferView: {
+            amount?: string;
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            fromCustomerNumber?: string;
+            fromName?: string;
+            reason?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            sellerHolding?: string;
+            /** Format: int64 */
+            shares?: number;
+            status?: string;
+            toCustomerNumber?: string;
+            toName?: string;
+            /** Format: uuid */
+            transferId?: string;
+        };
+        ShareholderRow: {
+            branchCode?: string;
+            customerNumber?: string;
+            holding?: string;
+            name?: string;
+            /** Format: int64 */
+            shares?: number;
         };
         SmsClaimRequest: {
             /** Format: int32 */
@@ -8145,6 +8513,356 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TillView"][];
+                };
+            };
+        };
+    };
+    Share_dividendRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendRunView"][];
+                };
+            };
+        };
+    };
+    Share_requestDividend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DividendRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendRunView"];
+                };
+            };
+        };
+    };
+    Share_previewDividend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DividendPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendPreview"];
+                };
+            };
+        };
+    };
+    Share_approveDividend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ShareDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendRunView"];
+                };
+            };
+        };
+    };
+    Share_dividendLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendLineView"][];
+                };
+            };
+        };
+    };
+    Share_rejectDividend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendRunView"];
+                };
+            };
+        };
+    };
+    Share_member: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberShares"];
+                };
+            };
+        };
+    };
+    Share_purchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharePurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberShares"];
+                };
+            };
+        };
+    };
+    Share_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareRegister"];
+                };
+            };
+        };
+    };
+    Share_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareSettingsView"];
+                };
+            };
+        };
+    };
+    Share_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareSettingsView"];
+                };
+            };
+        };
+    };
+    Share_transfers: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareTransferView"][];
+                };
+            };
+        };
+    };
+    Share_requestTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareTransferView"];
+                };
+            };
+        };
+    };
+    Share_approveTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ShareDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareTransferView"];
+                };
+            };
+        };
+    };
+    Share_rejectTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareTransferView"];
                 };
             };
         };

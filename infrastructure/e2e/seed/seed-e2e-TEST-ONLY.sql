@@ -61,4 +61,10 @@ INSERT INTO savings.till (tenant_id, till_id, till_code, branch_code, currency, 
   (:t, '0e2e7e00-0000-0000-0000-000000000002', 'NBO01-T2', 'NBO01', 'KES', '1002-TILL-NBO01-02');
 INSERT INTO savings.teller_policy (tenant_id, currency, withdrawal_approval_above, deposit_approval_above)
 VALUES (:t, 'KES', 50000, 1000000);
+-- TEST-ONLY share capital accounts (ADR-0040); finance chooses them on the Dividends page.
+INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+  (:t, '3100-SHARE-CAPITAL', 'Member share capital (test)', 'EQUITY', 'KES', false),
+  (:t, '3300-RETAINED-EARNINGS', 'Retained earnings (test)', 'EQUITY', 'KES', false),
+  (:t, '2410-DIVIDENDS-PAYABLE', 'Dividends payable (test)', 'LIABILITY', 'KES', false),
+  (:t, '2420-WHT-DIVIDENDS', 'Withholding tax on dividends (test)', 'LIABILITY', 'KES', false);
 \echo TEST-ONLY seed loaded

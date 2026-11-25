@@ -49,6 +49,46 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(rows.nth(1)).toContainText("KES 60,000.00");
   await expect(rows.nth(1)).toContainText("KES 40,000.00");
 
+  // Share capital (ADR-0040): finance sets it up; the teller buys 5,000 in shares from the account;
+  // an officer asks to transfer 2,000 to another member and a supervisor approves it.
+  const finance = await signIn(browser, "finance");
+  await finance.goto("/dividends");
+  await finance.getByLabel("Value of one share").fill("100");
+  await finance.getByLabel("Minimum holding").fill("1000");
+  await finance.getByLabel("Share capital account (equity)").fill("3100-SHARE-CAPITAL");
+  await finance.getByLabel("Dividends paid from (equity)").fill("3300-RETAINED-EARNINGS");
+  await finance.getByLabel("Dividends payable (liability)").fill("2410-DIVIDENDS-PAYABLE");
+  await finance.getByLabel("Withholding tax payable (liability)").fill("2420-WHT-DIVIDENDS");
+  await finance.getByRole("button", { name: "Save share settings" }).click();
+  await expect(finance.getByText(/Last changed by user:/)).toBeVisible();
+  await teller.goto("/shares");
+  await teller.getByLabel("Member number").fill(customer);
+  await teller.getByRole("button", { name: "Show shares" }).click();
+  await expect(teller.getByText("No share movements yet.")).toBeVisible();
+  await teller.getByLabel("Pay from the member's savings account").fill(account);
+  await teller.getByLabel("Amount to buy (whole shares)").fill("5000");
+  await teller.getByRole("button", { name: "Buy shares" }).click();
+  await expect(teller.getByRole("status")).toContainText(`${customer} now holds 5,000.00 in shares.`);
+  await teller.goto(`/accounts/${account}`);
+  await expect(teller.getByText("KES 35,000.00").first()).toBeVisible();
+  const other = await verifiedCustomer(officer, manager, "Kamau");
+  await officer.goto("/shares");
+  await officer.getByLabel("Member number").fill(customer);
+  await officer.getByRole("button", { name: "Show shares" }).click();
+  await officer.getByLabel("To member number").fill(other);
+  await officer.getByLabel("Amount to transfer (whole shares)").fill("2000");
+  await officer.getByLabel(/^Reason/).fill("Gift to a family member (e2e)");
+  await officer.getByRole("button", { name: "Ask for the transfer" }).click();
+  await expect(officer.getByRole("status")).toContainText("it needs approval");
+  await expect(officer.getByRole("row", { name: new RegExp(other) }).getByRole("button", { name: "Approve" })).toHaveCount(0);
+  await supervisor.goto("/shares");
+  const shareTransfer = supervisor.getByRole("row", { name: /Gift to a family member \(e2e\)/ });
+  await shareTransfer.getByRole("button", { name: "Approve" }).click();
+  await expect(shareTransfer).toContainText("APPROVED");
+  await supervisor.reload();
+  await expect(supervisor.getByRole("row", { name: new RegExp(`^${other}.*2,000\\.00`) })).toBeVisible();
+  await expect(supervisor.getByRole("row", { name: new RegExp(`^${customer}.*3,000\\.00`) })).toBeVisible();
+
   // Vault cash into the till, approved by the supervisor.
   await teller.goto("/teller");
   await teller.getByLabel("Transfer amount").fill("20000");
@@ -94,7 +134,6 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(supervisor.getByRole("heading", { level: 1, name: "Loan write-offs" })).toBeVisible();
 
   // Finance sees the ledger the day's work produced, and it balances.
-  const finance = await signIn(browser, "finance");
   await finance.goto("/ledger");
   await expect(finance.getByRole("status").first()).toContainText("balanced.");
   await expect(finance.getByRole("link", { name: "1001-TILL-NBO01-01" })).toBeVisible();

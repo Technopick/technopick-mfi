@@ -11,6 +11,7 @@ export const NAV: { to: string; label: string; roles: string[] }[] = [
   { to: "/disbursements", label: "Disbursements", roles: ["LOAN_OFFICER", "OPERATIONS", "BRANCH_MANAGER", "SUPERVISOR"] },
   { to: "/mpesa", label: "M-Pesa close-out", roles: ["OPERATIONS", "SUPERVISOR"] },
   { to: "/suspense", label: "Suspense", roles: ["OPERATIONS", "SUPERVISOR"] },
+  { to: "/shares", label: "Member shares", roles: ["TELLER", "LOAN_OFFICER", "BRANCH_MANAGER", "OPERATIONS", "SUPERVISOR", "FINANCE"] },
   { to: "/loans", label: "Loan schedule", roles: ["LOAN_OFFICER", "BRANCH_MANAGER", "TELLER", "OPERATIONS"] },
   { to: "/portfolio", label: "Portfolio at risk", roles: ["BRANCH_MANAGER", "SUPERVISOR", "OPERATIONS", "LOAN_OFFICER"] },
   { to: "/write-offs", label: "Write-offs", roles: ["BRANCH_MANAGER", "OPERATIONS", "SUPERVISOR"] },
@@ -23,6 +24,7 @@ export const NAV: { to: string; label: string; roles: string[] }[] = [
   { to: "/mpesa-statements", label: "M-Pesa statements", roles: ["FINANCE", "SUPERVISOR"] },
   { to: "/b2c-float", label: "B2C float", roles: ["OPERATIONS", "FINANCE", "SUPERVISOR"] },
   { to: "/provisioning", label: "Provisioning", roles: ["FINANCE"] },
+  { to: "/dividends", label: "Dividends", roles: ["FINANCE", "SUPERVISOR"] },
   { to: "/audit", label: "Audit trail", roles: ["SUPERVISOR"] },
   { to: "/end-of-day", label: "End of day", roles: ["OPERATIONS", "BRANCH_MANAGER", "SUPERVISOR"] },
 ];

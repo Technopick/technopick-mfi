@@ -110,7 +110,7 @@ describe("screens", () => {
     const { api } = fakeApi({});
     renderAt("/", session("teller-1", "TELLER"), api);
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Loan schedule"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Member shares", "Loan schedule"]);
   });
 
   it("validates the amount locally and sends it as a string with an idempotency key", async () => {
@@ -891,6 +891,98 @@ describe("screens", () => {
       lowFloatThreshold: "100000.00", dailyCheckHour: 7 }));
   });
 
+  it("shows a member's shares and lets a teller buy shares from savings", async () => {
+    const S = "/api/v1/shares";
+    const settings = { parValue: "100.00", minimumHolding: "1000.00", shareCapitalAccount: "3100-SHARE-CAPITAL",
+      dividendSourceAccount: "3300-RETAINED-EARNINGS", dividendsPayableAccount: "2400-DIVIDENDS-PAYABLE",
+      dividendTaxAccount: "2410-WHT-DIVIDENDS", dividendTaxRate: "5.00", sharesIssued: true };
+    const member = { customerNumber: "CU26-0000001", name: "Member Load1", holding: "1000.00", shares: 10, minimumHolding: "1000.00",
+      transactions: [{ txnId: "t-1", kind: "PURCHASE", amount: "1000.00", shares: 10, businessDate: "2026-11-27",
+        accountNumber: "0100000001", createdBy: "user:teller-1", createdAt: "2026-11-27T08:00:00Z" }] };
+    const { api, calls } = fakeApi({
+      [`GET ${S}/settings`]: () => settings,
+      [`GET ${S}/members/CU26-0000001`]: () => member,
+      [`POST ${S}/purchases`]: () => ({ ...member, holding: "6000.00", shares: 60 }),
+    });
+    renderAt("/shares", session("teller-1", "TELLER"), api);
+    expect(await screen.findByText(/every shareholder keeps at least/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Member number"), "cu26-0000001");
+    await userEvent.click(screen.getByRole("button", { name: "Show shares" }));
+    expect(await screen.findByText("Bought")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ask for the transfer" })).toBeNull();
+    await userEvent.type(screen.getByLabelText("Pay from the member's savings account"), "0100000001");
+    await userEvent.type(screen.getByLabelText("Amount to buy (whole shares)"), "5000");
+    await userEvent.click(screen.getByRole("button", { name: "Buy shares" }));
+    expect(await screen.findByText(/now holds 6,?000\.00 in shares/)).toBeTruthy();
+    const body = calls.find((c) => c.method === "POST")?.body as Record<string, string>;
+    expect(body).toMatchObject({ customerNumber: "CU26-0000001", accountNumber: "0100000001", amount: "5000" });
+    expect(body.idempotencyKey).toBeTruthy();
+    expect(calls.some((c) => c.path.endsWith("/transfers") || c.path.endsWith("/register"))).toBe(false);
+  });
+
+  it("lets a branch manager decide another person's share transfer but not their own", async () => {
+    const S = "/api/v1/shares";
+    const t = (id: string, by: string) => ({ transferId: id, fromCustomerNumber: "CU26-0000001", fromName: "Member Load1",
+      toCustomerNumber: "CU26-0000002", toName: "Member Load2", amount: "2000.00", shares: 20, reason: "Gift to a family member",
+      status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-28T08:00:00Z", sellerHolding: "5000.00" });
+    const { api, calls } = fakeApi({
+      [`GET ${S}/settings`]: () => ({ parValue: "100.00", minimumHolding: "1000.00", sharesIssued: true }),
+      [`GET ${S}/transfers`]: () => [t("x-1", "user:lo-1"), t("x-2", "user:bm-1")],
+      [`GET ${S}/register`]: () => ({ parValue: "100.00", totalHolding: "6000.00", totalShares: 60, members: 2,
+        holders: [{ customerNumber: "CU26-0000001", name: "Member Load1", branchCode: "NBO01", holding: "5000.00", shares: 50 }] }),
+      [`POST ${S}/transfers/x-1/approve`]: () => ({ ...t("x-1", "user:lo-1"), status: "APPROVED" }),
+    });
+    renderAt("/shares", session("bm-1", "BRANCH_MANAGER"), api);
+    expect(await screen.findAllByRole("button", { name: "Approve" })).toHaveLength(1);
+    expect(screen.getByText(/Your own request/)).toBeTruthy();
+    expect(await screen.findByText("Share register")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual([`${S}/transfers/x-1/approve`]));
+  });
+
+  it("lets finance preview and request a dividend, and a supervisor approve it", async () => {
+    const S = "/api/v1/shares";
+    const preview = { financialYear: 2026, recordDate: "2026-11-28", ratePct: "10.00", taxRate: "5.00", members: 3, sharesTotal: "6000.00",
+      grossTotal: "600.00", taxTotal: "30.00", netTotal: "570.00", toSavingsTotal: "380.00", toPayableTotal: "190.00", lines: [] };
+    const run = { runId: "r-1", financialYear: 2026, recordDate: "2026-11-28", ratePct: "10.00", taxRate: "5.00", members: 3,
+      grossTotal: "600.00", taxTotal: "30.00", netTotal: "570.00", status: "REQUESTED", requestedBy: "user:fin-1",
+      requestedAt: "2026-11-29T08:00:00Z" };
+    let runs: unknown[] = [];
+    const { api, calls } = fakeApi({
+      [`GET ${S}/settings`]: () => ({ parValue: "100.00", minimumHolding: "1000.00", shareCapitalAccount: "3100-SHARE-CAPITAL",
+        dividendSourceAccount: "3300-RETAINED-EARNINGS", dividendsPayableAccount: "2400-DIVIDENDS-PAYABLE",
+        dividendTaxAccount: "2410-WHT-DIVIDENDS", dividendTaxRate: "5.00", sharesIssued: true }),
+      [`GET ${S}/dividends`]: () => runs,
+      [`POST ${S}/dividends/preview`]: () => preview,
+      [`POST ${S}/dividends`]: () => {
+        runs = [run];
+        return run;
+      },
+    });
+    renderAt("/dividends", session("fin-1", "FINANCE"), api);
+    expect(await screen.findByText("No dividend runs yet.")).toBeTruthy();
+    expect((screen.getByLabelText("Value of one share") as HTMLInputElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Record date (a closed business day)"), { target: { value: "2026-11-28" } });
+    await userEvent.type(screen.getByLabelText("Dividend rate (%)"), "10");
+    await userEvent.click(screen.getByRole("button", { name: "Calculate" }));
+    expect(await screen.findByText("Held as payable")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Request dividend for 2026" }));
+    expect(await screen.findByText(/Another finance user or a supervisor must approve it/)).toBeTruthy();
+    expect(await screen.findByText(/Your own request/)).toBeTruthy();
+    expect(calls.find((c) => c.path === `${S}/dividends/preview`)?.body).toMatchObject({ recordDate: "2026-11-28", ratePct: "10" });
+    cleanup();
+
+    const sup = fakeApi({
+      [`GET ${S}/settings`]: () => ({ parValue: "100.00", minimumHolding: "1000.00", sharesIssued: true }),
+      [`GET ${S}/dividends`]: () => [run],
+      [`POST ${S}/dividends/r-1/approve`]: () => ({ ...run, status: "POSTED", decidedBy: "user:sup-1" }),
+    });
+    renderAt("/dividends", session("sup-1", "SUPERVISOR"), sup.api);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve and pay" }));
+    expect(screen.queryByRole("button", { name: "Calculate" })).toBeNull();
+    await waitFor(() => expect(sup.calls.some((c) => c.path === `${S}/dividends/r-1/approve`)).toBe(true));
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -974,8 +1066,8 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns", "M-Pesa statements",
-      "B2C float", "Provisioning"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Member shares", "General ledger", "Prudential returns",
+      "M-Pesa statements", "B2C float", "Provisioning", "Dividends"]);
   });
 
   it("flags control accounts that do not match their records", async () => {
