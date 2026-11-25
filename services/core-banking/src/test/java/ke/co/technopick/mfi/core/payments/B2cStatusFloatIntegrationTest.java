@@ -107,8 +107,6 @@ class B2cStatusFloatIntegrationTest {
                 "-f", "/tmp/seed.sql");
         assertEquals(0, r.getExitCode(), r.getStderr());
         JdbcTemplate db = owner();
-        db.update("INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency) VALUES "
-                + "(?::uuid, '1110-MPESA-B2C-CLEARING', 'M-Pesa B2C clearing', 'ASSET', 'KES')", T);
         db.update("INSERT INTO payments.mpesa_b2c_account (tenant_id, short_code, branch_code, gl_clearing) "
                 + "VALUES (?::uuid, '600000', 'NBO01', '1110-MPESA-B2C-CLEARING')", T);
         for (int i = 1; i <= 3; i++) {

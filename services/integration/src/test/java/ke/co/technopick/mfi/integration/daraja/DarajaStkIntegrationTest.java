@@ -100,6 +100,7 @@ class DarajaStkIntegrationTest {
         CORE.createContext("/token", ex -> reply(ex, 200, "{\"access_token\":\"stub\",\"expires_in\":300}"));
         CORE.createContext("/api/v1/payments/mpesa/stk-requests/", DarajaStkIntegrationTest::core);
         CORE.createContext("/api/v1/payments/mpesa/b2c/disbursements/", DarajaStkIntegrationTest::b2cCore);
+        CORE.createContext("/api/v1/payments/mpesa/b2c/", DarajaStkIntegrationTest::b2cQueryCore);
         CORE.start();
     }
 
@@ -165,6 +166,28 @@ class DarajaStkIntegrationTest {
             reply(ex, 200, """
                 {"disbursementId":"%s","shortCode":"600000","msisdn":"%s","amount":"98000","remarks":"Loan LN-T",
                  "occasion":"LN-T"}""".formatted(id, PHONES.get(id)));
+            return;
+        }
+        reply(ex, 200, "{\"status\":\"OK\"}");
+    }
+
+    /** What the stub core hands out as due on the next call (then forgets). */
+    static final List<String> DUE_QUERIES = new CopyOnWriteArrayList<>();
+    static final List<String> DUE_CHECKS = new CopyOnWriteArrayList<>();
+
+    /** TEST-ONLY stub of core's B2C status-query and balance-check endpoints (ADR-0039). */
+    static void b2cQueryCore(HttpExchange ex) throws IOException {
+        String[] parts = ex.getRequestURI().getPath().split("/");
+        String id = parts[parts.length - 2];
+        String action = parts[parts.length - 1];
+        String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        String kind = ex.getRequestURI().getPath().contains("/status-queries/") ? "q" : "c";
+        CALLS.add("b2c" + kind + "-" + action + " " + id + " " + body);
+        if ("due".equals(action)) {
+            List<String> due = "q".equals(kind) ? DUE_QUERIES : DUE_CHECKS;
+            String items = String.join(",", due);
+            due.clear();
+            reply(ex, 200, "[" + items + "]");
             return;
         }
         reply(ex, 200, "{\"status\":\"OK\"}");
@@ -322,6 +345,9 @@ class DarajaStkIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired
     StkReconciler reconciler;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    B2cQueries b2cQueries;
+
     /** No callback ever arrives: the reconciler asks Daraja (STK query) and reports what it learns. */
     @Test
     void overdueResultsAreQueried() throws Exception {
@@ -413,5 +439,53 @@ class DarajaStkIntegrationTest {
             .POST(HttpRequest.BodyPublishers.ofString("{\"Result\":{\"ResultCode\":0,\"OriginatorConversationID\":\""
                     + UUID.randomUUID() + "\"}}")).build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(400, misrouted.statusCode());
+    }
+
+    /**
+     * A payment whose result never arrived (999) is asked about with the Transaction Status API and
+     * found paid; a request that never reached M-Pesa (500) is not found; the float is asked with the
+     * Account Balance API. Only the code, status, receipt, amount and balance text reach core.
+     */
+    @Test
+    void statusQueriesAndFloatChecksThroughSimulator() throws Exception {
+        String silent = disbursement("254712349999");
+        String neverSent = disbursement("254712349500");
+        await("B2C requests reached the simulator", () -> !b2cCallsFor(silent).isEmpty() && !b2cCallsFor(neverSent).isEmpty());
+        String q1 = UUID.randomUUID().toString();
+        String q2 = UUID.randomUUID().toString();
+        String c1 = UUID.randomUUID().toString();
+        DUE_QUERIES.add("{\"queryId\":\"" + q1 + "\",\"disbursementId\":\"" + silent + "\",\"shortCode\":\"600000\"}");
+        DUE_QUERIES.add("{\"queryId\":\"" + q2 + "\",\"disbursementId\":\"" + neverSent + "\",\"shortCode\":\"600000\"}");
+        DUE_CHECKS.add("{\"checkId\":\"" + c1 + "\",\"shortCode\":\"600000\"}");
+
+        assertEquals(3, b2cQueries.run());
+        assertEquals(1, calls("b2cq-sent", q1).size());
+        assertEquals(1, calls("b2cc-sent", c1).size());
+        assertTrue(SIM.statusQueries().containsAll(List.of(silent, neverSent)), SIM.statusQueries().toString());
+
+        await("answers applied in core", () -> calls("b2cq-result", q1).size() == 1 && calls("b2cq-result", q2).size() == 1
+                && calls("b2cc-result", c1).size() == 1);
+        String txn = SIM.payments().get(silent).transactionId();
+        String found = calls("b2cq-result", q1).get(0);
+        assertTrue(found.contains("\"resultCode\":\"0\"") && found.contains("\"transactionStatus\":\"Completed\"")
+                && found.contains("\"receiptNo\":\"" + txn + "\"") && found.contains("\"amount\":\"98000.00\""), found);
+        assertTrue(!found.contains("TEST CUSTOMER") && !found.contains("254700000000"), "party details not forwarded");
+        String notFound = calls("b2cq-result", q2).get(0);
+        assertTrue(notFound.contains("\"resultCode\":\"1\"") && !notFound.contains("receiptNo\":\"S"), notFound);
+        String balance = calls("b2cc-result", c1).get(0);
+        assertTrue(balance.contains("\"resultCode\":\"0\"") && balance.contains("Utility Account|KES|"
+                + SIM.utilityBalance("600000").toPlainString()), balance);
+
+        // a forged answer for an unknown token is refused; a malformed one is not stored
+        HttpResponse<String> forged = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(
+                "http://127.0.0.1:" + PORT + "/daraja/b2c/not-a-token/status-result/" + q1))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"Result\":{\"ResultCode\":0}}")).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(404, forged.statusCode());
+        HttpResponse<String> malformed = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(
+                "http://127.0.0.1:" + PORT + "/daraja/b2c/test-only-b2c-token-41aa/balance-result/" + UUID.randomUUID()))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"nothing\":true}")).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, malformed.statusCode());
     }
 }

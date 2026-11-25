@@ -56,6 +56,10 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>B2C outcome is scripted by the last three digits of PartyB: {@code 001} insufficient float
  * (ResultCode 1), {@code 777} queue timeout (callback to QueueTimeOutURL), {@code 999} no callback,
  * {@code 222} result delivered twice, {@code 400} refused, {@code 500} provider error, else success.
+ * Every accepted B2C payment is remembered, so the Transaction Status API answers what really
+ * happened ({@code 777} and {@code 999} are paid even though no result arrives; {@code 001} failed;
+ * {@code 400}/{@code 500} never reached M-Pesa, so the query finds nothing), and the Account Balance
+ * API reports a Utility Account float that starts at 1,000,000.00 and falls with each payment.
  * The SecurityCredential is checked by decrypting it with the simulator's own RSA key; tests
  * configure the integration runtime with {@link #publicKeyPem()} in place of Safaricom's certificate.
  */
@@ -65,6 +69,7 @@ public final class DarajaSimulator implements AutoCloseable {
     private static final ZoneId EAT = ZoneId.of("Africa/Nairobi");
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String ALNUM = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
+    private static final BigDecimal START_FLOAT = new BigDecimal("1000000.00");
 
     /** One STK Push request as received, for test assertions. */
     public record StkCall(String shortCode, String phone, String amount, String accountReference, String callbackUrl,
@@ -73,6 +78,10 @@ public final class DarajaSimulator implements AutoCloseable {
     /** One B2C payment request as received, for test assertions. */
     public record B2cCall(String originatorConversationId, String shortCode, String partyB, String amount,
                           String conversationId, int httpStatus) { }
+
+    /** What M-Pesa did with one accepted B2C request, for the Transaction Status API. */
+    public record Payment(String originatorConversationId, String shortCode, String transactionId, BigDecimal amount,
+                          boolean completed) { }
 
     /** B2C initiator credentials per short code (TEST values). */
     public record Initiator(String name, String password) { }
@@ -99,6 +108,10 @@ public final class DarajaSimulator implements AutoCloseable {
     private final List<Delivery> deliveries = new CopyOnWriteArrayList<>();
     private final List<String> queries = new CopyOnWriteArrayList<>();
     private final List<B2cCall> b2cCalls = new CopyOnWriteArrayList<>();
+    private final Map<String, Payment> payments = new ConcurrentHashMap<>();
+    private final Map<String, BigDecimal> utility = new ConcurrentHashMap<>();
+    private final List<String> statusQueries = new CopyOnWriteArrayList<>();
+    private final List<String> balanceQueries = new CopyOnWriteArrayList<>();
     private final Map<String, Initiator> initiators;
     private final KeyPair keys;
 
@@ -122,6 +135,8 @@ public final class DarajaSimulator implements AutoCloseable {
         server.createContext("/mpesa/stkpush/v1/processrequest", this::stkPush);
         server.createContext("/mpesa/stkpushquery/v1/query", this::stkQuery);
         server.createContext("/mpesa/b2c/v3/paymentrequest", this::b2c);
+        server.createContext("/mpesa/transactionstatus/v1/query", this::transactionStatus);
+        server.createContext("/mpesa/accountbalance/v1/query", this::accountBalance);
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
     }
@@ -149,6 +164,26 @@ public final class DarajaSimulator implements AutoCloseable {
 
     public List<B2cCall> b2cCalls() {
         return List.copyOf(b2cCalls);
+    }
+
+    /** Payments as M-Pesa recorded them, by OriginatorConversationID. */
+    public Map<String, Payment> payments() {
+        return Map.copyOf(payments);
+    }
+
+    /** Transaction ids or originator ids asked about through the Transaction Status API, in order. */
+    public List<String> statusQueries() {
+        return List.copyOf(statusQueries);
+    }
+
+    /** Short codes asked about through the Account Balance API, in order. */
+    public List<String> balanceQueries() {
+        return List.copyOf(balanceQueries);
+    }
+
+    /** Current Utility Account float of a B2C short code. */
+    public BigDecimal utilityBalance(String shortCode) {
+        return utility.getOrDefault(shortCode, START_FLOAT);
     }
 
     public String baseUrl() {
@@ -397,13 +432,19 @@ public final class DarajaSimulator implements AutoCloseable {
         String conversation = "AG_" + ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_"
                 + random.nextInt(100_000_000, 999_999_999);
         b2cCalls.add(new B2cCall(originator, shortCode, partyB, amount, conversation, 200));
+        String txn = receipt();
+        boolean paid = !partyB.endsWith("001");
+        payments.put(originator, new Payment(originator, shortCode, txn, new BigDecimal(amount).setScale(2), paid));
+        if (paid) {
+            utility.compute(shortCode, (k, v) -> (v == null ? START_FLOAT : v).subtract(new BigDecimal(amount)));
+        }
         if (partyB.endsWith("777")) {
             Map<String, Object> timeout = Map.of("Result", Map.of("ResultType", 1, "ResultCode", "SIM-TIMEOUT",
                     "ResultDesc", "Simulated queue timeout", "OriginatorConversationID", originator,
                     "ConversationID", conversation));
             scheduler.schedule(() -> deliver(timeoutUrl, conversation, timeout), callbackDelayMs, TimeUnit.MILLISECONDS);
         } else if (!partyB.endsWith("999")) {
-            Map<String, Object> result = b2cResult(originator, conversation, partyB, amount);
+            Map<String, Object> result = b2cResult(originator, conversation, partyB, amount, txn, shortCode);
             int times = partyB.endsWith("222") ? 2 : 1;
             for (int i = 0; i < times; i++) {
                 scheduler.schedule(() -> deliver(resultUrl, conversation, result), callbackDelayMs * (i + 1),
@@ -414,16 +455,21 @@ public final class DarajaSimulator implements AutoCloseable {
                 "ResponseCode", "0", "ResponseDescription", "Accept the service request successfully."));
     }
 
-    private Map<String, Object> b2cResult(String originator, String conversation, String partyB, String amount) {
+    private String receipt() {
         StringBuilder txn = new StringBuilder("SIM");
         for (int i = 0; i < 7; i++) {
             txn.append(ALNUM.charAt(random.nextInt(ALNUM.length())));
         }
+        return txn.toString();
+    }
+
+    private Map<String, Object> b2cResult(String originator, String conversation, String partyB, String amount, String txn,
+                                          String shortCode) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ResultType", 0);
         result.put("OriginatorConversationID", originator);
         result.put("ConversationID", conversation);
-        result.put("TransactionID", txn.toString());
+        result.put("TransactionID", txn);
         if (partyB.endsWith("001")) {
             result.put("ResultCode", 1);
             result.put("ResultDesc", "The balance is insufficient for the transaction.");
@@ -432,15 +478,124 @@ public final class DarajaSimulator implements AutoCloseable {
             result.put("ResultDesc", "The service request is processed successfully.");
             List<Map<String, Object>> params = new ArrayList<>();
             params.add(Map.of("Key", "TransactionAmount", "Value", new BigDecimal(amount)));
-            params.add(Map.of("Key", "TransactionReceipt", "Value", txn.toString()));
+            params.add(Map.of("Key", "TransactionReceipt", "Value", txn));
             params.add(Map.of("Key", "ReceiverPartyPublicName", "Value", partyB + " - TEST CUSTOMER"));
             params.add(Map.of("Key", "TransactionCompletedDateTime",
                     "Value", ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))));
-            params.add(Map.of("Key", "B2CUtilityAccountAvailableFunds", "Value", new BigDecimal("1000000.00")));
+            params.add(Map.of("Key", "B2CUtilityAccountAvailableFunds", "Value", utilityBalance(shortCode)));
             params.add(Map.of("Key", "B2CRecipientIsRegisteredCustomer", "Value", "Y"));
             result.put("ResultParameters", Map.of("ResultParameter", params));
         }
         return Map.of("Result", result);
+    }
+
+    /** Initiator-authenticated asynchronous command: checks shared by Transaction Status and Account Balance. */
+    private String commandError(Map<String, Object> r, String command) {
+        Initiator initiator = initiators.get(str(r.get("PartyA")));
+        if (initiator == null) {
+            return "Invalid PartyA";
+        } else if (!initiator.name().equals(str(r.get("Initiator")))) {
+            return "Invalid Initiator";
+        } else if (!credentialValid(str(r.get("SecurityCredential")), initiator.password())) {
+            return "Invalid SecurityCredential";
+        } else if (!command.equals(str(r.get("CommandID")))) {
+            return "Invalid CommandID";
+        } else if (!str(r.get("ResultURL")).startsWith("http") || !str(r.get("QueueTimeOutURL")).startsWith("http")) {
+            return "Invalid ResultURL";
+        }
+        return null;
+    }
+
+    private void transactionStatus(HttpExchange ex) throws IOException {
+        if (!authorised(ex)) {
+            reply(ex, 401, Map.of("errorCode", "404.001.04", "errorMessage", "Invalid Access Token"));
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> r = json.readValue(ex.getRequestBody().readAllBytes(), Map.class);
+        String error = commandError(r, "TransactionStatusQuery");
+        String txnId = str(r.get("TransactionID"));
+        String originalId = str(r.getOrDefault("OriginalConversationID", r.get("OriginatorConversationID")));
+        if (error == null && txnId.isEmpty() && originalId.isEmpty()) {
+            error = "Invalid TransactionID";
+        }
+        if (error != null) {
+            reply(ex, 400, Map.of("requestId", UUID.randomUUID().toString(), "errorCode", "400.002.02",
+                    "errorMessage", "Bad Request - " + error));
+            return;
+        }
+        statusQueries.add(txnId.isEmpty() ? originalId : txnId);
+        Payment payment = payments.values().stream()
+            .filter(p -> (!txnId.isEmpty() && p.transactionId().equals(txnId))
+                    || (txnId.isEmpty() && p.originatorConversationId().equals(originalId)))
+            .findFirst().orElse(null);
+        String queryOriginator = UUID.randomUUID().toString();
+        String conversation = "AG_" + ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_"
+                + random.nextInt(100_000_000, 999_999_999);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ResultType", 0);
+        result.put("OriginatorConversationID", queryOriginator);
+        result.put("ConversationID", conversation);
+        if (payment == null) {
+            result.put("ResultCode", 1);
+            result.put("ResultDesc", "No such transaction (TEST-ONLY simulator)");
+            result.put("TransactionID", "");
+        } else {
+            result.put("ResultCode", 0);
+            result.put("ResultDesc", "The service request has been accepted successfully.");
+            result.put("TransactionID", payment.transactionId());
+            List<Map<String, Object>> params = new ArrayList<>();
+            params.add(Map.of("Key", "ReceiptNo", "Value", payment.transactionId()));
+            params.add(Map.of("Key", "Amount", "Value", payment.amount()));
+            params.add(Map.of("Key", "TransactionStatus", "Value", payment.completed() ? "Completed" : "Failed"));
+            params.add(Map.of("Key", "ReasonType", "Value", "Business Payment to Customer via API"));
+            params.add(Map.of("Key", "DebitPartyName", "Value", payment.shortCode() + " - TEST-ONLY ORGANISATION"));
+            params.add(Map.of("Key", "CreditPartyName", "Value", "254700000000 - TEST CUSTOMER"));
+            params.add(Map.of("Key", "FinalisedTime", "Value", ZonedDateTime.now(EAT).format(STAMP)));
+            result.put("ResultParameters", Map.of("ResultParameter", params));
+        }
+        String resultUrl = str(r.get("ResultURL"));
+        Map<String, Object> body = Map.of("Result", result);
+        scheduler.schedule(() -> deliver(resultUrl, conversation, body), callbackDelayMs, TimeUnit.MILLISECONDS);
+        reply(ex, 200, Map.of("ConversationID", conversation, "OriginatorConversationID", queryOriginator,
+                "ResponseCode", "0", "ResponseDescription", "Accept the service request successfully."));
+    }
+
+    private void accountBalance(HttpExchange ex) throws IOException {
+        if (!authorised(ex)) {
+            reply(ex, 401, Map.of("errorCode", "404.001.04", "errorMessage", "Invalid Access Token"));
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> r = json.readValue(ex.getRequestBody().readAllBytes(), Map.class);
+        String error = commandError(r, "AccountBalance");
+        if (error != null) {
+            reply(ex, 400, Map.of("requestId", UUID.randomUUID().toString(), "errorCode", "400.002.02",
+                    "errorMessage", "Bad Request - " + error));
+            return;
+        }
+        String shortCode = str(r.get("PartyA"));
+        balanceQueries.add(shortCode);
+        String balance = utilityBalance(shortCode).setScale(2).toPlainString();
+        String queryOriginator = UUID.randomUUID().toString();
+        String conversation = "AG_" + ZonedDateTime.now(EAT).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_"
+                + random.nextInt(100_000_000, 999_999_999);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ResultType", 0);
+        result.put("ResultCode", 0);
+        result.put("ResultDesc", "The service request is processed successfully.");
+        result.put("OriginatorConversationID", queryOriginator);
+        result.put("ConversationID", conversation);
+        result.put("TransactionID", receipt());
+        result.put("ResultParameters", Map.of("ResultParameter", List.of(
+                Map.of("Key", "AccountBalance", "Value", "Working Account|KES|0.00|0.00|0.00|0.00&Utility Account|KES|"
+                        + balance + "|" + balance + "|0.00|0.00&Charges Paid Account|KES|0.00|0.00|0.00|0.00"),
+                Map.of("Key", "BOCompletedTime", "Value", ZonedDateTime.now(EAT).format(STAMP)))));
+        String resultUrl = str(r.get("ResultURL"));
+        Map<String, Object> body = Map.of("Result", result);
+        scheduler.schedule(() -> deliver(resultUrl, conversation, body), callbackDelayMs, TimeUnit.MILLISECONDS);
+        reply(ex, 200, Map.of("ConversationID", conversation, "OriginatorConversationID", queryOriginator,
+                "ResponseCode", "0", "ResponseDescription", "Accept the service request successfully."));
     }
 
     @SuppressWarnings("unchecked")

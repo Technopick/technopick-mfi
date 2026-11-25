@@ -159,6 +159,77 @@ public class DarajaClient {
         }
     }
 
+    /**
+     * Transaction Status query about one B2C payment (ADR-0039). The payment is named by its M-Pesa
+     * transaction id when known, and otherwise by its OriginatorConversationID (our disbursement id),
+     * sent as both OriginatorConversationID and OriginalConversationID because Daraja documentation
+     * versions differ; to be confirmed in the sandbox. The answer arrives at {@code resultUrl}.
+     */
+    public B2cOutcome transactionStatus(DarajaProperties.B2cAccount account, String transactionId,
+                                        String originatorConversationId, String resultUrl, String timeoutUrl) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("CommandID", "TransactionStatusQuery");
+        if (transactionId != null && !transactionId.isBlank()) {
+            body.put("TransactionID", transactionId);
+        }
+        body.put("OriginatorConversationID", originatorConversationId);
+        body.put("OriginalConversationID", originatorConversationId);
+        body.put("PartyA", account.shortCode());
+        body.put("IdentifierType", "4");
+        body.put("Remarks", "Disbursement status");
+        body.put("Occasion", "");
+        return asyncCommand(account, "/mpesa/transactionstatus/v1/query", body, resultUrl, timeoutUrl);
+    }
+
+    /** Account Balance query for a B2C short code (ADR-0039); the answer arrives at {@code resultUrl}. */
+    public B2cOutcome accountBalance(DarajaProperties.B2cAccount account, String resultUrl, String timeoutUrl) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("CommandID", "AccountBalance");
+        body.put("PartyA", account.shortCode());
+        body.put("IdentifierType", "4");
+        body.put("Remarks", "Float check");
+        return asyncCommand(account, "/mpesa/accountbalance/v1/query", body, resultUrl, timeoutUrl);
+    }
+
+    /** Sends an initiator-authenticated command whose result Daraja delivers later to the given URLs. */
+    private B2cOutcome asyncCommand(DarajaProperties.B2cAccount account, String path, Map<String, Object> fields,
+                                    String resultUrl, String timeoutUrl) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        String bearer;
+        try {
+            body.put("Initiator", account.initiatorName());
+            body.put("SecurityCredential", SecurityCredential.encrypt(props.certificatePem(), account.initiatorPassword()));
+            body.putAll(fields);
+            body.put("ResultURL", resultUrl);
+            body.put("QueueTimeOutURL", timeoutUrl);
+            bearer = accessToken();
+        } catch (RuntimeException e) {
+            LOG.warn("{} not sent: {}", path, e.toString());
+            return new B2cOutcome(Kind.REJECTED, null, "PREPARE", e.getClass().getSimpleName());
+        }
+        try {
+            Map<String, Object> r = Objects.requireNonNull(http.post()
+                .uri(props.baseUrl() + path)
+                .header("Authorization", "Bearer " + bearer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP));
+            String code = String.valueOf(r.get("ResponseCode"));
+            if ("0".equals(code)) {
+                return new B2cOutcome(Kind.ACCEPTED, str(r.get("ConversationID")), code, str(r.get("ResponseDescription")));
+            }
+            return new B2cOutcome(Kind.REJECTED, null, code, str(r.get("ResponseDescription")));
+        } catch (HttpClientErrorException e) {
+            Map<String, Object> err = parse(e.getResponseBodyAsString());
+            return new B2cOutcome(Kind.REJECTED, null, str(err.getOrDefault("errorCode", "HTTP" + e.getStatusCode().value())),
+                    str(err.getOrDefault("errorMessage", e.getStatusText())));
+        } catch (RestClientException | IllegalStateException e) {
+            LOG.warn("{} outcome unknown: {}", path, e.toString());
+            return new B2cOutcome(Kind.UNKNOWN, null, "UNKNOWN", e.getClass().getSimpleName());
+        }
+    }
+
     /** Lipa na M-Pesa Online status query for one CheckoutRequestID. */
     public QueryOutcome stkQuery(DarajaProperties.Paybill paybill, String checkoutRequestId) {
         String timestamp = ZonedDateTime.now(EAT).format(STAMP);

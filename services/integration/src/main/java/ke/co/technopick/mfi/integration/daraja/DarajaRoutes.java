@@ -20,6 +20,8 @@ import org.springframework.stereotype.Component;
  *   <li>{@code daraja-stk-reconciler}: timer that queries Daraja for overdue STK results.</li>
  *   <li>{@code daraja-b2c-dispatch}: consumes {@code MpesaDisbursementApproved} events and sends the payment.</li>
  *   <li>{@code daraja-b2c-processor}: timer that applies stored B2C results and timeouts in core.</li>
+ *   <li>{@code daraja-b2c-queries}: timer that sends the B2C status queries and float checks core says are due.</li>
+ *   <li>{@code daraja-b2c-query-processor}: timer that applies stored status and balance answers in core.</li>
  * </ul>
  */
 @Component
@@ -100,6 +102,16 @@ public class DarajaRoutes extends RouteBuilder {
             .routeId("daraja-stk-reconciler")
             .autoStartup("{{mfi.daraja.reconciler-enabled}}")
             .bean(StkReconciler.class, "reconcile");
+
+        from("timer:daraja-b2c-queries?period={{mfi.daraja.reconcile-interval-ms}}&delay=15000")
+            .routeId("daraja-b2c-queries")
+            .autoStartup("{{mfi.daraja.reconciler-enabled}}")
+            .bean(B2cQueries.class, "run");
+
+        from("timer:daraja-b2c-query-processor?period={{mfi.daraja.process-interval-ms}}&delay=2000")
+            .routeId("daraja-b2c-query-processor")
+            .autoStartup("{{mfi.daraja.processor-enabled}}")
+            .bean(B2cQueryResultProcessor.class, "processPending");
     }
 
     private Map<String, Object> validateInCore(C2bCallback c) {

@@ -301,6 +301,12 @@ class EndOfDaySchedulerIntegrationTest {
             expectLatestAttempt("MANUAL", "SKIPPED", "user:ops-1");
         }
         // That process ends (its connection closes): the run is now interrupted (and the day is late), and resumes.
+        // The server releases the lock when the closed session's backend exits, a moment after close().
+        long until = System.currentTimeMillis() + 10_000;
+        while (owner().queryForObject("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND granted", Integer.class) > 0
+                && System.currentTimeMillis() < until) {
+            Thread.sleep(20);
+        }
         expectAlerts("EOD_INTERRUPTED", "EOD_LATE");
         assertEquals(Action.RUN, tick("2026-12-03T22:47"));
         assertEquals("2026-12-04", businessDate());
