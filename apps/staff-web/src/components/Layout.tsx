@@ -21,6 +21,7 @@ export const NAV: { to: string; label: string; roles: string[] }[] = [
   { to: "/ledger", label: "General ledger", roles: ["FINANCE", "SUPERVISOR", "OPERATIONS"] },
   { to: "/regulatory", label: "Prudential returns", roles: ["FINANCE", "SUPERVISOR"] },
   { to: "/mpesa-statements", label: "M-Pesa statements", roles: ["FINANCE", "SUPERVISOR"] },
+  { to: "/b2c-float", label: "B2C float", roles: ["OPERATIONS", "FINANCE", "SUPERVISOR"] },
   { to: "/provisioning", label: "Provisioning", roles: ["FINANCE"] },
   { to: "/audit", label: "Audit trail", roles: ["SUPERVISOR"] },
   { to: "/end-of-day", label: "End of day", roles: ["OPERATIONS", "BRANCH_MANAGER", "SUPERVISOR"] },

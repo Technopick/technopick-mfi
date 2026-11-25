@@ -54,6 +54,9 @@ mfi:
     reconciler-enabled: ${MFI_DARAJA_RECONCILER_ENABLED:true}
     reconcile-interval-ms: 60000
     reconcile-after: PT3M
+    # B2C status queries and float checks (ADR-0039): how often to ask core what is due and send it.
+    b2c-queries-enabled: ${MFI_DARAJA_B2C_QUERIES_ENABLED:true}
+    b2c-queries-interval-ms: 60000
     # B2C (ADR-0012): per tenant B2C short code with its callback token, initiator name and initiator
     # password (secret store). certificate-pem: Safaricom's public certificate for the environment.
     b2c-accounts: []

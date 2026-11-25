@@ -59,6 +59,7 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
     "mfi.daraja.consumer-secret=test-only-secret",
     "mfi.daraja.allow-insecure-test-endpoint=true",
     "mfi.daraja.reconciler-enabled=false",
+    "mfi.daraja.b2c-queries-enabled=false",
     "mfi.daraja.b2c-accounts[0].token=test-only-b2c-token-41aa",
     "mfi.daraja.b2c-accounts[0].tenant-id=00000000-0000-0000-0000-0000000000a1",
     "mfi.daraja.b2c-accounts[0].short-code=600000",

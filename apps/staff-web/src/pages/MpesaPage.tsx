@@ -8,6 +8,48 @@ import { useAction, useLoad } from "../hooks";
 import { isAmount } from "../money";
 
 type ItemType = "STK_REQUEST" | "B2C_DISBURSEMENT";
+type StatusQuery = Schemas["StatusQueryView"];
+
+const QUERY_OUTCOME: Record<string, string> = {
+  COMPLETED_DISBURSEMENT: "Paid - disbursement completed",
+  AMOUNT_MISMATCH: "Paid a different amount - not posted",
+  ALREADY_FINAL: "Outcome already known",
+  NOT_CONFIRMED: "Payment not confirmed",
+};
+
+/** The latest M-Pesa Transaction Status answer for one disbursement, and a button to ask again (ADR-0039). */
+function StatusQueryCell({ disbursementId, canAsk, onAnswered }: { disbursementId: string; canAsk: boolean; onAnswered: () => void }) {
+  const api = useApi();
+  const queries = useLoad<StatusQuery[]>(`/api/v1/payments/mpesa/b2c/disbursements/${disbursementId}/status-queries`);
+  const action = useAction();
+  const latest = queries.data?.[0];
+  const waiting = latest?.status === "PENDING" || latest?.status === "SENT";
+  async function ask() {
+    const q = await action.run(() => api.post<StatusQuery>(`/api/v1/payments/mpesa/b2c/disbursements/${disbursementId}/status-queries`));
+    if (q) {
+      queries.reload();
+      onAnswered();
+    }
+  }
+  let text = "Not asked yet";
+  if (latest) {
+    if (waiting) text = `Asked ${when(latest.requestedAt)} - waiting for M-Pesa`;
+    else if (latest.status === "ANSWERED") {
+      text = `${QUERY_OUTCOME[latest.outcome ?? ""] ?? latest.outcome}`
+        + (latest.reportedReceipt ? ` (${latest.reportedReceipt}, ${latest.reportedAmount})` : ` (code ${latest.resultCode})`);
+    } else text = latest.status === "SEND_FAILED" ? `Could not ask: ${latest.resultDesc ?? ""}` : "No answer from M-Pesa";
+  }
+  return (
+    <div>
+      <span className="small">{text}</span>
+      {(queries.data?.length ?? 0) > 1 && <span className="muted small"> · asked {queries.data?.length} times</span>}
+      <ProblemBox problem={action.error ?? queries.error} />
+      {canAsk && (
+        <div><button type="button" className="secondary" disabled={action.busy || waiting} onClick={() => void ask()}>Ask M-Pesa now</button></div>
+      )}
+    </div>
+  );
+}
 interface Target { itemType: ItemType; itemId: string; label: string }
 
 function ProposeForm({ target, onDone, onCancel }: { target: Target; onDone: () => void; onCancel: () => void }) {
@@ -67,6 +109,7 @@ export function MpesaPage() {
   const [target, setTarget] = useState<Target | null>(null);
   const canPropose = hasAnyRole(session, "OPERATIONS");
   const canDecide = hasAnyRole(session, "SUPERVISOR");
+  const canAsk = hasAnyRole(session, "OPERATIONS", "SUPERVISOR");
   const proposed = new Set((pending.data ?? []).map((r) => r.itemId ?? ""));
   const reloadAll = () => { stk.reload(); b2c.reload(); pending.reload(); };
 
@@ -135,7 +178,7 @@ export function MpesaPage() {
         <ProblemBox problem={b2c.error} />
         {b2c.loading ? <Loading /> : !b2c.data?.length ? <Empty>Nothing needs attention.</Empty> : (
           <table>
-            <thead><tr><th>Loan</th><th className="num">Amount</th><th>To</th><th>Reason</th><th>Conversation</th><th /></tr></thead>
+            <thead><tr><th>Loan</th><th className="num">Amount</th><th>To</th><th>Reason</th><th>Conversation</th><th>M-Pesa transaction status</th><th /></tr></thead>
             <tbody>
               {b2c.data.map((d) => {
                 const resolvable = d.attention === "TIMEOUT_UNKNOWN" || d.attention === "SEND_OUTCOME_UNKNOWN";
@@ -146,6 +189,8 @@ export function MpesaPage() {
                     <td>{d.msisdnMasked}</td>
                     <td><Status value={d.attention} /></td>
                     <td className="mono">{d.conversationId ?? d.disbursementId}</td>
+                    <td><StatusQueryCell disbursementId={d.disbursementId ?? ""} onAnswered={reloadAll}
+                      canAsk={canAsk && (d.status === "DISPATCHED" || d.status === "SUBMITTED")} /></td>
                     <td>{resolvable ? proposeButton({ itemType: "B2C_DISBURSEMENT", itemId: d.disbursementId ?? "", label: `disbursement ${d.loanNumber ?? ""}` })
                       : <span className="muted">Finance</span>}</td>
                   </tr>

@@ -140,6 +140,7 @@ services:
           "callback-base-url":"http://integration:8081",
           "allowed-cidrs":["172.30.57.0/24"],
           "process-interval-ms":1000,"retry-backoff":"PT2S","reconciler-enabled":false,
+          "b2c-queries-interval-ms":3000,
           "paybills":[{"token":"e2e-only-paybill-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001",
                        "short-code":"600991","passkey":"e2e-only-passkey"}],
           "b2c-accounts":[{"token":"e2e-only-b2c-token","tenant-id":"0e2e0000-0000-0000-0000-000000000001",

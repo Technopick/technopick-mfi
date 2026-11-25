@@ -313,6 +313,152 @@
         },
         "type": "object"
       },
+      "B2cDueRequest": {
+        "properties": {
+          "limit": {
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "B2cSendFailure": {
+        "properties": {
+          "description": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "B2cTenantRequest": {
+        "properties": {
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "BalanceCheckDue": {
+        "properties": {
+          "checkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BalanceCheckResultRequest": {
+        "properties": {
+          "accountBalance": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultCode": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultDesc": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resultCode",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "BalanceCheckView": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/FloatSubAccount"
+            },
+            "type": "array"
+          },
+          "answeredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "checkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "committed": {
+            "type": "string"
+          },
+          "difference": {
+            "type": "string"
+          },
+          "floatAccount": {
+            "type": "string"
+          },
+          "floatAvailable": {
+            "type": "string"
+          },
+          "floatCurrent": {
+            "type": "string"
+          },
+          "ledgerBalance": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultDesc": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "BalanceResponse": {
         "properties": {
           "accountNumber": {
@@ -1937,6 +2083,105 @@
             "type": "string"
           },
           "currency": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FloatAccountView": {
+        "properties": {
+          "alerts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "clearingAccount": {
+            "type": "string"
+          },
+          "committedNow": {
+            "type": "string"
+          },
+          "latest": {
+            "$ref": "#/components/schemas/BalanceCheckView"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/BalanceCheckView"
+            },
+            "type": "array"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/FloatSettings"
+          },
+          "shortCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FloatSettings": {
+        "properties": {
+          "dailyCheckHour": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "floatAccountName": {
+            "type": "string"
+          },
+          "lowFloatThreshold": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FloatSettingsRequest": {
+        "properties": {
+          "dailyCheckHour": {
+            "format": "int32",
+            "maximum": 23,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "floatAccountName": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "lowFloatThreshold": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "dailyCheckHour",
+          "floatAccountName",
+          "lowFloatThreshold"
+        ],
+        "type": "object"
+      },
+      "FloatSubAccount": {
+        "properties": {
+          "available": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "current": {
             "type": "string"
           },
           "name": {
@@ -4762,6 +5007,116 @@
         "required": [
           "reason"
         ],
+        "type": "object"
+      },
+      "StatusQueryDue": {
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "queryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "transactionId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StatusQueryResultRequest": {
+        "properties": {
+          "amount": {
+            "pattern": "^\\d{1,15}(\\.\\d{1,2})?$",
+            "type": "string"
+          },
+          "receiptNo": {
+            "pattern": "^[A-Z0-9]{8,20}$",
+            "type": "string"
+          },
+          "resultCode": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "resultDesc": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "transactionStatus": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "resultCode",
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "StatusQueryView": {
+        "properties": {
+          "answeredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "queryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reportedAmount": {
+            "type": "string"
+          },
+          "reportedReceipt": {
+            "type": "string"
+          },
+          "reportedStatus": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultDesc": {
+            "type": "string"
+          },
+          "sentAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "StepTimings": {
@@ -7819,6 +8174,203 @@
         ]
       }
     },
+    "/api/v1/payments/mpesa/b2c/balance-checks/due": {
+      "post": {
+        "operationId": "B2cStatusFloat_checksDue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BalanceCheckDue"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/no-answer": {
+      "post": {
+        "operationId": "B2cStatusFloat_checkNoAnswer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "checkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceCheckView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/result": {
+      "post": {
+        "operationId": "B2cStatusFloat_checkResult",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "checkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BalanceCheckResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceCheckView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/send-failure": {
+      "post": {
+        "operationId": "B2cStatusFloat_checkSendFailure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "checkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cSendFailure"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceCheckView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/sent": {
+      "post": {
+        "operationId": "B2cStatusFloat_checkSent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "checkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceCheckView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
     "/api/v1/payments/mpesa/b2c/disbursements": {
       "get": {
         "operationId": "B2cDisbursement_pending",
@@ -8109,6 +8661,69 @@
         ]
       }
     },
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/status-queries": {
+      "get": {
+        "operationId": "B2cStatusFloat_queriesFor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatusQueryView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      },
+      "post": {
+        "operationId": "B2cStatusFloat_askNow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusQueryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
     "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/submitted": {
       "post": {
         "operationId": "B2cDisbursement_submitted",
@@ -8188,6 +8803,298 @@
         },
         "tags": [
           "b-2c-disbursement-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/float": {
+      "get": {
+        "operationId": "B2cStatusFloat_floatOverview",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FloatAccountView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/float/{shortCode}/checks": {
+      "post": {
+        "operationId": "B2cStatusFloat_checkNow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "shortCode",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]{5,10}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceCheckView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/float/{shortCode}/settings": {
+      "put": {
+        "operationId": "B2cStatusFloat_saveSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "shortCode",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]{5,10}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FloatSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FloatSettings"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/status-queries/due": {
+      "post": {
+        "operationId": "B2cStatusFloat_queriesDue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cDueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatusQueryDue"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/no-answer": {
+      "post": {
+        "operationId": "B2cStatusFloat_queryNoAnswer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusQueryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/result": {
+      "post": {
+        "operationId": "B2cStatusFloat_queryResult",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusQueryResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusQueryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/send-failure": {
+      "post": {
+        "operationId": "B2cStatusFloat_querySendFailure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cSendFailure"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusQueryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
+        ]
+      }
+    },
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/sent": {
+      "post": {
+        "operationId": "B2cStatusFloat_querySent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/B2cTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusQueryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "b-2c-status-float-controller"
         ]
       }
     },

@@ -253,8 +253,9 @@ class B2cStatusFloatIntegrationTest {
                 + "&Utility Account|KES|30000.00|30000.00|0.00|0.00\"}")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.floatAvailable").value("30000.00"))
-            .andExpect(jsonPath("$.ledgerBalance").value("-20000.00"))
-            .andExpect(jsonPath("$.difference").value("50000.00"))
+            // the seed's ten loans (120,000.00) and loan 1 (20,000.00) were paid out from this account; no top-ups booked
+            .andExpect(jsonPath("$.ledgerBalance").value("-140000.00"))
+            .andExpect(jsonPath("$.difference").value("170000.00"))
             .andExpect(jsonPath("$.committed").value("40000.00"))
             .andExpect(jsonPath("$.accounts.length()").value(2))
             .andExpect(jsonPath("$.accounts[1].name").value("Utility Account"));

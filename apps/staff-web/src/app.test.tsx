@@ -833,6 +833,64 @@ describe("screens", () => {
       { note: "QAR0000003 on next statement" }]);
   });
 
+  it("lets operations ask M-Pesa about a disbursement with an unknown outcome", async () => {
+    const B = "/api/v1/payments/mpesa/b2c";
+    let asked = false;
+    const { api, calls } = fakeApi({
+      "GET /api/v1/payments/mpesa/stk-requests/attention": () => [],
+      "GET /api/v1/payments/mpesa/resolutions": () => [],
+      [`GET ${B}/disbursements/attention`]: () => [{ disbursementId: "d-1", loanNumber: "LN-000123", amount: "20000.00",
+        currency: "KES", msisdnMasked: "2547****678", status: "DISPATCHED", attention: "TIMEOUT_UNKNOWN" }],
+      [`GET ${B}/disbursements/d-1/status-queries`]: () => (asked ? [{ queryId: "q-2", status: "PENDING", reason: "MANUAL",
+        requestedAt: "2026-11-25T08:00:00Z" }, { queryId: "q-1", status: "ANSWERED", outcome: "NOT_CONFIRMED", resultCode: "1",
+        requestedAt: "2026-11-25T07:00:00Z" }] : [{ queryId: "q-1", status: "ANSWERED", outcome: "NOT_CONFIRMED", resultCode: "1",
+        requestedAt: "2026-11-25T07:00:00Z" }]),
+      [`POST ${B}/disbursements/d-1/status-queries`]: () => {
+        asked = true;
+        return { queryId: "q-2", status: "PENDING" };
+      },
+    });
+    renderAt("/mpesa", session("ops-1", "OPERATIONS"), api);
+    expect(await screen.findByText("Payment not confirmed (code 1)")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Ask M-Pesa now" }));
+    expect(await screen.findByText(/waiting for M-Pesa/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Ask M-Pesa now" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual([`${B}/disbursements/d-1/status-queries`]);
+  });
+
+  it("shows the B2C float with alerts and lets finance check it and set the threshold", async () => {
+    const F = "/api/v1/payments/mpesa/b2c/float";
+    const latest = { checkId: "c-1", status: "ANSWERED", resultCode: "0", reason: "MANUAL", requestedBy: "user:ops-1",
+      requestedAt: "2026-11-25T07:00:00Z", answeredAt: "2026-11-25T07:00:05Z", floatAccount: "Utility Account",
+      floatCurrent: "30000.00", floatAvailable: "30000.00", ledgerBalance: "-20000.00", difference: "50000.00",
+      committed: "40000.00", accounts: [{ name: "Working Account", currency: "KES", current: "0.00", available: "0.00" },
+        { name: "Utility Account", currency: "KES", current: "30000.00", available: "30000.00" }] };
+    let checks = [latest];
+    const { api, calls } = fakeApi({
+      [`GET ${F}`]: () => [{ shortCode: "600000", clearingAccount: "1110-MPESA-B2C-CLEARING", committedNow: "40000.00",
+        settings: { shortCode: "600000", floatAccountName: "Utility Account", lowFloatThreshold: "50000.00", dailyCheckHour: 7 },
+        latest, alerts: ["APPROVED_EXCEEDS_FLOAT", "LOW_FLOAT", "LEDGER_DIFFERENCE"], recent: checks }],
+      [`POST ${F}/600000/checks`]: () => {
+        checks = [{ ...latest, checkId: "c-2", status: "PENDING", resultCode: "", reason: "MANUAL" }, latest];
+        return checks[0];
+      },
+      [`PUT ${F}/600000/settings`]: (body) => ({ shortCode: "600000", ...(body as object) }),
+    });
+    renderAt("/b2c-float", session("fin-1", "FINANCE"), api);
+    expect(await screen.findByText(/add up to more than the float/)).toBeTruthy();
+    expect(screen.getByText("The float is below the threshold finance set.")).toBeTruthy();
+    expect(screen.getByText(/differs from the clearing account/)).toBeTruthy();
+    expect(screen.getAllByText(/^50,?000\.00$/).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Check balance now" }));
+    expect(await screen.findByText(/Balance check sent to M-Pesa/)).toBeTruthy();
+    const threshold = screen.getByLabelText("Alert when the float is below");
+    await userEvent.clear(threshold);
+    await userEvent.type(threshold, "100000.00");
+    await userEvent.click(screen.getByRole("button", { name: "Save float settings" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ floatAccountName: "Utility Account",
+      lowFloatThreshold: "100000.00", dailyCheckHour: 7 }));
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -917,7 +975,7 @@ describe("screens", () => {
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "General ledger", "Prudential returns", "M-Pesa statements",
-      "Provisioning"]);
+      "B2C float", "Provisioning"]);
   });
 
   it("flags control accounts that do not match their records", async () => {

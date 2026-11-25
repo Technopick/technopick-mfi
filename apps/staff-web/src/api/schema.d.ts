@@ -1044,6 +1044,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payments/mpesa/b2c/balance-checks/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_checksDue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/no-answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_checkNoAnswer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_checkResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/send-failure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_checkSendFailure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/balance-checks/{checkId}/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_checkSent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/mpesa/b2c/disbursements": {
         parameters: {
             query?: never;
@@ -1172,6 +1252,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/status-queries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["B2cStatusFloat_queriesFor"];
+        put?: never;
+        post: operations["B2cStatusFloat_askNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/mpesa/b2c/disbursements/{disbursementId}/submitted": {
         parameters: {
             query?: never;
@@ -1198,6 +1294,134 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["B2cDisbursement_timeout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/float": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["B2cStatusFloat_floatOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/float/{shortCode}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_checkNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/float/{shortCode}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["B2cStatusFloat_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/status-queries/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_queriesDue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/no-answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_queryNoAnswer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_queryResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/send-failure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_querySendFailure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mpesa/b2c/status-queries/{queryId}/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["B2cStatusFloat_querySent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2219,6 +2443,54 @@ export interface components {
             reason?: string;
             replayed?: boolean;
         };
+        B2cDueRequest: {
+            /** Format: int32 */
+            limit?: number;
+            /** Format: uuid */
+            tenantId: string;
+        };
+        B2cSendFailure: {
+            description?: string;
+            /** Format: uuid */
+            tenantId: string;
+        };
+        B2cTenantRequest: {
+            /** Format: uuid */
+            tenantId: string;
+        };
+        BalanceCheckDue: {
+            /** Format: uuid */
+            checkId?: string;
+            shortCode?: string;
+        };
+        BalanceCheckResultRequest: {
+            accountBalance?: string;
+            resultCode: string;
+            resultDesc?: string;
+            /** Format: uuid */
+            tenantId: string;
+        };
+        BalanceCheckView: {
+            accounts?: components["schemas"]["FloatSubAccount"][];
+            /** Format: date-time */
+            answeredAt?: string;
+            /** Format: uuid */
+            checkId?: string;
+            committed?: string;
+            difference?: string;
+            floatAccount?: string;
+            floatAvailable?: string;
+            floatCurrent?: string;
+            ledgerBalance?: string;
+            reason?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            resultCode?: string;
+            resultDesc?: string;
+            shortCode?: string;
+            status?: string;
+        };
         BalanceResponse: {
             accountNumber?: string;
             activeHolds?: string;
@@ -2779,6 +3051,37 @@ export interface components {
             accountCode?: string;
             amount?: string;
             currency?: string;
+            name?: string;
+        };
+        FloatAccountView: {
+            alerts?: string[];
+            clearingAccount?: string;
+            committedNow?: string;
+            latest?: components["schemas"]["BalanceCheckView"];
+            recent?: components["schemas"]["BalanceCheckView"][];
+            settings?: components["schemas"]["FloatSettings"];
+            shortCode?: string;
+        };
+        FloatSettings: {
+            /** Format: int32 */
+            dailyCheckHour?: number;
+            floatAccountName?: string;
+            lowFloatThreshold?: string;
+            shortCode?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        FloatSettingsRequest: {
+            /** Format: int32 */
+            dailyCheckHour: number;
+            floatAccountName: string;
+            lowFloatThreshold: number;
+        };
+        FloatSubAccount: {
+            available?: string;
+            currency?: string;
+            current?: string;
             name?: string;
         };
         GlAccount: {
@@ -3738,6 +4041,45 @@ export interface components {
         };
         StatementWithdrawRequest: {
             reason: string;
+        };
+        StatusQueryDue: {
+            conversationId?: string;
+            /** Format: uuid */
+            disbursementId?: string;
+            /** Format: uuid */
+            queryId?: string;
+            shortCode?: string;
+            transactionId?: string;
+        };
+        StatusQueryResultRequest: {
+            amount?: string;
+            receiptNo?: string;
+            resultCode: string;
+            resultDesc?: string;
+            /** Format: uuid */
+            tenantId: string;
+            transactionStatus?: string;
+        };
+        StatusQueryView: {
+            /** Format: date-time */
+            answeredAt?: string;
+            /** Format: uuid */
+            disbursementId?: string;
+            outcome?: string;
+            /** Format: uuid */
+            queryId?: string;
+            reason?: string;
+            reportedAmount?: string;
+            reportedReceipt?: string;
+            reportedStatus?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            resultCode?: string;
+            resultDesc?: string;
+            /** Format: date-time */
+            sentAt?: string;
+            status?: string;
         };
         StepTimings: {
             /** Format: int64 */
@@ -5639,6 +5981,134 @@ export interface operations {
             };
         };
     };
+    B2cStatusFloat_checksDue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceCheckDue"][];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_checkNoAnswer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceCheckView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_checkResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BalanceCheckResultRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceCheckView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_checkSendFailure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cSendFailure"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceCheckView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_checkSent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceCheckView"];
+                };
+            };
+        };
+    };
     B2cDisbursement_pending: {
         parameters: {
             query?: never;
@@ -5847,6 +6317,50 @@ export interface operations {
             };
         };
     };
+    B2cStatusFloat_queriesFor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                disbursementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryView"][];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_askNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                disbursementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryView"];
+                };
+            };
+        };
+    };
     B2cDisbursement_submitted: {
         parameters: {
             query?: never;
@@ -5895,6 +6409,202 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisbursementView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_floatOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FloatAccountView"][];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_checkNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceCheckView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shortCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FloatSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FloatSettings"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_queriesDue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cDueRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryDue"][];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_queryNoAnswer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_queryResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusQueryResultRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_querySendFailure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cSendFailure"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryView"];
+                };
+            };
+        };
+    };
+    B2cStatusFloat_querySent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["B2cTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusQueryView"];
                 };
             };
         };

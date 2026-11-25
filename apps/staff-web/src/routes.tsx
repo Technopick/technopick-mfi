@@ -9,6 +9,7 @@ import { ManualJournalsPage, PeriodsPage } from "./pages/FinancePages";
 import { AccountActivityPage, JournalEntryPage, TrialBalancePage } from "./pages/LedgerPages";
 import { LoanSchedulePage } from "./pages/LoanSchedulePage";
 import { MpesaPage } from "./pages/MpesaPage";
+import { B2cFloatPage } from "./pages/B2cFloatPage";
 import { MpesaStatementsPage } from "./pages/MpesaStatementsPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
@@ -41,6 +42,7 @@ export const routes: RouteObject[] = [
       { path: "disbursements", element: <DisbursementsPage /> },
       { path: "mpesa", element: <MpesaPage /> },
       { path: "mpesa-statements", element: <MpesaStatementsPage /> },
+      { path: "b2c-float", element: <B2cFloatPage /> },
       { path: "suspense", element: <SuspensePage /> },
       { path: "end-of-day", element: <EndOfDayPage /> },
       { path: "portfolio", element: <PortfolioPage /> },

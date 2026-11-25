@@ -103,9 +103,9 @@ public class DarajaRoutes extends RouteBuilder {
             .autoStartup("{{mfi.daraja.reconciler-enabled}}")
             .bean(StkReconciler.class, "reconcile");
 
-        from("timer:daraja-b2c-queries?period={{mfi.daraja.reconcile-interval-ms}}&delay=15000")
+        from("timer:daraja-b2c-queries?period={{mfi.daraja.b2c-queries-interval-ms:60000}}&delay=15000")
             .routeId("daraja-b2c-queries")
-            .autoStartup("{{mfi.daraja.reconciler-enabled}}")
+            .autoStartup("{{mfi.daraja.b2c-queries-enabled:true}}")
             .bean(B2cQueries.class, "run");
 
         from("timer:daraja-b2c-query-processor?period={{mfi.daraja.process-interval-ms}}&delay=2000")
