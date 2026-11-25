@@ -87,7 +87,7 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(shareTransfer).toContainText("APPROVED");
   await supervisor.reload();
   await expect(supervisor.getByRole("row", { name: new RegExp(`^${other}.*2,000\\.00`) })).toBeVisible();
-  await expect(supervisor.getByRole("row", { name: new RegExp(`^${customer}.*3,000\\.00`) })).toBeVisible();
+  await expect(supervisor.getByRole("row", { name: new RegExp(`^${customer}.*NBO01.*3,000\\.00`) })).toBeVisible();
 
   // Vault cash into the till, approved by the supervisor.
   await teller.goto("/teller");
