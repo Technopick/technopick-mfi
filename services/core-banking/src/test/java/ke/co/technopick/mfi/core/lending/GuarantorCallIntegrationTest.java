@@ -201,8 +201,8 @@ class GuarantorCallIntegrationTest {
             .andExpect(jsonPath("$.status").value("REJECTED"));
         String second = call(loan, "c5", "3000", 200);
         String secondId = JsonPath.read(second, "$.callId");
-        assertEquals("2000.00", JsonPath.read(second, "$.lines[?(@.guaranteeId == '" + g2 + "')].amount", net.minidev.json.JSONArray.class)
-                .get(0).toString());
+        java.util.List<String> share2 = JsonPath.read(second, "$.lines[?(@.guaranteeId == '" + g2 + "')].amount");
+        assertEquals(java.util.List.of("2000.00"), share2);
         BigDecimal saved2 = balance("Load2");
         BigDecimal saved6 = balance("Load6");
         mvc.perform(post(L + "/guarantor-calls/" + secondId + "/approve").with(OFFICER)).andExpect(status().isForbidden());
