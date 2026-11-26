@@ -53,6 +53,8 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                // metrics for the monitoring system's service account only (ADR-0045)
+                .requestMatchers("/actuator/prometheus").hasRole("MONITORING")
                 .requestMatchers("/v3/api-docs", "/v3/api-docs/**").hasRole("PLATFORM_ADMIN")
                 .requestMatchers("/api/v1/member/**").hasRole(MEMBER)
                 .requestMatchers("/api/**").access((authentication, context) -> {

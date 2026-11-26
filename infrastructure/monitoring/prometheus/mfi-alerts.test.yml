@@ -1,0 +1,124 @@
+# Unit tests for mfi-alerts.yml: `promtool test rules mfi-alerts.test.yml` (run in CI). TEST-ONLY series.
+rule_files:
+  - mfi-alerts.yml
+evaluation_interval: 1m
+
+tests:
+  # End of day: one day behind warns only after two hours; two days behind is critical after 15 minutes.
+  - interval: 1m
+    input_series:
+      - series: 'mfi_eod_days_behind{job="mfi-core",instance="core-1",tenant="SACCO-A"}'
+        values: '0x60 1x150 2x30'
+      - series: 'mfi_eod_days_behind{job="mfi-core",instance="core-1",tenant="SACCO-B"}'
+        values: '-1x240'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: MfiEndOfDayBehind
+        exp_alerts: []
+      - eval_time: 185m
+        alertname: MfiEndOfDayBehind
+        exp_alerts:
+          - exp_labels: {severity: warning, tenant: SACCO-A}
+            exp_annotations:
+              summary: "SACCO-A: yesterday's business day is not closed"
+              runbook: docs/operations/runbooks/end-of-day.md
+      - eval_time: 220m
+        alertname: MfiEndOfDayFarBehind
+        exp_alerts: []
+      - eval_time: 230m
+        alertname: MfiEndOfDayFarBehind
+        exp_alerts:
+          - exp_labels: {severity: critical, tenant: SACCO-A}
+            exp_annotations:
+              summary: "SACCO-A: end of day is 2 days behind"
+              runbook: docs/operations/runbooks/end-of-day.md
+
+  # Money: a reconciliation difference is critical after 5 minutes; a broken audit chain at once.
+  - interval: 1m
+    input_series:
+      - series: 'mfi_reconciliation_differences{job="mfi-core",instance="core-1",tenant="SACCO-A"}'
+        values: '0x10 1x10'
+      - series: 'mfi_audit_chain_broken{job="mfi-core",instance="core-1",tenant="SACCO-A"}'
+        values: '0x10 1x5'
+      - series: 'mfi_audit_chain_broken{job="mfi-core",instance="core-1",tenant="SACCO-B"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: MfiReconciliationDifference
+        exp_alerts: []
+      - eval_time: 17m
+        alertname: MfiReconciliationDifference
+        exp_alerts:
+          - exp_labels: {severity: critical, tenant: SACCO-A}
+            exp_annotations:
+              summary: "SACCO-A: 1 control account(s) do not match their records at the last close"
+              runbook: docs/operations/runbooks/monitoring.md#mfireconciliationdifference
+      - eval_time: 11m
+        alertname: MfiAuditChainBroken
+        exp_alerts:
+          - exp_labels: {severity: critical, tenant: SACCO-A}
+            exp_annotations:
+              summary: "SACCO-A: the audit trail does not verify - possible tampering"
+              runbook: docs/operations/runbooks/monitoring.md#mfiauditchainbroken
+
+  # Two instances report the same tenant: one alert per tenant, not per instance.
+  - interval: 1m
+    input_series:
+      - series: 'mfi_outbox_oldest_unpublished_seconds{job="mfi-core",instance="core-1",tenant="SACCO-A"}'
+        values: '0+60x20'
+      - series: 'mfi_outbox_oldest_unpublished_seconds{job="mfi-core",instance="core-2",tenant="SACCO-A"}'
+        values: '0+60x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: MfiOutboxStuck
+        exp_alerts: []
+      - eval_time: 17m
+        alertname: MfiOutboxStuck
+        exp_alerts:
+          - exp_labels: {severity: warning, tenant: SACCO-A}
+            exp_annotations:
+              summary: "SACCO-A: events have waited over 10 minutes to be published"
+              runbook: docs/operations/runbooks/monitoring.md#mfioutboxstuck
+
+  # Availability and blind monitoring.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="mfi-core",instance="core-1"}'
+        values: '1x5 0x5'
+      - series: 'mfi_ops_snapshot_last_success_seconds{job="mfi-core",instance="core-1"}'
+        values: '0+60x5 300x20'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: MfiCoreDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: mfi-core, instance: core-1}
+            exp_annotations:
+              summary: "Core banking instance core-1 is not answering"
+              runbook: docs/operations/runbooks/monitoring.md#mficoredown
+      - eval_time: 14m
+        alertname: MfiOperationalFiguresStale
+        exp_alerts: []
+      - eval_time: 21m
+        alertname: MfiOperationalFiguresStale
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: core-1}
+            exp_annotations:
+              summary: "Operational figures have not been read for 10 minutes; the alerts below are blind"
+              runbook: docs/operations/runbooks/monitoring.md#mfioperationalfiguresstale
+
+  # Backups: written by mfi-backup.sh through the node_exporter textfile collector.
+  - interval: 1m
+    input_series:
+      - series: 'mfi_backup_last_success_timestamp_seconds{job="node",instance="db-1",database="mfi"}'
+        values: '3600x1700'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: MfiBackupMissing
+        exp_alerts: []
+      - eval_time: 28h
+        alertname: MfiBackupMissing
+        exp_alerts:
+          - exp_labels: {severity: critical, database: mfi}
+            exp_annotations:
+              summary: "No successful backup of mfi for over 26 hours"
+              runbook: docs/operations/runbooks/backup-and-restore.md

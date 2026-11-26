@@ -139,6 +139,52 @@ jobs:
       - name: Run ledger invariant tests
         run: bash services/core-banking/src/test/sql/run-ledger-db-tests.sh
 
+  backup-restore-drill:
+    name: backup and restore drill (TEST-ONLY, PostgreSQL 17)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mfi_owner
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mfi_owner" --health-interval 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGUSER: mfi_owner
+      PGPASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v5
+      - name: PostgreSQL 17 client tools (pg_dump must match the server)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq postgresql-client-17 > /dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Install btree_gist in template
+        run: psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS btree_gist"
+      - name: Drill (back up, restore into a new database, prove damage is caught)
+        run: |
+          pg_dump --version
+          bash infrastructure/scripts/bash/tests/backup-restore-drill.sh 2000 800 2>&1 | grep -v "^   V[0-9]" | tee drill.txt
+          grep -q "DRILL RESULT: all checks passed" drill.txt
+
+  monitoring-rules:
+    name: monitoring alert rules (promtool)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check and unit-test the alert rules
+        run: |
+          docker run --rm -v "$PWD/infrastructure/monitoring/prometheus:/rules:ro" -w /rules --entrypoint promtool \
+            prom/prometheus:v3.5.0 check rules mfi-alerts.yml
+          docker run --rm -v "$PWD/infrastructure/monitoring/prometheus:/rules:ro" -w /rules --entrypoint promtool \
+            prom/prometheus:v3.5.0 test rules mfi-alerts.test.yml
+
   windows-packaging:
     name: Windows service packaging smoke test
     runs-on: windows-latest

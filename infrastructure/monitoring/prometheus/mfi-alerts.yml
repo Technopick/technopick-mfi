@@ -1,0 +1,137 @@
+# =============================================================================
+# Alert rules for the core banking platform (ADR-0045). Thresholds are starting points for the
+# pilot; operations should tune them per tenant. Runbook: docs/operations/runbooks/monitoring.md.
+# Tested by mfi-alerts.test.yml (`promtool test rules`), run in CI.
+#
+# Labels: severity=critical pages on-call at any hour; severity=warning goes to the operations queue.
+# Scrape job names assumed: mfi-core (core banking /actuator/prometheus, bearer token of the
+# MONITORING service account) and node (node_exporter with the textfile collector, for backups).
+# =============================================================================
+groups:
+  - name: mfi-availability
+    rules:
+      - alert: MfiCoreDown
+        expr: up{job="mfi-core"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Core banking instance {{ $labels.instance }} is not answering"
+          runbook: docs/operations/runbooks/monitoring.md#mficoredown
+      - alert: MfiHttpErrors
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="mfi-core", status=~"5.."}[5m]))
+            / sum by (job) (rate(http_server_requests_seconds_count{job="mfi-core"}[5m])) > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 5% of core banking requests are failing"
+          runbook: docs/operations/runbooks/monitoring.md#mfihttperrors
+      - alert: MfiDatabasePoolExhausted
+        expr: max by (instance) (hikaricp_connections_pending{job="mfi-core"}) > 5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Requests are waiting for database connections on {{ $labels.instance }}"
+          runbook: docs/operations/runbooks/monitoring.md#mfidatabasepoolexhausted
+      - alert: MfiOperationalFiguresStale
+        expr: time() - max by (instance) (mfi_ops_snapshot_last_success_seconds{job="mfi-core"}) > 600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Operational figures have not been read for 10 minutes; the alerts below are blind"
+          runbook: docs/operations/runbooks/monitoring.md#mfioperationalfiguresstale
+
+  - name: mfi-end-of-day
+    rules:
+      - alert: MfiEndOfDayBehind
+        expr: max by (tenant) (mfi_eod_days_behind) >= 1
+        for: 2h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: yesterday's business day is not closed"
+          runbook: docs/operations/runbooks/end-of-day.md
+      - alert: MfiEndOfDayFarBehind
+        expr: max by (tenant) (mfi_eod_days_behind) >= 2
+        for: 15m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.tenant }}: end of day is {{ $value }} days behind"
+          runbook: docs/operations/runbooks/end-of-day.md
+      - alert: MfiEndOfDayRunningLong
+        expr: max by (tenant) (mfi_eod_running_seconds) > 3600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: an end-of-day run has been running for over an hour"
+          runbook: docs/operations/runbooks/end-of-day.md
+      - alert: MfiEndOfDayFailed
+        expr: max by (tenant) (mfi_eod_last_attempt_failed) == 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: the last end-of-day attempt failed, was blocked or was interrupted"
+          runbook: docs/operations/runbooks/end-of-day.md
+
+  - name: mfi-money
+    rules:
+      - alert: MfiReconciliationDifference
+        expr: max by (tenant) (mfi_reconciliation_differences) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.tenant }}: {{ $value }} control account(s) do not match their records at the last close"
+          runbook: docs/operations/runbooks/monitoring.md#mfireconciliationdifference
+      - alert: MfiB2cOutcomeUnknown
+        expr: max by (tenant) (mfi_b2c_outcome_unknown) > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: {{ $value }} M-Pesa loan payout(s) with no outcome for over 45 minutes"
+          runbook: docs/operations/runbooks/monitoring.md#mfib2coutcomeunknown
+      - alert: MfiAuditChainBroken
+        expr: max by (tenant) (mfi_audit_chain_broken) == 1
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.tenant }}: the audit trail does not verify - possible tampering"
+          runbook: docs/operations/runbooks/monitoring.md#mfiauditchainbroken
+
+  - name: mfi-messaging
+    rules:
+      - alert: MfiOutboxStuck
+        expr: max by (tenant) (mfi_outbox_oldest_unpublished_seconds) > 600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: events have waited over 10 minutes to be published"
+          runbook: docs/operations/runbooks/monitoring.md#mfioutboxstuck
+      - alert: MfiSmsOverdue
+        expr: max by (tenant) (mfi_sms_overdue) > 50
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: {{ $value }} SMS overdue by more than 15 minutes"
+          runbook: docs/operations/runbooks/monitoring.md#mfismsoverdue
+      - alert: MfiSmsFailing
+        expr: max by (tenant) (mfi_sms_failed_24h) > 20
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.tenant }}: {{ $value }} SMS failed in the last 24 hours"
+          runbook: docs/operations/runbooks/monitoring.md#mfismsoverdue
+
+  - name: mfi-backups
+    rules:
+      - alert: MfiBackupMissing
+        expr: time() - max by (database) (mfi_backup_last_success_timestamp_seconds) > 26 * 3600
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "No successful backup of {{ $labels.database }} for over 26 hours"
+          runbook: docs/operations/runbooks/backup-and-restore.md
+      - alert: MfiBackupNeverReported
+        expr: absent(mfi_backup_last_success_timestamp_seconds)
+        for: 26h
+        labels: {severity: critical}
+        annotations:
+          summary: "No backup has ever reported success to monitoring"
+          runbook: docs/operations/runbooks/backup-and-restore.md
