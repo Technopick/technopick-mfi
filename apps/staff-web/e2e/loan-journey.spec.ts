@@ -27,6 +27,9 @@ test("apply, approve, disburse by M-Pesa and activate a loan", async ({ browser 
   await expect(officer.getByText("KES 49,000.00").first()).toBeVisible(); // 50,000 less the 2% fee
   // Four eyes: the officer has no approve action.
   await expect(officer.getByRole("button", { name: /approve/i })).toHaveCount(0);
+  // Limits and guarantors (ADR-0043): BIASHARA has no limit rule on this stack; guarantors can be added while it is open.
+  await expect(officer.getByText("This product has no loan limit rule.")).toBeVisible();
+  await expect(officer.getByRole("button", { name: "Pledge guarantee" })).toBeVisible();
   const applicationUrl = officer.url();
 
   await manager.goto(applicationUrl);

@@ -96,6 +96,42 @@
         },
         "type": "object"
       },
+      "ApplicationCover": {
+        "properties": {
+          "applicationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "borrowerNumber": {
+            "type": "string"
+          },
+          "covered": {
+            "type": "boolean"
+          },
+          "guaranteeNeeded": {
+            "type": "string"
+          },
+          "guarantees": {
+            "items": {
+              "$ref": "#/components/schemas/GuaranteeView"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "$ref": "#/components/schemas/LoanLimitView"
+          },
+          "pledged": {
+            "type": "string"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "withinLimit": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "ApplyRequest": {
         "properties": {
           "amount": {
@@ -3073,6 +3109,115 @@
         },
         "type": "object"
       },
+      "GuaranteePledgeRequest": {
+        "properties": {
+          "accountNumber": {
+            "minLength": 1,
+            "pattern": "^[0-9]{10}$",
+            "type": "string"
+          },
+          "amount": {
+            "minimum": 0.01,
+            "type": "number"
+          },
+          "consentReference": {
+            "maxLength": 100,
+            "minLength": 3,
+            "type": "string"
+          },
+          "guarantorNumber": {
+            "minLength": 1,
+            "pattern": "^CU[0-9]{2}-[0-9]{7}$",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountNumber",
+          "amount",
+          "consentReference",
+          "guarantorNumber",
+          "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "GuaranteeView": {
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "applicationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "borrowerName": {
+            "type": "string"
+          },
+          "borrowerNumber": {
+            "type": "string"
+          },
+          "consentReference": {
+            "type": "string"
+          },
+          "endReason": {
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endedBy": {
+            "type": "string"
+          },
+          "guaranteeId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "guarantorName": {
+            "type": "string"
+          },
+          "guarantorNumber": {
+            "type": "string"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "pledgedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "pledgedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GuaranteeWithdrawRequest": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
       "IncomeStatement": {
         "properties": {
           "branchCode": {
@@ -3352,6 +3497,99 @@
           },
           "restructured": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "LoanLimitRuleRequest": {
+        "properties": {
+          "deductOutstanding": {
+            "type": "boolean"
+          },
+          "guaranteesRequired": {
+            "type": "boolean"
+          },
+          "includeShares": {
+            "type": "boolean"
+          },
+          "savingsMultiple": {
+            "maximum": 20,
+            "minimum": 0.01,
+            "type": "number"
+          }
+        },
+        "required": [
+          "deductOutstanding",
+          "guaranteesRequired",
+          "includeShares",
+          "savingsMultiple"
+        ],
+        "type": "object"
+      },
+      "LoanLimitRuleView": {
+        "properties": {
+          "deductOutstanding": {
+            "type": "boolean"
+          },
+          "guaranteesRequired": {
+            "type": "boolean"
+          },
+          "includeShares": {
+            "type": "boolean"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "savingsMultiple": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LoanLimitView": {
+        "properties": {
+          "customerNumber": {
+            "type": "string"
+          },
+          "guaranteesRequired": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "string"
+          },
+          "outstanding": {
+            "type": "string"
+          },
+          "ownCover": {
+            "type": "string"
+          },
+          "pledgedForOthers": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "ruleApplies": {
+            "type": "boolean"
+          },
+          "savings": {
+            "type": "string"
+          },
+          "savingsMultiple": {
+            "type": "string"
+          },
+          "shares": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -8670,6 +8908,37 @@
         ]
       }
     },
+    "/api/v1/lending/applications/{applicationId}/cover": {
+      "get": {
+        "operationId": "LoanGuarantee_cover",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationCover"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
+        ]
+      }
+    },
     "/api/v1/lending/applications/{applicationId}/decline": {
       "post": {
         "operationId": "LoanOrigination_decline",
@@ -8708,6 +8977,47 @@
         },
         "tags": [
           "loan-origination-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/applications/{applicationId}/guarantees": {
+      "post": {
+        "operationId": "LoanGuarantee_pledge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuaranteePledgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationCover"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
         ]
       }
     },
@@ -8833,6 +9143,181 @@
         },
         "tags": [
           "loan-settlement-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/guarantees/{guaranteeId}/withdraw": {
+      "post": {
+        "operationId": "LoanGuarantee_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guaranteeId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuaranteeWithdrawRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationCover"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/limit-rules": {
+      "get": {
+        "operationId": "LoanGuarantee_rules",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoanLimitRuleView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/limit-rules/{productCode}": {
+      "put": {
+        "operationId": "LoanGuarantee_saveRule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanLimitRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanLimitRuleView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/limit-rules/{productCode}/remove": {
+      "post": {
+        "operationId": "LoanGuarantee_removeRule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoanLimitRuleView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/limits": {
+      "get": {
+        "operationId": "LoanGuarantee_limit",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "productCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanLimitView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
         ]
       }
     },
@@ -9160,6 +9645,39 @@
         },
         "tags": [
           "loan-write-off-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/members/{customerNumber}/guarantees-given": {
+      "get": {
+        "operationId": "LoanGuarantee_givenBy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GuaranteeView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "loan-guarantee-controller"
         ]
       }
     },

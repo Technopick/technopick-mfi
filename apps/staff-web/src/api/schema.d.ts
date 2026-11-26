@@ -740,6 +740,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lending/applications/{applicationId}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanGuarantee_cover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/applications/{applicationId}/decline": {
         parameters: {
             query?: never;
@@ -750,6 +766,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["LoanOrigination_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/applications/{applicationId}/guarantees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanGuarantee_pledge"];
         delete?: never;
         options?: never;
         head?: never;
@@ -798,6 +830,86 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["LoanSettlement_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/guarantees/{guaranteeId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanGuarantee_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/limit-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanGuarantee_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/limit-rules/{productCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["LoanGuarantee_saveRule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/limit-rules/{productCode}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoanGuarantee_removeRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanGuarantee_limit"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -894,6 +1006,22 @@ export interface paths {
         get: operations["LoanWriteOff_ofLoan"];
         put?: never;
         post: operations["LoanWriteOff_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/members/{customerNumber}/guarantees-given": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoanGuarantee_givenBy"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2907,6 +3035,18 @@ export interface components {
             reference?: string;
             source?: string;
         };
+        ApplicationCover: {
+            /** Format: uuid */
+            applicationId?: string;
+            borrowerNumber?: string;
+            covered?: boolean;
+            guaranteeNeeded?: string;
+            guarantees?: components["schemas"]["GuaranteeView"][];
+            limit?: components["schemas"]["LoanLimitView"];
+            pledged?: string;
+            principal?: string;
+            withinLimit?: boolean;
+        };
         ApplyRequest: {
             amount: string;
             billRef?: string;
@@ -3905,6 +4045,39 @@ export interface components {
             status?: string;
             subledger?: boolean;
         };
+        GuaranteePledgeRequest: {
+            accountNumber: string;
+            amount: number;
+            consentReference: string;
+            guarantorNumber: string;
+            idempotencyKey: string;
+        };
+        GuaranteeView: {
+            accountNumber?: string;
+            amount?: string;
+            /** Format: uuid */
+            applicationId?: string;
+            applicationStatus?: string;
+            borrowerName?: string;
+            borrowerNumber?: string;
+            consentReference?: string;
+            endReason?: string;
+            /** Format: date-time */
+            endedAt?: string;
+            endedBy?: string;
+            /** Format: uuid */
+            guaranteeId?: string;
+            guarantorName?: string;
+            guarantorNumber?: string;
+            loanNumber?: string;
+            /** Format: date-time */
+            pledgedAt?: string;
+            pledgedBy?: string;
+            status?: string;
+        };
+        GuaranteeWithdrawRequest: {
+            reason: string;
+        };
         IncomeStatement: {
             branchCode?: string;
             expenses?: components["schemas"]["FinancialStatementLine"][];
@@ -3990,6 +4163,36 @@ export interface components {
             loanNumber?: string;
             outstandingPrincipal?: string;
             restructured?: boolean;
+        };
+        LoanLimitRuleRequest: {
+            deductOutstanding: boolean;
+            guaranteesRequired: boolean;
+            includeShares: boolean;
+            savingsMultiple: number;
+        };
+        LoanLimitRuleView: {
+            deductOutstanding?: boolean;
+            guaranteesRequired?: boolean;
+            includeShares?: boolean;
+            productCode?: string;
+            productName?: string;
+            savingsMultiple?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        LoanLimitView: {
+            customerNumber?: string;
+            guaranteesRequired?: boolean;
+            limit?: string;
+            outstanding?: string;
+            ownCover?: string;
+            pledgedForOthers?: string;
+            productCode?: string;
+            ruleApplies?: boolean;
+            savings?: string;
+            savingsMultiple?: string;
+            shares?: string;
         };
         LoanQuote: {
             annualRate?: string;
@@ -6385,6 +6588,28 @@ export interface operations {
             };
         };
     };
+    LoanGuarantee_cover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationCover"];
+                };
+            };
+        };
+    };
     LoanOrigination_decline: {
         parameters: {
             query?: never;
@@ -6407,6 +6632,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoanApplicationView"];
+                };
+            };
+        };
+    };
+    LoanGuarantee_pledge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuaranteePledgeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationCover"];
                 };
             };
         };
@@ -6482,6 +6733,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefundView"];
+                };
+            };
+        };
+    };
+    LoanGuarantee_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guaranteeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuaranteeWithdrawRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationCover"];
+                };
+            };
+        };
+    };
+    LoanGuarantee_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanLimitRuleView"][];
+                };
+            };
+        };
+    };
+    LoanGuarantee_saveRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoanLimitRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanLimitRuleView"];
+                };
+            };
+        };
+    };
+    LoanGuarantee_removeRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanLimitRuleView"][];
+                };
+            };
+        };
+    };
+    LoanGuarantee_limit: {
+        parameters: {
+            query: {
+                customerNumber: string;
+                productCode: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanLimitView"];
                 };
             };
         };
@@ -6700,6 +7068,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    LoanGuarantee_givenBy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuaranteeView"][];
                 };
             };
         };

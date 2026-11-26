@@ -1147,6 +1147,64 @@ describe("screens", () => {
     expect(screen.getByRole("button", { name: "Save exit settings" })).toBeTruthy();
   });
 
+  it("shows an application's limit and lets the officer add and withdraw guarantors", async () => {
+    const L = "/api/v1/lending";
+    const app = { applicationId: "app-1", customerRef: "CU26-0000001", productCode: "BIASHARA", branchCode: "NBO01", principal: "10000.00",
+      currency: "KES", termMonths: 12, firstDueDate: "2026-12-28", purpose: "Restock the shop", status: "SUBMITTED",
+      submittedBy: "user:lo-1", submittedAt: "2026-11-28T08:00:00Z" };
+    const limit = { customerNumber: "CU26-0000001", productCode: "BIASHARA", ruleApplies: true, savings: "8919.00", pledgedForOthers: "0.00",
+      shares: "0.00", outstanding: "12000.00", ownCover: "8919.00", savingsMultiple: "3.00", limit: "14757.00", guaranteesRequired: true };
+    const g = { guaranteeId: "g-1", applicationId: "app-1", borrowerNumber: "CU26-0000001", guarantorNumber: "CU26-0000002",
+      guarantorName: "Member Load2", accountNumber: "0100000002", amount: "1000.00", consentReference: "Form G-1", status: "PLEDGED",
+      pledgedBy: "user:lo-1", pledgedAt: "2026-11-28T09:00:00Z", applicationStatus: "SUBMITTED" };
+    let guarantees: unknown[] = [g];
+    const { api, calls } = fakeApi({
+      [`GET ${L}/applications/app-1`]: () => app,
+      [`GET ${L}/applications/app-1/cover`]: () => ({ applicationId: "app-1", borrowerNumber: "CU26-0000001", principal: "10000.00", limit,
+        guaranteeNeeded: "1081.00", pledged: guarantees.length ? "1000.00" : "0.00", withinLimit: true, covered: false, guarantees }),
+      [`POST ${L}/applications/app-1/guarantees`]: () => ({}),
+      [`POST ${L}/guarantees/g-1/withdraw`]: () => {
+        guarantees = [];
+        return {};
+      },
+    });
+    renderAt("/applications/app-1", session("lo-1", "LOAN_OFFICER"), api);
+    expect(await screen.findByText("Limit and guarantors")).toBeTruthy();
+    expect(screen.getByText(/3.00 x own cover, less/)).toBeTruthy();
+    expect(screen.getByText("not yet covered")).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Reason to withdraw CU26-0000002's pledge"), "Guarantor will pledge more");
+    await userEvent.click(screen.getByRole("button", { name: "Withdraw pledge" }));
+    expect(await screen.findByText("No guarantors yet.")).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Guarantor member number"), "cu26-0000002");
+    await userEvent.type(screen.getByLabelText("Guarantor's savings account"), "0100000002");
+    await userEvent.type(screen.getByLabelText("Amount guaranteed"), "1200");
+    await userEvent.type(screen.getByLabelText("Signed consent reference"), "Form G-2");
+    await userEvent.click(screen.getByRole("button", { name: "Pledge guarantee" }));
+    await waitFor(() => expect(calls.find((c) => c.path === `${L}/applications/app-1/guarantees`)?.body).toMatchObject({
+      guarantorNumber: "CU26-0000002", accountNumber: "0100000002", amount: "1200", consentReference: "Form G-2" }));
+    expect(calls.find((c) => c.path === `${L}/guarantees/g-1/withdraw`)?.body).toMatchObject({ reason: "Guarantor will pledge more" });
+  });
+
+  it("lets finance set a product's loan limit, and shows it read-only to an officer", async () => {
+    const L = "/api/v1/lending";
+    const rules = [{ productCode: "BIASHARA", productName: "Business loan", includeShares: false, deductOutstanding: false,
+      guaranteesRequired: false }];
+    const fin = fakeApi({
+      [`GET ${L}/limit-rules`]: () => rules,
+      [`PUT ${L}/limit-rules/BIASHARA`]: () => ({ ...rules[0], savingsMultiple: "3.00" }),
+    });
+    renderAt("/loan-limits", session("fin-1", "FINANCE"), fin.api);
+    await userEvent.click(await screen.findByLabelText("Require guarantees for BIASHARA"));
+    await userEvent.click(screen.getByRole("button", { name: "Set limit" }));
+    await waitFor(() => expect(fin.calls.find((c) => c.method === "PUT")?.body).toEqual({ savingsMultiple: "3.00", includeShares: true,
+      deductOutstanding: true, guaranteesRequired: true }));
+    cleanup();
+    const officer = fakeApi({ [`GET ${L}/limit-rules`]: () => [{ ...rules[0], savingsMultiple: "3.00", guaranteesRequired: true }] });
+    renderAt("/loan-limits", session("lo-1", "LOAN_OFFICER"), officer.api);
+    expect(await screen.findByText("3.00 x")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -1230,7 +1288,7 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Member shares", "Fixed deposits", "Members leaving", "General ledger", "Prudential returns",
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Loan limits", "Member shares", "Fixed deposits", "Members leaving", "General ledger", "Prudential returns",
       "M-Pesa statements", "B2C float", "Provisioning", "Dividends"]);
   });
 
