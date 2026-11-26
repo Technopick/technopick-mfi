@@ -1,3 +1,4 @@
+import { ApplicationCoverPanel } from "./LoanLimitPages";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useApi } from "../api/ApiContext";
@@ -167,6 +168,8 @@ export function ApplicationPage() {
         ))}
         <ProblemBox problem={action.error} />
       </Section>
+      {data.applicationId && <ApplicationCoverPanel key={`${data.applicationId}-${data.status}`} applicationId={data.applicationId}
+        applicationStatus={data.status ?? ""} />}
       {data.quote && <Section title="Repayment schedule (quote)"><QuoteTable quote={data.quote} /></Section>}
     </>
   );

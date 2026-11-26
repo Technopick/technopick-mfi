@@ -18,7 +18,6 @@ import ke.co.technopick.mfi.core.lending.application.LoanLimitService.GuaranteeV
 import ke.co.technopick.mfi.core.lending.application.LoanLimitService.LoanLimitRuleView;
 import ke.co.technopick.mfi.core.lending.application.LoanLimitService.LoanLimitView;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,7 +65,7 @@ public class LoanGuaranteeController {
                 r.guaranteesRequired(), caller.actor());
     }
 
-    @DeleteMapping("/limit-rules/{productCode}")
+    @PostMapping("/limit-rules/{productCode}/remove")
     @PreAuthorize("hasRole('FINANCE')")
     public List<LoanLimitRuleView> removeRule(@PathVariable String productCode) {
         limits.removeRule(caller.tenantId(), productCode);
