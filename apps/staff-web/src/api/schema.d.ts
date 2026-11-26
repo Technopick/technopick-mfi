@@ -996,6 +996,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/member-exits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberExit_exits"];
+        put?: never;
+        post: operations["MemberExit_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/members/{customerNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberExit_position"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/refund-payments/{paymentId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberExit_approveRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/refund-payments/{paymentId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberExit_rejectRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberExit_settings"];
+        put: operations["MemberExit_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/{exitId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MemberExit_exit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/{exitId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberExit_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/{exitId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberExit_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/{exitId}/refund-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberExit_recordRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/member-exits/{exitId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MemberExit_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/member-pin-setups": {
         parameters: {
             query?: never;
@@ -3519,6 +3679,63 @@ export interface components {
             source?: string;
             switchReference?: string;
         };
+        ExitAccountView: {
+            accountNumber?: string;
+            balance?: string;
+            interestGross?: string;
+            interestTax?: string;
+            refund?: string;
+        };
+        ExitDecisionRequest: {
+            reason?: string;
+        };
+        ExitRequestCreate: {
+            customerNumber: string;
+            idempotencyKey: string;
+            reason: string;
+        };
+        ExitSettingsRequest: {
+            /** Format: int32 */
+            noticeDays: number;
+            refundsPayableAccount: string;
+        };
+        ExitSettingsView: {
+            /** Format: int32 */
+            noticeDays?: number;
+            refundsPayableAccount?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        ExitView: {
+            accounts?: components["schemas"]["ExitAccountView"][];
+            blockers?: string[];
+            /** Format: date */
+            businessDate?: string;
+            customerNumber?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: date */
+            earliestExitDate?: string;
+            /** Format: uuid */
+            entryId?: string;
+            /** Format: uuid */
+            exitId?: string;
+            memberName?: string;
+            /** Format: int32 */
+            noticeDays?: number;
+            payment?: components["schemas"]["RefundPaymentView"];
+            reason?: string;
+            refundTotal?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            /** Format: date */
+            requestedOn?: string;
+            status?: string;
+        };
         FinancialStatementLine: {
             accountClass?: string;
             accountCode?: string;
@@ -3846,6 +4063,15 @@ export interface components {
             accountCode?: string;
             line?: string;
         };
+        MemberExitPosition: {
+            accounts?: components["schemas"]["ExitAccountView"][];
+            blockers?: string[];
+            customerNumber?: string;
+            memberName?: string;
+            memberStatus?: string;
+            openExit?: components["schemas"]["ExitView"];
+            refundToday?: string;
+        };
         MemberFixedDeposits: {
             activePrincipal?: string;
             customerNumber?: string;
@@ -4100,6 +4326,32 @@ export interface components {
             providerRef?: string;
             /** Format: date-time */
             recordedAt?: string;
+        };
+        RefundPaymentRequest: {
+            idempotencyKey: string;
+            method: string;
+            paidFromAccount: string;
+            reference: string;
+        };
+        RefundPaymentView: {
+            amount?: string;
+            /** Format: date */
+            businessDate?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            /** Format: uuid */
+            entryId?: string;
+            method?: string;
+            paidFrom?: string;
+            /** Format: uuid */
+            paymentId?: string;
+            reference?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
         };
         RefundView: {
             accountNumber?: string;
@@ -6594,6 +6846,288 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteOffView"];
+                };
+            };
+        };
+    };
+    MemberExit_exits: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"][];
+                };
+            };
+        };
+    };
+    MemberExit_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_position: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberExitPosition"];
+                };
+            };
+        };
+    };
+    MemberExit_approveRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_rejectRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitSettingsView"];
+                };
+            };
+        };
+    };
+    MemberExit_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitSettingsView"];
+                };
+            };
+        };
+    };
+    MemberExit_exit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_recordRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
+                };
+            };
+        };
+    };
+    MemberExit_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitView"];
                 };
             };
         };

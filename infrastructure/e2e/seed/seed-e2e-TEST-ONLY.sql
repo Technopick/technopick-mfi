@@ -73,4 +73,7 @@ INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, cur
   (:t, '2610-FD-INTEREST-PAYABLE', 'Interest payable on fixed deposits (test)', 'LIABILITY', 'KES', false),
   (:t, '5600-FD-INTEREST', 'Interest on fixed deposits (test)', 'EXPENSE', 'KES', false),
   (:t, '2620-WHT-FD-INTEREST', 'Withholding tax on deposit interest (test)', 'LIABILITY', 'KES', false);
+-- TEST-ONLY member refunds account (ADR-0042); finance chooses it in the exit settings.
+INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+  (:t, '2450-MEMBER-REFUNDS', 'Member refunds payable (test)', 'LIABILITY', 'KES', false);
 \echo TEST-ONLY seed loaded

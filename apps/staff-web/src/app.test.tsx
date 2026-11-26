@@ -110,7 +110,7 @@ describe("screens", () => {
     const { api } = fakeApi({});
     renderAt("/", session("teller-1", "TELLER"), api);
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Member shares", "Fixed deposits", "Loan schedule"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Member shares", "Fixed deposits", "Members leaving", "Loan schedule"]);
   });
 
   it("validates the amount locally and sends it as a string with an idempotency key", async () => {
@@ -1076,6 +1076,77 @@ describe("screens", () => {
     expect(body.maxAmount).toBeUndefined();
   });
 
+  it("shows what stops a member leaving and lets an officer ask for an exit", async () => {
+    const X = "/api/v1/member-exits";
+    const position = (n: string, blockers: string[]) => ({ customerNumber: n, memberName: "Member Leaver", memberStatus: "ACTIVE", blockers,
+      accounts: [{ accountNumber: "0100000009", balance: "20000.00", interestGross: "6.58", interestTax: "0.99", refund: "20005.59" }],
+      refundToday: "20005.59" });
+    const { api, calls } = fakeApi({
+      [`GET ${X}/settings`]: () => ({ noticeDays: 60, refundsPayableAccount: "2450-MEMBER-REFUNDS" }),
+      [`GET ${X}`]: () => [],
+      [`GET ${X}/members/CU26-0000001`]: () => position("CU26-0000001", ["1 loan(s) not yet repaid"]),
+      [`GET ${X}/members/CU26-0009801`]: () => position("CU26-0009801", []),
+      [`POST ${X}`]: () => ({ exitId: "e-1", customerNumber: "CU26-0009801", status: "REQUESTED", earliestExitDate: "2027-01-27" }),
+    });
+    renderAt("/member-exits", session("lo-1", "LOAN_OFFICER"), api);
+    await userEvent.type(await screen.findByLabelText("Member number"), "CU26-0000001");
+    await userEvent.click(screen.getByRole("button", { name: "Show position" }));
+    expect(await screen.findByText("1 loan(s) not yet repaid")).toBeTruthy();
+    await userEvent.clear(screen.getByLabelText("Member number"));
+    await userEvent.type(screen.getByLabelText("Member number"), "cu26-0009801");
+    await userEvent.click(screen.getByRole("button", { name: "Show position" }));
+    expect(await screen.findByText("Nothing outstanding.")).toBeTruthy();
+    expect(screen.getAllByText(/20,?005\.59/).length).toBeGreaterThan(0);
+    await userEvent.type(screen.getByLabelText(/^Reason the member gives/), "Relocating abroad for work");
+    await userEvent.click(screen.getByRole("button", { name: "Ask to leave" }));
+    expect(await screen.findByText(/CU26-0009801 asked to leave; the notice period ends 2027-01-27/)).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ customerNumber: "CU26-0009801", reason: "Relocating abroad for work" });
+    expect(screen.queryByRole("button", { name: "Save exit settings" })).toBeNull();
+  });
+
+  it("lets a branch manager approve a clear exit but not their own or a blocked one", async () => {
+    const X = "/api/v1/member-exits";
+    const e = (id: string, by: string, blockers: string[]) => ({ exitId: id, customerNumber: `CU26-000000${id}`, memberName: "Member",
+      reason: "Relocating abroad for work", requestedOn: "2026-11-28", noticeDays: 2, earliestExitDate: "2026-11-30", status: "REQUESTED",
+      requestedBy: by, requestedAt: "2026-11-28T08:00:00Z", blockers, accounts: [] });
+    const { api, calls } = fakeApi({
+      [`GET ${X}/settings`]: () => ({ noticeDays: 2, refundsPayableAccount: "2450-MEMBER-REFUNDS" }),
+      [`GET ${X}`]: () => [e("1", "user:lo-1", []), e("2", "user:bm-1", []), e("3", "user:lo-1", ["1 loan(s) not yet repaid"])],
+      [`POST ${X}/1/approve`]: () => ({ ...e("1", "user:lo-1", []), status: "APPROVED" }),
+    });
+    renderAt("/member-exits", session("bm-1", "BRANCH_MANAGER"), api);
+    const approve = await screen.findAllByRole("button", { name: "Approve exit" });
+    expect(approve).toHaveLength(2);
+    expect((approve[1] as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Your own request/)).toBeTruthy();
+    await userEvent.click(approve[0]!);
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual([`${X}/1/approve`]));
+  });
+
+  it("lets finance record a refund and another person approve a recorded one", async () => {
+    const X = "/api/v1/member-exits";
+    const e = (id: string, payment: unknown) => ({ exitId: id, customerNumber: `CU26-000000${id}`, memberName: "Member",
+      reason: "Relocating abroad for work", earliestExitDate: "2026-11-30", status: "APPROVED", requestedBy: "user:lo-1",
+      requestedAt: "2026-11-28T08:00:00Z", decidedBy: "user:bm-1", refundTotal: "20005.59", blockers: [], accounts: [], payment });
+    const { api, calls } = fakeApi({
+      [`GET ${X}/settings`]: () => ({ noticeDays: 2, refundsPayableAccount: "2450-MEMBER-REFUNDS" }),
+      [`GET ${X}`]: () => [e("1", null), e("2", { paymentId: "p-2", amount: "20005.59", method: "CHEQUE", paidFrom: "1020-BANK",
+        reference: "CHQ 88", status: "REQUESTED", requestedBy: "user:fin-2" })],
+      [`POST ${X}/1/refund-payments`]: () => e("1", { paymentId: "p-1", status: "REQUESTED", requestedBy: "user:fin-1" }),
+      [`POST ${X}/refund-payments/p-2/approve`]: () => e("2", { paymentId: "p-2", status: "APPROVED" }),
+    });
+    renderAt("/member-exits", session("fin-1", "FINANCE"), api);
+    await userEvent.type(await screen.findByLabelText("Paid from account"), "1020-BANK");
+    await userEvent.type(screen.getByLabelText("Payment reference"), "EFT-0001");
+    await userEvent.click(screen.getByRole("button", { name: "Record refund paid" }));
+    await userEvent.click(screen.getByRole("button", { name: "Approve payment" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST").map((c) => c.path))
+      .toEqual([`${X}/1/refund-payments`, `${X}/refund-payments/p-2/approve`]));
+    expect(calls.find((c) => c.path === `${X}/1/refund-payments`)?.body).toMatchObject({ method: "BANK_TRANSFER", paidFromAccount: "1020-BANK",
+      reference: "EFT-0001" });
+    expect(screen.getByRole("button", { name: "Save exit settings" })).toBeTruthy();
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -1159,7 +1230,7 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Member shares", "Fixed deposits", "General ledger", "Prudential returns",
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Member shares", "Fixed deposits", "Members leaving", "General ledger", "Prudential returns",
       "M-Pesa statements", "B2C float", "Provisioning", "Dividends"]);
   });
 

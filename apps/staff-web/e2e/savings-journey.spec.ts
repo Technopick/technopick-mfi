@@ -127,6 +127,30 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await teller.goto(`/accounts/${account}`);
   await expect(teller.getByText("KES 35,000.00").first()).toBeVisible();
 
+  // Member exit (ADR-0042): finance sets the notice period (none on this TEST-ONLY stack); the member
+  // with shares is told to transfer them first; a new member with nothing outstanding asks to leave,
+  // and the supervisor approves.
+  await finance.goto("/member-exits");
+  await finance.getByLabel("Notice period (days)").fill("0");
+  await finance.getByLabel("Member refunds payable (liability)").fill("2450-MEMBER-REFUNDS");
+  await finance.getByRole("button", { name: "Save exit settings" }).click();
+  await expect(finance.getByText(/Last changed by user:/)).toBeVisible();
+  const leaver = await verifiedCustomer(officer, manager, "Wafula");
+  await officer.goto("/member-exits");
+  await officer.getByLabel("Member number").fill(customer);
+  await officer.getByRole("button", { name: "Show position" }).click();
+  await expect(officer.getByRole("alert")).toContainText("in shares to transfer to another member");
+  await officer.getByLabel("Member number").fill(leaver);
+  await officer.getByRole("button", { name: "Show position" }).click();
+  await expect(officer.getByText("Nothing outstanding.")).toBeVisible();
+  await officer.getByLabel(/^Reason the member gives/).fill("Relocating upcountry (e2e)");
+  await officer.getByRole("button", { name: "Ask to leave" }).click();
+  await expect(officer.getByRole("status")).toContainText(`${leaver} asked to leave`);
+  await supervisor.goto("/member-exits");
+  const exitRow = supervisor.getByRole("row", { name: new RegExp(leaver) });
+  await exitRow.getByRole("button", { name: "Approve exit" }).click();
+  await expect(exitRow).toContainText("APPROVED");
+
   // Vault cash into the till, approved by the supervisor.
   await teller.goto("/teller");
   await teller.getByLabel("Transfer amount").fill("20000");
