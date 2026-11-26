@@ -34,6 +34,9 @@ const SCHEDULE_OFF = { enabled: false, runAt: "21:00", timeZone: "Africa/Nairobi
   retryMinutes: 15, maxCatchUpDays: 3, nextCutOff: "2026-11-28T21:00:00+03:00" };
 const SCHEDULE_ON = { ...SCHEDULE_OFF, enabled: true, updatedBy: "user:sup-1", updatedAt: "2026-11-20T09:00:00Z" };
 
+const noGuarantees = (loanNumber: string) => ({ loanNumber, borrowerNumber: "CU26-0000001", loanStatus: "ACTIVE", daysPastDue: 0,
+  minDaysPastDue: 0, owed: "0.00", locked: "0.00", callable: "0.00", callAllowed: false, guarantees: [] });
+
 describe("money", () => {
   it("formats decimal strings without floating point", () => {
     expect(formatAmount("1234567.5")).toBe("1,234,567.50");
@@ -473,6 +476,7 @@ describe("screens", () => {
   it("quotes an early settlement and settles the loan once the member has paid enough", async () => {
     let settled = false;
     const { api, calls } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000007/guarantees": () => noGuarantees("LN26-0000007"),
       "GET /api/v1/lending/loans/LN26-0000007/schedule": () => ({ loanNumber: "LN26-0000007", status: settled ? "CLOSED" : "ACTIVE",
         installments: [{ number: 1, dueDate: "2026-12-01", principal: "1000.00", interest: "360.00", total: "1360.00", closingBalance: "11000.00" }] }),
       "GET /api/v1/lending/loans/LN26-0000007/settlement": () => settled
@@ -501,6 +505,7 @@ describe("screens", () => {
 
   it("shows the settlement quote without a settle button to a loan officer", async () => {
     const { api } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000008/guarantees": () => noGuarantees("LN26-0000008"),
       "GET /api/v1/lending/loans/LN26-0000008/schedule": () => ({ loanNumber: "LN26-0000008", status: "ACTIVE", installments: [] }),
       "GET /api/v1/lending/loans/LN26-0000008/settlement": () => ({ loanNumber: "LN26-0000008", status: "ACTIVE", businessDate: "2026-11-29",
         currency: "KES", principal: "12000.00", interest: "324.00", penalty: "0.00", payoff: "12324.00", interestWaived: "2016.00",
@@ -518,6 +523,7 @@ describe("screens", () => {
       proposed: [{ no: 3, dueDate: "2026-12-01", principal: "0.00", interest: "300.00", total: "300.00" },
         { no: 4, dueDate: "2027-01-01", principal: "845.55", interest: "360.00", total: "1205.55" }] };
     const { api, calls } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000009/guarantees": () => noGuarantees("LN26-0000009"),
       "GET /api/v1/lending/loans/LN26-0000009/schedule": () => ({ loanNumber: "LN26-0000009", status: "ACTIVE", scheduleVersion: 1,
         restructured: false, installments: [] }),
       "GET /api/v1/lending/loans/LN26-0000009/settlement": () => ({ loanNumber: "LN26-0000009", status: "ACTIVE", canSettle: false,
@@ -553,6 +559,7 @@ describe("screens", () => {
       requestedBy: "user:officer-1" };
     let approved = false;
     const { api, calls } = fakeApi({
+      "GET /api/v1/lending/loans/LN26-0000010/guarantees": () => noGuarantees("LN26-0000010"),
       "GET /api/v1/lending/loans/LN26-0000010/schedule": () => ({ loanNumber: "LN26-0000010", status: "ACTIVE",
         scheduleVersion: approved ? 2 : 1, restructured: false, installments: [] }),
       "GET /api/v1/lending/loans/LN26-0000010/settlement": () => ({ loanNumber: "LN26-0000010", status: "ACTIVE", canSettle: false,
@@ -1205,6 +1212,78 @@ describe("screens", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
+  it("shows a past-due loan's guarantors and lets an officer ask to call on them", async () => {
+    const L = "/api/v1/lending";
+    const line = (id: string, n: string, pledged: string, locked: string) => ({ guaranteeId: id, guarantorNumber: n, guarantorName: `Member ${n}`,
+      accountNumber: "0100000002", pledged, locked, recovered: "0.00", status: "PLEDGED" });
+    const position = { loanNumber: "LN26-0000003", borrowerNumber: "CU26-0000003", loanStatus: "ACTIVE", daysPastDue: 58, minDaysPastDue: 30,
+      owed: "11520.00", locked: "6000.00", callable: "6000.00", callAllowed: true,
+      guarantees: [line("g-2", "CU26-0000002", "4000.00", "4000.00"), line("g-6", "CU26-0000006", "2000.00", "2000.00")] };
+    let requested: unknown[] = [];
+    const { api, calls } = fakeApi({
+      [`GET ${L}/loans/LN26-0000003/schedule`]: () => ({ loanNumber: "LN26-0000003", status: "ACTIVE", installments: [] }),
+      [`GET ${L}/loans/LN26-0000003/settlement`]: () => ({ loanNumber: "LN26-0000003", status: "ACTIVE", canSettle: false,
+        businessDate: "2026-11-29", currency: "KES", principal: "12000.00", interest: "0.00", penalty: "0.00", payoff: "12000.00",
+        interestWaived: "0.00", creditHeld: "0.00", stillToPay: "12000.00" }),
+      [`GET ${L}/loans/LN26-0000003/reschedules`]: () => [],
+      [`GET ${L}/loans/LN26-0000003/guarantees`]: () => position,
+      [`GET ${L}/guarantor-calls`]: () => requested,
+      [`POST ${L}/loans/LN26-0000003/guarantor-calls`]: () => {
+        requested = [{ callId: "c-1", loanNumber: "LN26-0000003", borrowerNumber: "CU26-0000003", daysPastDue: 58, amount: "1000.00",
+          reason: "Borrower has stopped paying", status: "REQUESTED", requestedBy: "user:lo-1", requestedAt: "2026-11-29T08:00:00Z",
+          lines: [{ guaranteeId: "g-2", guarantorNumber: "CU26-0000002", guarantorName: "Member", accountNumber: "0100000002",
+            amount: "666.67", applied: false }] }];
+        return requested[0];
+      },
+    });
+    renderAt("/loans/LN26-0000003", session("lo-1", "LOAN_OFFICER"), api);
+    expect(await screen.findByRole("heading", { name: "Guarantors" })).toBeTruthy();
+    expect(screen.getByText("Can be called").nextSibling?.textContent).toContain("6,000.00");
+    await userEvent.type(screen.getByLabelText("Amount"), "1000");
+    await userEvent.type(screen.getByLabelText("Reason"), "Borrower has stopped paying");
+    await userEvent.click(screen.getByRole("button", { name: "Ask for approval" }));
+    await waitFor(() => expect(calls.find((c) => c.path === `${L}/loans/LN26-0000003/guarantor-calls`)?.body).toMatchObject({
+      amount: "1000", reason: "Borrower has stopped paying", idempotencyKey: expect.any(String) }));
+    expect(await screen.findByText(/666.67/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ask for approval" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Approve and recover" })).toBeNull();
+  });
+
+  it("lets a branch manager approve a guarantor call and finance set guarantor calls up", async () => {
+    const L = "/api/v1/lending";
+    const call = (id: string, by: string) => ({ callId: id, loanNumber: "LN26-0000003", borrowerNumber: "CU26-0000003", daysPastDue: 58,
+      amount: "1000.00", reason: "Borrower has stopped paying", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z",
+      lines: [] });
+    const settings = { recoveryClearingAccount: "1190-GUARANTOR-RECOVERIES", minDaysPastDue: 90, releaseAsRepaid: false,
+      updatedBy: "user:fin-1", updatedAt: "2026-11-28T08:00:00Z" };
+    const bm = fakeApi({
+      [`GET ${L}/guarantee-settings`]: () => settings,
+      [`GET ${L}/guarantor-calls?status=REQUESTED`]: () => [call("c-1", "user:lo-1"), call("c-2", "user:bm-1")],
+      [`POST ${L}/guarantor-calls/c-1/approve`]: () => ({ ...call("c-1", "user:lo-1"), status: "APPROVED" }),
+    });
+    renderAt("/guarantor-calls", session("bm-1", "BRANCH_MANAGER"), bm.api);
+    const buttons = await screen.findAllByRole("button", { name: "Approve and recover" });
+    expect(buttons).toHaveLength(1);
+    expect(screen.getByText("Your own request - a colleague must decide.")).toBeTruthy();
+    await userEvent.click(buttons[0]!);
+    await waitFor(() => expect(bm.calls.some((c) => c.path === `${L}/guarantor-calls/c-1/approve`)).toBe(true));
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    cleanup();
+    const fin = fakeApi({
+      [`GET ${L}/guarantee-settings`]: () => settings,
+      [`GET ${L}/guarantor-calls?status=REQUESTED`]: () => [],
+      [`PUT ${L}/guarantee-settings`]: (body) => ({ ...settings, ...(body as object) }),
+    });
+    renderAt("/guarantor-calls", session("fin-1", "FINANCE"), fin.api);
+    const days = await screen.findByLabelText("Call guarantors from (days past due)");
+    await userEvent.clear(days);
+    await userEvent.type(days, "60");
+    await userEvent.click(screen.getByLabelText("Release guarantees as loans are repaid"));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(fin.calls.find((c) => c.method === "PUT")?.body).toEqual({
+      recoveryClearingAccount: "1190-GUARANTOR-RECOVERIES", minDaysPastDue: 60, releaseAsRepaid: true }));
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -1288,7 +1367,7 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Loan limits", "Member shares", "Fixed deposits", "Members leaving", "General ledger", "Prudential returns",
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Loan limits", "Guarantor calls", "Member shares", "Fixed deposits", "Members leaving", "General ledger", "Prudential returns",
       "M-Pesa statements", "B2C float", "Provisioning", "Dividends"]);
   });
 

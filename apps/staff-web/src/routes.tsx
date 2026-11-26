@@ -14,6 +14,7 @@ import { DividendsPage, SharesPage } from "./pages/SharePages";
 import { FixedDepositsPage } from "./pages/FixedDepositsPage";
 import { MemberExitsPage } from "./pages/MemberExitsPage";
 import { LoanLimitsPage } from "./pages/LoanLimitPages";
+import { GuarantorCallsPage } from "./pages/GuarantorCallPages";
 import { MpesaStatementsPage } from "./pages/MpesaStatementsPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
@@ -52,6 +53,7 @@ export const routes: RouteObject[] = [
       { path: "fixed-deposits", element: <FixedDepositsPage /> },
       { path: "member-exits", element: <MemberExitsPage /> },
       { path: "loan-limits", element: <LoanLimitsPage /> },
+      { path: "guarantor-calls", element: <GuarantorCallsPage /> },
       { path: "suspense", element: <SuspensePage /> },
       { path: "end-of-day", element: <EndOfDayPage /> },
       { path: "portfolio", element: <PortfolioPage /> },

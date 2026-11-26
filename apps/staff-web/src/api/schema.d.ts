@@ -836,6 +836,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lending/guarantee-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GuarantorCall_settings"];
+        put: operations["GuarantorCall_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/guarantees/{guaranteeId}/withdraw": {
         parameters: {
             query?: never;
@@ -846,6 +862,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["LoanGuarantee_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/guarantor-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GuarantorCall_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/guarantor-calls/{callId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GuarantorCall_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/guarantor-calls/{callId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GuarantorCall_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -926,6 +990,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["LoanSettlement_requestRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/loans/{loanNumber}/guarantees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GuarantorCall_loanGuarantees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lending/loans/{loanNumber}/guarantor-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GuarantorCall_request"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4052,6 +4148,21 @@ export interface components {
             guarantorNumber: string;
             idempotencyKey: string;
         };
+        GuaranteeSettingsRequest: {
+            /** Format: int32 */
+            minDaysPastDue: number;
+            recoveryClearingAccount: string;
+            releaseAsRepaid: boolean;
+        };
+        GuaranteeSettingsView: {
+            /** Format: int32 */
+            minDaysPastDue?: number;
+            recoveryClearingAccount?: string;
+            releaseAsRepaid?: boolean;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
         GuaranteeView: {
             accountNumber?: string;
             amount?: string;
@@ -4077,6 +4188,42 @@ export interface components {
         };
         GuaranteeWithdrawRequest: {
             reason: string;
+        };
+        GuarantorCallDecision: {
+            reason?: string;
+        };
+        GuarantorCallLineView: {
+            accountNumber?: string;
+            amount?: string;
+            applied?: boolean;
+            /** Format: uuid */
+            guaranteeId?: string;
+            guarantorName?: string;
+            guarantorNumber?: string;
+        };
+        GuarantorCallRequest: {
+            amount?: number;
+            idempotencyKey: string;
+            reason: string;
+        };
+        GuarantorCallView: {
+            amount?: string;
+            borrowerNumber?: string;
+            /** Format: uuid */
+            callId?: string;
+            /** Format: int32 */
+            daysPastDue?: number;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            lines?: components["schemas"]["GuarantorCallLineView"][];
+            loanNumber?: string;
+            reason?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
         };
         IncomeStatement: {
             branchCode?: string;
@@ -4151,6 +4298,31 @@ export interface components {
         };
         LoanDecisionRequest: {
             reason?: string;
+        };
+        LoanGuaranteeLine: {
+            accountNumber?: string;
+            /** Format: uuid */
+            guaranteeId?: string;
+            guarantorName?: string;
+            guarantorNumber?: string;
+            locked?: string;
+            pledged?: string;
+            recovered?: string;
+            status?: string;
+        };
+        LoanGuarantees: {
+            borrowerNumber?: string;
+            callAllowed?: boolean;
+            callable?: string;
+            /** Format: int32 */
+            daysPastDue?: number;
+            guarantees?: components["schemas"]["LoanGuaranteeLine"][];
+            loanNumber?: string;
+            loanStatus?: string;
+            locked?: string;
+            /** Format: int32 */
+            minDaysPastDue?: number;
+            owed?: string;
         };
         LoanInArrears: {
             arrearsAmount?: string;
@@ -6737,6 +6909,50 @@ export interface operations {
             };
         };
     };
+    GuarantorCall_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuaranteeSettingsView"];
+                };
+            };
+        };
+    };
+    GuarantorCall_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuaranteeSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuaranteeSettingsView"];
+                };
+            };
+        };
+    };
     LoanGuarantee_withdraw: {
         parameters: {
             query?: never;
@@ -6759,6 +6975,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicationCover"];
+                };
+            };
+        };
+    };
+    GuarantorCall_list: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuarantorCallView"][];
+                };
+            };
+        };
+    };
+    GuarantorCall_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                callId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuarantorCallView"];
+                };
+            };
+        };
+    };
+    GuarantorCall_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                callId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuarantorCallDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuarantorCallView"];
                 };
             };
         };
@@ -6876,6 +7162,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefundView"];
+                };
+            };
+        };
+    };
+    GuarantorCall_loanGuarantees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanGuarantees"];
+                };
+            };
+        };
+    };
+    GuarantorCall_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loanNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuarantorCallRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuarantorCallView"];
                 };
             };
         };

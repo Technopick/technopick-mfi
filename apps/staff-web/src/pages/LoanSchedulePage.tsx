@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import type { Schemas } from "../api/client";
 import { Empty, Loading, Money, ProblemBox, Section, Status } from "../components/ui";
 import { useLoad } from "../hooks";
+import { LoanGuarantorsPanel } from "./GuarantorCallPages";
 import { ReschedulePanel } from "./ReschedulePages";
 import { SettlementPanel } from "./SettlementPages";
 
@@ -49,6 +50,7 @@ export function LoanSchedulePage() {
         </Section>
       )}
       {number && data && <SettlementPanel key={number} loanNumber={number} onChange={reload} />}
+      {number && data && <LoanGuarantorsPanel key={`g-${number}`} loanNumber={number} onChange={reload} />}
       {number && data && data.status === "ACTIVE" && <ReschedulePanel key={`r-${number}`} loanNumber={number} onChange={reload} />}
     </>
   );

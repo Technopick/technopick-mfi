@@ -43,7 +43,7 @@ import org.testcontainers.utility.MountableFile;
 /**
  * Calling on guarantors (increment 44, ADR-0044) on the small TEST-ONLY book. Member 3's 12,000.00
  * loan (disbursed 1 Sep, 58 days past due after the 28 Nov close) is guaranteed 4,000.00 by member 2
- * and 2,000.00 by member 6. A call of 3,000.00 takes 2,000.00 and 1,000.00 from their savings into
+ * and 2,000.00 by member 6. A call of 1,000.00 takes 666.67 and 333.33 from their savings into
  * the loan; the next close lowers the remaining locks to each pledge's share of the principal still
  * outstanding; a second call takes what is left and the guarantees are CALLED.
  */
@@ -199,21 +199,21 @@ class GuarantorCallIntegrationTest {
         mvc.perform(post(L + "/guarantor-calls/" + firstId + "/reject").with(MANAGER).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Call the full arrears instead\"}")).andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REJECTED"));
-        String second = call(loan, "c5", "3000", 200);
+        String second = call(loan, "c5", "1000", 200);
         String secondId = JsonPath.read(second, "$.callId");
         java.util.List<String> share2 = JsonPath.read(second, "$.lines[?(@.guaranteeId == '" + g2 + "')].amount");
-        assertEquals(java.util.List.of("2000.00"), share2);
+        assertEquals(java.util.List.of("666.67"), share2);
         BigDecimal saved2 = balance("Load2");
         BigDecimal saved6 = balance("Load6");
         mvc.perform(post(L + "/guarantor-calls/" + secondId + "/approve").with(OFFICER)).andExpect(status().isForbidden());
         mvc.perform(post(L + "/guarantor-calls/" + secondId + "/approve").with(MANAGER)).andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("APPROVED")).andExpect(jsonPath("$.lines[0].applied").value(true));
-        assertEquals(0, saved2.subtract(new BigDecimal("2000")).compareTo(balance("Load2")));
-        assertEquals(0, saved6.subtract(new BigDecimal("1000")).compareTo(balance("Load6")));
+        assertEquals(0, saved2.subtract(new BigDecimal("666.67")).compareTo(balance("Load2")));
+        assertEquals(0, saved6.subtract(new BigDecimal("333.33")).compareTo(balance("Load6")));
         assertEquals("PLEDGED", guarantee(g2).get("status"));
-        assertEquals(0, new BigDecimal("2000").compareTo((BigDecimal) guarantee(g2).get("locked_amount")));
-        assertEquals(0, new BigDecimal("2000").compareTo((BigDecimal) guarantee(g2).get("recovered")));
-        assertEquals(0, new BigDecimal("3000").compareTo(owner().queryForObject(
+        assertEquals(0, new BigDecimal("3333.33").compareTo((BigDecimal) guarantee(g2).get("locked_amount")));
+        assertEquals(0, new BigDecimal("666.67").compareTo((BigDecimal) guarantee(g2).get("recovered")));
+        assertEquals(0, new BigDecimal("1000").compareTo(owner().queryForObject(
                 "SELECT sum(amount) FROM lending.repayment WHERE provider_ref LIKE 'GUARANTOR:' || ? || ':%'", BigDecimal.class, secondId)));
         assertEquals(0, BigDecimal.ZERO.compareTo(owner().queryForObject("""
                 SELECT COALESCE(sum(CASE side WHEN 'D' THEN amount ELSE -amount END), 0) FROM ledger.journal_line
@@ -233,7 +233,7 @@ class GuarantorCallIntegrationTest {
                 SELECT lending.loan_principal_outstanding(l.tenant_id, l.loan_id) FROM lending.loan l WHERE l.loan_number = ?
                 """, BigDecimal.class, loan);
         BigDecimal expected2 = new BigDecimal("4000").multiply(outstanding).divide(new BigDecimal("12000"), 2, RoundingMode.HALF_UP)
-            .subtract(new BigDecimal("2000")).max(BigDecimal.ZERO).min(new BigDecimal("2000"));
+            .subtract(new BigDecimal("666.67")).max(BigDecimal.ZERO).min(new BigDecimal("3333.33"));
         assertEquals(0, expected2.compareTo((BigDecimal) guarantee(g2).get("locked_amount")),
                 "lock " + guarantee(g2) + " with " + outstanding + " outstanding");
         assertEquals(1, owner().queryForObject("""
@@ -241,7 +241,7 @@ class GuarantorCallIntegrationTest {
                  WHERE g.guarantee_id = ?::uuid AND h.status = 'ACTIVE' AND h.amount = g.locked_amount
                 """, Integer.class, g2), "one active hold carries the lock");
 
-        // A second call takes what is left; both guarantees are used up.
+        // Still past due (a partial recovery leaves October unpaid): a second call takes what is left; both guarantees are used up.
         String rest = call(loan, "c6", null, 200);
         String restId = JsonPath.read(rest, "$.callId");
         mvc.perform(post(L + "/guarantor-calls/" + restId + "/approve").with(MANAGER)).andExpect(status().isOk());

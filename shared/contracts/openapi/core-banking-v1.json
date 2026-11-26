@@ -3145,6 +3145,52 @@
         ],
         "type": "object"
       },
+      "GuaranteeSettingsRequest": {
+        "properties": {
+          "minDaysPastDue": {
+            "format": "int32",
+            "maximum": 3650,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "recoveryClearingAccount": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "releaseAsRepaid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "minDaysPastDue",
+          "recoveryClearingAccount",
+          "releaseAsRepaid"
+        ],
+        "type": "object"
+      },
+      "GuaranteeSettingsView": {
+        "properties": {
+          "minDaysPastDue": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "recoveryClearingAccount": {
+            "type": "string"
+          },
+          "releaseAsRepaid": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GuaranteeView": {
         "properties": {
           "accountNumber": {
@@ -3216,6 +3262,114 @@
         "required": [
           "reason"
         ],
+        "type": "object"
+      },
+      "GuarantorCallDecision": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GuarantorCallLineView": {
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "guaranteeId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "guarantorName": {
+            "type": "string"
+          },
+          "guarantorNumber": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GuarantorCallRequest": {
+        "properties": {
+          "amount": {
+            "minimum": 0.01,
+            "type": "number"
+          },
+          "idempotencyKey": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 300,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "GuarantorCallView": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "borrowerNumber": {
+            "type": "string"
+          },
+          "callId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "daysPastDue": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/GuarantorCallLineView"
+            },
+            "type": "array"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "IncomeStatement": {
@@ -3463,6 +3617,76 @@
           "reason": {
             "maxLength": 300,
             "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LoanGuaranteeLine": {
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "guaranteeId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "guarantorName": {
+            "type": "string"
+          },
+          "guarantorNumber": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "string"
+          },
+          "pledged": {
+            "type": "string"
+          },
+          "recovered": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LoanGuarantees": {
+        "properties": {
+          "borrowerNumber": {
+            "type": "string"
+          },
+          "callAllowed": {
+            "type": "boolean"
+          },
+          "callable": {
+            "type": "string"
+          },
+          "daysPastDue": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "guarantees": {
+            "items": {
+              "$ref": "#/components/schemas/LoanGuaranteeLine"
+            },
+            "type": "array"
+          },
+          "loanNumber": {
+            "type": "string"
+          },
+          "loanStatus": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "string"
+          },
+          "minDaysPastDue": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "owed": {
             "type": "string"
           }
         },
@@ -9146,6 +9370,54 @@
         ]
       }
     },
+    "/api/v1/lending/guarantee-settings": {
+      "get": {
+        "operationId": "GuarantorCall_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuaranteeSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
+        ]
+      },
+      "put": {
+        "operationId": "GuarantorCall_saveSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuaranteeSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuaranteeSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
+        ]
+      }
+    },
     "/api/v1/lending/guarantees/{guaranteeId}/withdraw": {
       "post": {
         "operationId": "LoanGuarantee_withdraw",
@@ -9184,6 +9456,111 @@
         },
         "tags": [
           "loan-guarantee-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/guarantor-calls": {
+      "get": {
+        "operationId": "GuarantorCall_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GuarantorCallView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/guarantor-calls/{callId}/approve": {
+      "post": {
+        "operationId": "GuarantorCall_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "callId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuarantorCallView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/guarantor-calls/{callId}/reject": {
+      "post": {
+        "operationId": "GuarantorCall_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "callId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuarantorCallDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuarantorCallView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
         ]
       }
     },
@@ -9360,6 +9737,76 @@
         },
         "tags": [
           "loan-settlement-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/loans/{loanNumber}/guarantees": {
+      "get": {
+        "operationId": "GuarantorCall_loanGuarantees",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanGuarantees"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
+        ]
+      }
+    },
+    "/api/v1/lending/loans/{loanNumber}/guarantor-calls": {
+      "post": {
+        "operationId": "GuarantorCall_request",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loanNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuarantorCallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuarantorCallView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "guarantor-call-controller"
         ]
       }
     },
