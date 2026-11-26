@@ -189,4 +189,7 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== Member exit tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/member_exit_test.sql"
 
+echo "== Loan limit and guarantor tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/loan_limits_test.sql"
+
 echo "== done"

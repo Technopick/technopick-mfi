@@ -62,9 +62,11 @@ public class LoanOriginationService {
     private final BusinessDates businessDates;
     private final Outbox outbox;
     private final CustomerService customers;
+    private final LoanLimitService limits;
 
     public LoanOriginationService(JdbcClient jdbc, TenantSession session, BusinessDates businessDates, Outbox outbox,
-                                  CustomerService customers) {
+                                  CustomerService customers, LoanLimitService limits) {
+        this.limits = limits;
         this.jdbc = jdbc;
         this.session = session;
         this.businessDates = businessDates;
@@ -109,6 +111,8 @@ public class LoanOriginationService {
             }
             return new LoanApplicationSubmitted(a.id(), a.status(), true, quote(product, principal, termMonths, firstDue));
         }
+        // ADR-0043: within the member's limit on this product, if the product has a rule
+        limits.checkLimit(customerNumber, customer.customerId(), productCode.strip().toUpperCase(Locale.ROOT), principal.amount(), null);
         UUID id = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO lending.loan_application (tenant_id, application_id, idempotency_key, customer_ref, customer_id,
@@ -158,6 +162,13 @@ public class LoanOriginationService {
             throw new ConflictException("the first due date has passed; resubmit with a new date");
         }
         Money principal = money(a.principal(), product);
+        if (a.customerId() != null) {
+            // ADR-0043: still within the limit, and guarantees cover the part above own cover (re-checked by V40)
+            String productCode = jdbc.sql("SELECT product_code FROM lending.loan_product_version WHERE version_id = :v")
+                .param("v", a.versionId()).query(String.class).single();
+            limits.checkLimit(a.customerRef(), a.customerId(), productCode, a.principal(), null);
+            limits.checkCover(applicationId, a.customerRef(), a.customerId(), productCode, a.principal(), null);
+        }
         String loanNumber = jdbc.sql("SELECT lending.next_loan_number(:year)").param("year", today.getYear())
             .query(String.class).single();
         UUID loanId = UUID.randomUUID();
