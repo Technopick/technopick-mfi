@@ -11,6 +11,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import ke.co.technopick.mfi.core.accounting.application.ReconciliationService;
+import ke.co.technopick.mfi.core.lending.application.GuarantorCallService;
 import ke.co.technopick.mfi.core.messaging.persistence.Outbox;
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService;
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService.AccrualGroup;
@@ -83,10 +84,13 @@ public class EndOfDayService {
     private final DataSource dataSource;
     private final NotificationService notifications;
     private final FixedDepositEndOfDayStep fixedDeposits;
+    private final GuarantorCallService guarantees;
 
     public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, LoanEndOfDayStep loans,
                            ReconciliationService reconciliation, Outbox outbox, PlatformTransactionManager transactions,
-                           DataSource dataSource, NotificationService notifications, FixedDepositEndOfDayStep fixedDeposits) {
+                           DataSource dataSource, NotificationService notifications, FixedDepositEndOfDayStep fixedDeposits,
+                           GuarantorCallService guarantees) {
+        this.guarantees = guarantees;
         this.fixedDeposits = fixedDeposits;
         this.notifications = notifications;
         this.dataSource = dataSource;
@@ -215,6 +219,11 @@ public class EndOfDayService {
                     penalties = penalties.add(r.penalties().amount());
                     inArrears += r.daysPastDue() > 0 ? 1 : 0;
                 }
+            }
+            // ADR-0044: guarantee locks follow the principal still outstanding, when the tenant chose that
+            int relocked = tx.execute(s -> guarantees.releaseAsRepaid(tenantId, date, actor));
+            if (relocked > 0) {
+                log.info("EOD {}: {} guarantee lock(s) lowered as loans were repaid", date, relocked);
             }
             long t1 = System.nanoTime();
             int accrued = 0;
