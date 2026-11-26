@@ -18,6 +18,8 @@ import ke.co.technopick.mfi.core.savings.application.SavingsInterestService.Accr
 import ke.co.technopick.mfi.core.savings.application.SavingsInterestService.PostingResult;
 import ke.co.technopick.mfi.core.savings.domain.SavingsInterest;
 import ke.co.technopick.mfi.core.tenancy.persistence.TenantSession;
+import ke.co.technopick.mfi.core.termdeposits.application.FixedDepositEndOfDayStep;
+import ke.co.technopick.mfi.core.termdeposits.application.FixedDepositService.ClosureResult;
 import ke.co.technopick.mfi.core.notification.application.NotificationService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Closes the business day (ADR-0019, ADR-0020). Steps, each in its own transaction so a crash
  * resumes without double posting: start (or resume) the run; for each active loan accrue interest,
  * charge penalties and snapshot arrears; accrue savings interest per product and branch; credit
- * interest to accounts on the last day of the month; record the subledger-to-control
+ * interest to accounts on the last day of the month; accrue fixed-deposit interest and close deposits
+ * maturing on the next date (ADR-0041); record the subledger-to-control
  * reconciliation (ADR-0024); then complete the run and move the business
  * date forward one day. The database refuses to complete while any till is open (V18) and refuses
  * to move the date before the run has completed (V4).
@@ -61,10 +64,12 @@ public class EndOfDayService {
                                   int loansClosed, String creditApplied, int reconciliationDifferences,
                                   int accountsAccrued,
                                   String interestAccrued, int accountsCredited, String interestCredited,
-                                  String taxWithheld, StepTimings timings) { }
+                                  String taxWithheld, int fixedDepositsAccrued, String fixedDepositInterestAccrued,
+                                  int fixedDepositsMatured, int fixedDepositsRolledOver, StepTimings timings) { }
 
     /** How long each step of the run took, in milliseconds (for operations and load testing). */
-    public record StepTimings(long loansMs, long savingsAccrualMs, long interestCreditMs, long closeMs, long totalMs) { }
+    public record StepTimings(long loansMs, long savingsAccrualMs, long interestCreditMs, long fixedDepositsMs, long closeMs,
+                              long totalMs) { }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EndOfDayService.class);
 
@@ -77,10 +82,12 @@ public class EndOfDayService {
     private final TransactionTemplate tx;
     private final DataSource dataSource;
     private final NotificationService notifications;
+    private final FixedDepositEndOfDayStep fixedDeposits;
 
     public EndOfDayService(JdbcClient jdbc, TenantSession session, SavingsInterestService interest, LoanEndOfDayStep loans,
                            ReconciliationService reconciliation, Outbox outbox, PlatformTransactionManager transactions,
-                           DataSource dataSource, NotificationService notifications) {
+                           DataSource dataSource, NotificationService notifications, FixedDepositEndOfDayStep fixedDeposits) {
+        this.fixedDeposits = fixedDeposits;
         this.notifications = notifications;
         this.dataSource = dataSource;
         this.reconciliation = reconciliation;
@@ -244,6 +251,39 @@ public class EndOfDayService {
                 }
             }
             long t3 = System.nanoTime();
+            int fdAccrued = 0;
+            BigDecimal fdInterest = BigDecimal.ZERO.setScale(2);
+            List<FixedDepositEndOfDayStep.AccrualGroup> fdGroups = tx.execute(s -> {
+                session.bind(tenantId);
+                return fixedDeposits.accrualGroups(date);
+            });
+            for (FixedDepositEndOfDayStep.AccrualGroup g : fdGroups) {
+                FixedDepositEndOfDayStep.AccrualResult r = tx.execute(s -> {
+                    session.bind(tenantId);
+                    return fixedDeposits.accrue(tenantId, g, date, actor);
+                });
+                fdAccrued += r.deposits();
+                fdInterest = fdInterest.add(r.amount());
+            }
+            int fdMatured = 0;
+            int fdRolled = 0;
+            List<UUID> fdDue = tx.execute(s -> {
+                session.bind(tenantId);
+                return fixedDeposits.maturing(date);
+            });
+            for (UUID depositId : fdDue) {
+                ClosureResult r = tx.execute(s -> {
+                    session.bind(tenantId);
+                    return fixedDeposits.mature(tenantId, depositId, date, actor);
+                });
+                fdMatured++;
+                fdRolled += r.newDepositNumber() == null ? 0 : 1;
+            }
+            long t3b = System.nanoTime();
+            int fdAccruedCount = fdAccrued;
+            BigDecimal fdInterestTotal = fdInterest;
+            int fdMaturedCount = fdMatured;
+            int fdRolledCount = fdRolled;
             int loanCount = loansDone;
             int closedCount = closedLoans;
             BigDecimal creditTotal = credit;
@@ -275,17 +315,19 @@ public class EndOfDayService {
                 return new EndOfDaySummary(date, date.plusDays(1), loanCount, loanInterestTotal.toPlainString(),
                         penaltyTotal.toPlainString(), arrearsCount, closedCount, creditTotal.toPlainString(), differences,
                         accruedAccounts, accruedTotal.toPlainString(),
-                        creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString(), null);
+                        creditedAccounts, creditedNet.toPlainString(), taxTotal.toPlainString(), fdAccruedCount,
+                        fdInterestTotal.toPlainString(), fdMaturedCount, fdRolledCount, null);
             });
             long t4 = System.nanoTime();
-            StepTimings timings = new StepTimings(ms(t1 - t0), ms(t2 - t1), ms(t3 - t2), ms(t4 - t3), ms(t4 - t0));
-            log.info("EOD {} closed in {} ms (loans {}, savings accrual {}, interest credit {}, reconciliation and close {})",
+            StepTimings timings = new StepTimings(ms(t1 - t0), ms(t2 - t1), ms(t3 - t2), ms(t3b - t3), ms(t4 - t3b), ms(t4 - t0));
+            log.info("EOD {} closed in {} ms (loans {}, savings accrual {}, interest credit {}, fixed deposits {}, reconciliation and close {})",
                     date, timings.totalMs(), timings.loansMs(), timings.savingsAccrualMs(), timings.interestCreditMs(),
-                    timings.closeMs());
+                    timings.fixedDepositsMs(), timings.closeMs());
             return new EndOfDaySummary(done.closedDate(), done.newBusinessDate(), done.loansProcessed(),
                     done.loanInterestAccrued(), done.penaltiesCharged(), done.loansInArrears(), done.loansClosed(),
                     done.creditApplied(), done.reconciliationDifferences(), done.accountsAccrued(), done.interestAccrued(),
-                    done.accountsCredited(), done.interestCredited(), done.taxWithheld(), timings);
+                    done.accountsCredited(), done.interestCredited(), done.taxWithheld(), done.fixedDepositsAccrued(),
+                    done.fixedDepositInterestAccrued(), done.fixedDepositsMatured(), done.fixedDepositsRolledOver(), timings);
         } catch (RuntimeException e) {
             String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             tx.executeWithoutResult(s -> {

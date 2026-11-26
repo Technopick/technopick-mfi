@@ -16,6 +16,8 @@ const LABELS: Record<string, string> = {
   LOAN_INTEREST_SUSPENSE: "Interest in suspense (non-performing loans)",
   LOAN_LOSS_ALLOWANCE: "Loan loss allowance (IFRS 9)",
   SHARE_CAPITAL: "Member share capital",
+  TERM_DEPOSIT_PRINCIPAL: "Fixed deposits",
+  TERM_DEPOSIT_INTEREST: "Interest payable on fixed deposits",
 };
 
 /** Control accounts against the business records: live now, or as recorded by a past end of day. */

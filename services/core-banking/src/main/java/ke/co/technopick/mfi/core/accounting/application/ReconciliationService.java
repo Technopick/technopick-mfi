@@ -24,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>LOAN_OVERPAYMENT - credit held for customers (overpayments less credit applied);</li>
  *   <li>LOAN_INTEREST_SUSPENSE - interest in suspense on non-performing loans (ADR-0031);</li>
  *   <li>LOAN_LOSS_ALLOWANCE - the IFRS 9 allowance, equal to the approved provision runs (ADR-0036);</li>
- *   <li>SHARE_CAPITAL - members' share capital, equal to the share register (ADR-0040).</li>
+ *   <li>SHARE_CAPITAL - members' share capital, equal to the share register (ADR-0040);</li>
+ *   <li>TERM_DEPOSIT_PRINCIPAL and TERM_DEPOSIT_INTEREST - fixed deposits held and the interest accrued on them
+ *       (ADR-0041).</li>
  * </ul>
  * A difference means a posting reached the ledger without its business record (or the reverse),
  * and finance must investigate. Balances are in the account's natural sign.
@@ -112,7 +114,27 @@ public class ReconciliationService {
                        (SELECT count(*) FROM (SELECT t.customer_id FROM shares.share_transaction t GROUP BY t.customer_id
                                               HAVING sum(CASE t.kind WHEN 'TRANSFER_OUT' THEN -t.amount ELSE t.amount END) > 0) x)
                   FROM shares.share_settings s
-                  JOIN ledger.gl_account a ON a.account_code = s.gl_share_capital)
+                  JOIN ledger.gl_account a ON a.account_code = s.gl_share_capital
+                UNION ALL
+                -- Fixed deposits (ADR-0041): principal of active deposits, and the interest accrued on them.
+                SELECT 'TERM_DEPOSIT_PRINCIPAL', a.account_code, a.currency,
+                       COALESCE((SELECT sum(d.principal) FROM termdep.deposit d
+                                   JOIN termdep.product p ON p.product_code = d.product_code
+                                  WHERE d.status = 'ACTIVE' AND p.gl_principal = a.account_code), 0),
+                       (SELECT count(*) FROM termdep.deposit d JOIN termdep.product p ON p.product_code = d.product_code
+                         WHERE d.status = 'ACTIVE' AND p.gl_principal = a.account_code)
+                  FROM ledger.gl_account a
+                 WHERE a.account_code IN (SELECT gl_principal FROM termdep.product)
+                UNION ALL
+                SELECT 'TERM_DEPOSIT_INTEREST', a.account_code, a.currency,
+                       COALESCE((SELECT sum(x.posted) FROM termdep.accrual x
+                                   JOIN termdep.deposit d ON d.deposit_id = x.deposit_id
+                                   JOIN termdep.product p ON p.product_code = d.product_code
+                                  WHERE d.status = 'ACTIVE' AND p.gl_interest_payable = a.account_code), 0),
+                       (SELECT count(*) FROM termdep.deposit d JOIN termdep.product p ON p.product_code = d.product_code
+                         WHERE d.status = 'ACTIVE' AND p.gl_interest_payable = a.account_code)
+                  FROM ledger.gl_account a
+                 WHERE a.account_code IN (SELECT gl_interest_payable FROM termdep.product))
             SELECT s.check_code, s.account_code, s.currency, s.amount AS subledger, s.items,
                    CASE WHEN a.account_class IN ('ASSET', 'EXPENSE') THEN COALESCE(g.debit_positive, 0)
                         ELSE -COALESCE(g.debit_positive, 0) END AS ledger
