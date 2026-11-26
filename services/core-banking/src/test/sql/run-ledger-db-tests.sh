@@ -186,4 +186,7 @@ PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app 
 echo "== Fixed deposit tests as application role mfi_app"
 PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/termdep_test.sql"
 
+echo "== Member exit tests as application role mfi_app"
+PGPASSWORD="$APP_PW" psql -h "${MFI_APP_HOST:-${PGHOST:-localhost}}" -U mfi_app -d "$DB" -f "$HERE/member_exit_test.sql"
+
 echo "== done"

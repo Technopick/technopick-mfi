@@ -18,6 +18,7 @@ const LABELS: Record<string, string> = {
   SHARE_CAPITAL: "Member share capital",
   TERM_DEPOSIT_PRINCIPAL: "Fixed deposits",
   TERM_DEPOSIT_INTEREST: "Interest payable on fixed deposits",
+  MEMBER_REFUNDS_PAYABLE: "Refunds owed to members who have left",
 };
 
 /** Control accounts against the business records: live now, or as recorded by a past end of day. */

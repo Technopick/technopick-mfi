@@ -26,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>LOAN_LOSS_ALLOWANCE - the IFRS 9 allowance, equal to the approved provision runs (ADR-0036);</li>
  *   <li>SHARE_CAPITAL - members' share capital, equal to the share register (ADR-0040);</li>
  *   <li>TERM_DEPOSIT_PRINCIPAL and TERM_DEPOSIT_INTEREST - fixed deposits held and the interest accrued on them
- *       (ADR-0041).</li>
+ *       (ADR-0041);</li>
+ *   <li>MEMBER_REFUNDS_PAYABLE - refunds owed to members who have left, not yet paid (ADR-0042).</li>
  * </ul>
  * A difference means a posting reached the ledger without its business record (or the reverse),
  * and finance must investigate. Balances are in the account's natural sign.
@@ -63,6 +64,10 @@ public class ReconciliationService {
                                    JOIN savings.deposit_product q ON q.tenant_id = i.tenant_id AND q.product_code = i.product_code
                                   WHERE q.gl_interest_payable = p.gl_interest_payable), 0)
                      - COALESCE((SELECT sum(x.gross) FROM savings.interest_posting x
+                                   JOIN savings.deposit_account a ON a.tenant_id = x.tenant_id AND a.account_id = x.account_id
+                                   JOIN savings.deposit_product q ON q.tenant_id = a.tenant_id AND q.product_code = a.product_code
+                                  WHERE q.gl_interest_payable = p.gl_interest_payable), 0)
+                     - COALESCE((SELECT sum(x.interest_gross) FROM membership.exit_account x
                                    JOIN savings.deposit_account a ON a.tenant_id = x.tenant_id AND a.account_id = x.account_id
                                    JOIN savings.deposit_product q ON q.tenant_id = a.tenant_id AND q.product_code = a.product_code
                                   WHERE q.gl_interest_payable = p.gl_interest_payable), 0),
@@ -134,7 +139,21 @@ public class ReconciliationService {
                        (SELECT count(*) FROM termdep.deposit d JOIN termdep.product p ON p.product_code = d.product_code
                          WHERE d.status = 'ACTIVE' AND p.gl_interest_payable = a.account_code)
                   FROM ledger.gl_account a
-                 WHERE a.account_code IN (SELECT gl_interest_payable FROM termdep.product))
+                 WHERE a.account_code IN (SELECT gl_interest_payable FROM termdep.product)
+                UNION ALL
+                -- Member exits (ADR-0042): refunds owed to members who have left and not yet paid.
+                SELECT 'MEMBER_REFUNDS_PAYABLE', a.account_code, a.currency,
+                       COALESCE((SELECT sum(r.refund_total) FROM membership.exit_request r
+                                  WHERE r.status = 'APPROVED' AND r.gl_refunds_payable = a.account_code
+                                    AND NOT EXISTS (SELECT 1 FROM membership.refund_payment p
+                                                     WHERE p.exit_id = r.exit_id AND p.status = 'APPROVED')), 0),
+                       (SELECT count(*) FROM membership.exit_request r
+                         WHERE r.status = 'APPROVED' AND r.gl_refunds_payable = a.account_code AND r.refund_total > 0
+                           AND NOT EXISTS (SELECT 1 FROM membership.refund_payment p
+                                            WHERE p.exit_id = r.exit_id AND p.status = 'APPROVED'))
+                  FROM ledger.gl_account a
+                 WHERE a.account_code IN (SELECT gl_refunds_payable FROM membership.exit_settings
+                                          UNION SELECT gl_refunds_payable FROM membership.exit_request WHERE status = 'APPROVED'))
             SELECT s.check_code, s.account_code, s.currency, s.amount AS subledger, s.items,
                    CASE WHEN a.account_class IN ('ASSET', 'EXPENSE') THEN COALESCE(g.debit_positive, 0)
                         ELSE -COALESCE(g.debit_positive, 0) END AS ledger
