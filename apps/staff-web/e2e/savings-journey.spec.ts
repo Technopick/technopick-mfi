@@ -89,6 +89,44 @@ test("a teller day: till, deposit, approved withdrawal, vault transfer and closi
   await expect(supervisor.getByRole("row", { name: new RegExp(`^${other}.*2,000\\.00`) })).toBeVisible();
   await expect(supervisor.getByRole("row", { name: new RegExp(`^${customer}.*NBO01.*3,000\\.00`) })).toBeVisible();
 
+  // Fixed deposits (ADR-0041): finance creates a product; the teller places 10,000 from the member's
+  // savings; an officer asks to withdraw it early and the supervisor approves, paying it back today.
+  await finance.goto("/fixed-deposits");
+  await finance.getByLabel("Product code").fill("FD-E2E-3M");
+  await finance.getByLabel("Name").fill("Three months fixed (e2e)");
+  await finance.getByLabel("Term (months)").fill("3");
+  await finance.getByLabel("Annual rate (%)").fill("10");
+  await finance.getByLabel("Rate if withdrawn early (%)").fill("5");
+  await finance.getByLabel("Deposits account (liability)").fill("2600-FIXED-DEPOSITS");
+  await finance.getByLabel("Interest payable (liability)").fill("2610-FD-INTEREST-PAYABLE");
+  await finance.getByLabel("Interest expense").fill("5600-FD-INTEREST");
+  await finance.getByLabel("Withholding tax payable (liability)").fill("2620-WHT-FD-INTEREST");
+  await finance.getByRole("button", { name: "Save product" }).click();
+  await expect(finance.getByRole("row", { name: /FD-E2E-3M/ })).toBeVisible();
+  await teller.goto("/fixed-deposits");
+  await teller.getByLabel("Member number").fill(customer);
+  await teller.getByRole("button", { name: "Show deposits" }).click();
+  await teller.getByLabel("Pay from the member's savings account").fill(account);
+  await teller.getByLabel("Amount to deposit").fill("10000");
+  await teller.getByRole("button", { name: "Place deposit" }).click();
+  await expect(teller.getByRole("status")).toContainText(/FD\d{8} placed: 10,000\.00/);
+  const fixed = (await teller.getByRole("heading", { name: /^Fixed deposit FD\d{8}$/ }).textContent())!.replace("Fixed deposit ", "");
+  await teller.goto(`/accounts/${account}`);
+  await expect(teller.getByText("KES 25,000.00").first()).toBeVisible();
+  await officer.goto("/fixed-deposits");
+  await officer.getByLabel("Member number").fill(customer);
+  await officer.getByRole("button", { name: "Show deposits" }).click();
+  await officer.getByRole("button", { name: fixed }).click();
+  await officer.getByLabel(/^Reason/).fill("Member needs the money back (e2e)");
+  await officer.getByRole("button", { name: "Ask to withdraw early" }).click();
+  await expect(officer.getByRole("status")).toContainText("must approve it");
+  await supervisor.goto("/fixed-deposits");
+  const early = supervisor.getByRole("row", { name: new RegExp(fixed) });
+  await early.getByRole("button", { name: "Approve and pay" }).click();
+  await expect(early).toContainText("APPROVED");
+  await teller.goto(`/accounts/${account}`);
+  await expect(teller.getByText("KES 35,000.00").first()).toBeVisible();
+
   // Vault cash into the till, approved by the supervisor.
   await teller.goto("/teller");
   await teller.getByLabel("Transfer amount").fill("20000");

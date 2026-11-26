@@ -110,7 +110,7 @@ describe("screens", () => {
     const { api } = fakeApi({});
     renderAt("/", session("teller-1", "TELLER"), api);
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Member shares", "Loan schedule"]);
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Customers", "Teller", "Member shares", "Fixed deposits", "Loan schedule"]);
   });
 
   it("validates the amount locally and sends it as a string with an idempotency key", async () => {
@@ -983,6 +983,99 @@ describe("screens", () => {
     await waitFor(() => expect(sup.calls.some((c) => c.path === `${S}/dividends/r-1/approve`)).toBe(true));
   });
 
+  it("lets a teller place a fixed deposit from a member's savings", async () => {
+    const F = "/api/v1/fixed-deposits";
+    const product = { productCode: "FD-1M", name: "One month fixed", currency: "KES", termMonths: 1, ratePct: "12.00",
+      earlyRatePct: "6.00", earlyWithdrawalAllowed: true, minAmount: "1000.00", maxAmount: "500000.00", taxRatePct: "15.00",
+      status: "ACTIVE", activeDeposits: 0 };
+    const deposit = { depositId: "d-1", depositNumber: "FD00000001", customerNumber: "CU26-0000001", memberName: "Member Load1",
+      productCode: "FD-1M", accountNumber: "0100000001", principal: "5000.00", ratePct: "12.00", earlyRatePct: "6.00",
+      earlyWithdrawalAllowed: true, taxRatePct: "15.00", termMonths: 1, startDate: "2026-11-28", maturityDate: "2026-12-28",
+      maturityInstruction: "PAYOUT", status: "ACTIVE", accruedInterest: "0.00" };
+    const detail = { deposit, atMaturity: { nights: 30, ratePct: "12.00", interest: "49.32", tax: "7.40", netInterest: "41.92",
+      total: "5041.92" }, earlyToday: { nights: 0, ratePct: "6.00", interest: "0.00", tax: "0.00", netInterest: "0.00", total: "5000.00" } };
+    let deposits: unknown[] = [];
+    const { api, calls } = fakeApi({
+      [`GET ${F}/products`]: () => [product],
+      [`GET ${F}/members/CU26-0000001`]: () => ({ customerNumber: "CU26-0000001", name: "Member Load1", activePrincipal: "0.00", deposits }),
+      [`POST ${F}/deposits`]: () => {
+        deposits = [deposit];
+        return detail;
+      },
+      [`GET ${F}/deposits/FD00000001`]: () => detail,
+      [`GET ${F}/early-withdrawals`]: () => [],
+    });
+    renderAt("/fixed-deposits", session("teller-1", "TELLER"), api);
+    await userEvent.type(await screen.findByLabelText("Member number"), "cu26-0000001");
+    await userEvent.click(screen.getByRole("button", { name: "Show deposits" }));
+    expect(await screen.findByText("No fixed deposits yet.")).toBeTruthy();
+    expect(screen.getByText(/early withdrawal earns 6.00%/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Pay from the member's savings account"), "0100000001");
+    await userEvent.type(screen.getByLabelText("Amount to deposit"), "5000");
+    await userEvent.selectOptions(screen.getAllByLabelText("At maturity")[0]!, "ROLLOVER_ALL");
+    await userEvent.click(screen.getByRole("button", { name: "Place deposit" }));
+    expect(await screen.findByText(/FD00000001 placed: 5,?000\.00 until 2026-12-28, paying 5,?041\.92 at maturity/)).toBeTruthy();
+    expect(await screen.findByText("Fixed deposit FD00000001")).toBeTruthy();
+    const body = calls.find((c) => c.method === "POST")?.body as Record<string, string>;
+    expect(body).toMatchObject({ customerNumber: "CU26-0000001", accountNumber: "0100000001", productCode: "FD-1M", amount: "5000",
+      maturityInstruction: "ROLLOVER_ALL" });
+    expect(body.idempotencyKey).toBeTruthy();
+    expect(calls.some((c) => c.path.includes("/portfolio"))).toBe(false);
+    expect(screen.queryByRole("button", { name: "Save product" })).toBeNull();
+  });
+
+  it("lets a branch manager approve another person's early withdrawal but not their own", async () => {
+    const F = "/api/v1/fixed-deposits";
+    const r = (id: string, by: string) => ({ requestId: id, depositNumber: `FD0000000${id}`, customerNumber: "CU26-0000002",
+      memberName: "Member Load2", principal: "10000.00", maturityDate: "2026-12-29", reason: "Member needs school fees",
+      status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z",
+      quoteToday: { nights: 1, ratePct: "6.00", interest: "1.64", tax: "0.25", netInterest: "1.39", total: "10001.39" } });
+    const { api, calls } = fakeApi({
+      [`GET ${F}/products`]: () => [],
+      [`GET ${F}/early-withdrawals`]: () => [r("1", "user:teller-1"), r("2", "user:bm-1")],
+      [`GET ${F}/portfolio?days=30`]: () => ({ businessDate: "2026-11-29", active: 2, principal: "7000.00", accruedInterest: "2.30", maturingSoon: [] }),
+      [`POST ${F}/early-withdrawals/1/approve`]: () => ({ ...r("1", "user:teller-1"), status: "APPROVED" }),
+    });
+    renderAt("/fixed-deposits", session("bm-1", "BRANCH_MANAGER"), api);
+    expect(await screen.findAllByRole("button", { name: "Approve and pay" })).toHaveLength(1);
+    expect(screen.getByText(/Your own request/)).toBeTruthy();
+    expect(await screen.findByText("Principal held")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Approve and pay" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual([`${F}/early-withdrawals/1/approve`]));
+  });
+
+  it("lets finance create a fixed deposit product", async () => {
+    const F = "/api/v1/fixed-deposits";
+    let products: unknown[] = [];
+    const { api, calls } = fakeApi({
+      [`GET ${F}/products`]: () => products,
+      [`GET ${F}/portfolio?days=30`]: () => ({ businessDate: "2026-11-28", active: 0, principal: "0.00", accruedInterest: "0.00", maturingSoon: [] }),
+      [`PUT ${F}/products/FD-12M`]: () => {
+        products = [{ productCode: "FD-12M", name: "Twelve months", currency: "KES", termMonths: 12, ratePct: "10.00",
+          earlyRatePct: "4.00", earlyWithdrawalAllowed: true, minAmount: "1000.00", taxRatePct: "15.00", status: "ACTIVE", activeDeposits: 0 }];
+        return products[0];
+      },
+    });
+    renderAt("/fixed-deposits", session("fin-1", "FINANCE"), api);
+    expect(await screen.findByText("No fixed deposit products yet.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Early withdrawals" })).toBeNull();
+    await userEvent.type(screen.getByLabelText("Product code"), "fd-12m");
+    await userEvent.type(screen.getByLabelText("Name"), "Twelve months");
+    await userEvent.type(screen.getByLabelText("Annual rate (%)"), "10");
+    await userEvent.clear(screen.getByLabelText("Rate if withdrawn early (%)"));
+    await userEvent.type(screen.getByLabelText("Rate if withdrawn early (%)"), "4");
+    await userEvent.type(screen.getByLabelText("Deposits account (liability)"), "2600-FIXED-DEPOSITS");
+    await userEvent.type(screen.getByLabelText("Interest payable (liability)"), "2610-FD-INTEREST-PAYABLE");
+    await userEvent.type(screen.getByLabelText("Interest expense"), "5600-FD-INTEREST");
+    await userEvent.type(screen.getByLabelText("Withholding tax payable (liability)"), "2620-WHT-FD-INTEREST");
+    await userEvent.click(screen.getByRole("button", { name: "Save product" }));
+    expect(await screen.findByText("Twelve months")).toBeTruthy();
+    const body = calls.find((c) => c.method === "PUT")?.body as Record<string, unknown>;
+    expect(body).toMatchObject({ name: "Twelve months", termMonths: 12, ratePct: "10", earlyRatePct: "4", minAmount: "1000",
+      taxRatePct: "15", principalAccount: "2600-FIXED-DEPOSITS", status: "ACTIVE", earlyWithdrawalAllowed: true });
+    expect(body.maxAmount).toBeUndefined();
+  });
+
   it("lists PIN requests for a supervisor, who cannot approve their own", async () => {
     const setup = (id: string, by: string, name: string) => ({ setupId: id, customerNumber: `CU26-000000${id.slice(-1)}`, customerName: name,
       kind: "FIRST", reason: "ID sighted, member present", status: "REQUESTED", requestedBy: by, requestedAt: "2026-11-29T08:00:00Z" });
@@ -1066,7 +1159,7 @@ describe("screens", () => {
     await userEvent.click(screen.getByRole("link", { name: "savings-interest:x:2026-11-30" }));
     expect(await screen.findByText("2000000014")).toBeTruthy();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Member shares", "General ledger", "Prudential returns",
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Worklist", "Member shares", "Fixed deposits", "General ledger", "Prudential returns",
       "M-Pesa statements", "B2C float", "Provisioning", "Dividends"]);
   });
 

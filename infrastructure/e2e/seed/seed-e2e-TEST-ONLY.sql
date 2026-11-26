@@ -67,4 +67,10 @@ INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, cur
   (:t, '3300-RETAINED-EARNINGS', 'Retained earnings (test)', 'EQUITY', 'KES', false),
   (:t, '2410-DIVIDENDS-PAYABLE', 'Dividends payable (test)', 'LIABILITY', 'KES', false),
   (:t, '2420-WHT-DIVIDENDS', 'Withholding tax on dividends (test)', 'LIABILITY', 'KES', false);
+-- TEST-ONLY fixed deposit accounts (ADR-0041); finance chooses them when creating a product.
+INSERT INTO ledger.gl_account (tenant_id, account_code, name, account_class, currency, requires_subledger) VALUES
+  (:t, '2600-FIXED-DEPOSITS', 'Fixed deposits (test)', 'LIABILITY', 'KES', false),
+  (:t, '2610-FD-INTEREST-PAYABLE', 'Interest payable on fixed deposits (test)', 'LIABILITY', 'KES', false),
+  (:t, '5600-FD-INTEREST', 'Interest on fixed deposits (test)', 'EXPENSE', 'KES', false),
+  (:t, '2620-WHT-FD-INTEREST', 'Withholding tax on deposit interest (test)', 'LIABILITY', 'KES', false);
 \echo TEST-ONLY seed loaded

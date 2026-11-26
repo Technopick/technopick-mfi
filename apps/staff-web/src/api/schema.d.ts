@@ -516,6 +516,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fixed-deposits/deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FixedDeposit_place"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/deposits/{depositNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FixedDeposit_deposit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/deposits/{depositNumber}/early-withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FixedDeposit_requestEarly"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/deposits/{depositNumber}/instruction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["FixedDeposit_changeInstruction"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/early-withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FixedDeposit_earlyWithdrawals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/early-withdrawals/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FixedDeposit_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/early-withdrawals/{requestId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FixedDeposit_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/members/{customerNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FixedDeposit_member"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FixedDeposit_portfolio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FixedDeposit_products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fixed-deposits/products/{productCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["FixedDeposit_saveProduct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lending/applications": {
         parameters: {
             query?: never;
@@ -3075,6 +3251,33 @@ export interface components {
             toPayableTotal?: string;
             toSavingsTotal?: string;
         };
+        EarlyWithdrawalDecision: {
+            reason?: string;
+        };
+        EarlyWithdrawalRequest: {
+            idempotencyKey: string;
+            reason: string;
+        };
+        EarlyWithdrawalView: {
+            customerNumber?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            decisionReason?: string;
+            depositNumber?: string;
+            /** Format: date */
+            maturityDate?: string;
+            memberName?: string;
+            principal?: string;
+            quoteToday?: components["schemas"]["FixedDepositQuote"];
+            reason?: string;
+            /** Format: uuid */
+            requestId?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
+        };
         EclCalculation: {
             /** Format: date */
             asOf?: string;
@@ -3262,6 +3465,13 @@ export interface components {
             /** Format: date */
             closedDate?: string;
             creditApplied?: string;
+            fixedDepositInterestAccrued?: string;
+            /** Format: int32 */
+            fixedDepositsAccrued?: number;
+            /** Format: int32 */
+            fixedDepositsMatured?: number;
+            /** Format: int32 */
+            fixedDepositsRolledOver?: number;
             interestAccrued?: string;
             interestCredited?: string;
             loanInterestAccrued?: string;
@@ -3315,6 +3525,128 @@ export interface components {
             amount?: string;
             currency?: string;
             name?: string;
+        };
+        FixedDepositClosureView: {
+            accruedBefore?: string;
+            /** Format: date */
+            businessDate?: string;
+            createdBy?: string;
+            /** Format: uuid */
+            entryId?: string;
+            interestEarned?: string;
+            kind?: string;
+            netInterest?: string;
+            newDepositNumber?: string;
+            newPrincipal?: string;
+            /** Format: int32 */
+            nights?: number;
+            rateApplied?: string;
+            tax?: string;
+            toSavings?: string;
+        };
+        FixedDepositDetail: {
+            atMaturity?: components["schemas"]["FixedDepositQuote"];
+            closure?: components["schemas"]["FixedDepositClosureView"];
+            deposit?: components["schemas"]["FixedDepositView"];
+            earlyToday?: components["schemas"]["FixedDepositQuote"];
+            openRequest?: components["schemas"]["EarlyWithdrawalView"];
+        };
+        FixedDepositInstructionRequest: {
+            maturityInstruction: string;
+        };
+        FixedDepositPlacementRequest: {
+            accountNumber: string;
+            amount: number;
+            customerNumber: string;
+            idempotencyKey: string;
+            maturityInstruction: string;
+            productCode: string;
+        };
+        FixedDepositPortfolio: {
+            accruedInterest?: string;
+            /** Format: int32 */
+            active?: number;
+            /** Format: date */
+            businessDate?: string;
+            maturingSoon?: components["schemas"]["FixedDepositView"][];
+            principal?: string;
+        };
+        FixedDepositProductRequest: {
+            earlyRatePct: number;
+            earlyWithdrawalAllowed: boolean;
+            interestExpenseAccount: string;
+            interestPayableAccount: string;
+            maxAmount?: number;
+            minAmount: number;
+            name: string;
+            principalAccount: string;
+            ratePct: number;
+            status: string;
+            taxAccount: string;
+            taxRatePct: number;
+            /** Format: int32 */
+            termMonths: number;
+        };
+        FixedDepositProductView: {
+            /** Format: int32 */
+            activeDeposits?: number;
+            currency?: string;
+            earlyRatePct?: string;
+            earlyWithdrawalAllowed?: boolean;
+            interestExpenseAccount?: string;
+            interestPayableAccount?: string;
+            maxAmount?: string;
+            minAmount?: string;
+            name?: string;
+            principalAccount?: string;
+            productCode?: string;
+            ratePct?: string;
+            status?: string;
+            taxAccount?: string;
+            taxRatePct?: string;
+            /** Format: int32 */
+            termMonths?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
+        FixedDepositQuote: {
+            interest?: string;
+            netInterest?: string;
+            /** Format: int32 */
+            nights?: number;
+            ratePct?: string;
+            tax?: string;
+            total?: string;
+        };
+        FixedDepositView: {
+            accountNumber?: string;
+            accruedInterest?: string;
+            branchCode?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            currency?: string;
+            customerNumber?: string;
+            /** Format: uuid */
+            depositId?: string;
+            depositNumber?: string;
+            earlyRatePct?: string;
+            earlyWithdrawalAllowed?: boolean;
+            /** Format: date */
+            maturityDate?: string;
+            maturityInstruction?: string;
+            memberName?: string;
+            principal?: string;
+            productCode?: string;
+            ratePct?: string;
+            rolledFromNumber?: string;
+            /** Format: date */
+            startDate?: string;
+            status?: string;
+            taxRatePct?: string;
+            /** Format: int32 */
+            termMonths?: number;
         };
         FloatAccountView: {
             alerts?: string[];
@@ -3513,6 +3845,12 @@ export interface components {
         MappingChange: {
             accountCode?: string;
             line?: string;
+        };
+        MemberFixedDeposits: {
+            activePrincipal?: string;
+            customerNumber?: string;
+            deposits?: components["schemas"]["FixedDepositView"][];
+            name?: string;
         };
         MemberLoan: {
             currency?: string;
@@ -4452,6 +4790,8 @@ export interface components {
         StepTimings: {
             /** Format: int64 */
             closeMs?: number;
+            /** Format: int64 */
+            fixedDepositsMs?: number;
             /** Format: int64 */
             interestCreditMs?: number;
             /** Format: int64 */
@@ -5435,6 +5775,268 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EndOfDaySchedule"];
+                };
+            };
+        };
+    };
+    FixedDeposit_place: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FixedDepositPlacementRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedDepositDetail"];
+                };
+            };
+        };
+    };
+    FixedDeposit_deposit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                depositNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedDepositDetail"];
+                };
+            };
+        };
+    };
+    FixedDeposit_requestEarly: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                depositNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EarlyWithdrawalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarlyWithdrawalView"];
+                };
+            };
+        };
+    };
+    FixedDeposit_changeInstruction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                depositNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FixedDepositInstructionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedDepositDetail"];
+                };
+            };
+        };
+    };
+    FixedDeposit_earlyWithdrawals: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarlyWithdrawalView"][];
+                };
+            };
+        };
+    };
+    FixedDeposit_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EarlyWithdrawalDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarlyWithdrawalView"];
+                };
+            };
+        };
+    };
+    FixedDeposit_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EarlyWithdrawalDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarlyWithdrawalView"];
+                };
+            };
+        };
+    };
+    FixedDeposit_member: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberFixedDeposits"];
+                };
+            };
+        };
+    };
+    FixedDeposit_portfolio: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedDepositPortfolio"];
+                };
+            };
+        };
+    };
+    FixedDeposit_products: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedDepositProductView"][];
+                };
+            };
+        };
+    };
+    FixedDeposit_saveProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FixedDepositProductRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedDepositProductView"];
                 };
             };
         };
